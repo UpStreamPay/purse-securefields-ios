@@ -51,6 +51,27 @@ struct SecureExpDateFieldTests {
         #expect(!field.isValid)
     }
 
+    @Test func autoPrependsZeroForMonthDigit3to9() {
+        let field = SecureExpDateField()
+        field.text = "9"
+        field.textDidChange()
+        #expect(field.storedText == "09")
+    }
+
+    @Test func autoPrependsZeroForMonthDigit2() {
+        let field = SecureExpDateField()
+        field.text = "2"
+        field.textDidChange()
+        #expect(field.storedText == "02")
+    }
+
+    @Test func doesNotPrependZeroForMonthDigit1() {
+        let field = SecureExpDateField()
+        field.text = "1"
+        field.textDidChange()
+        #expect(field.storedText == "1") // "1" alone — could be 10, 11, or 12
+    }
+
     @Test func partialInput2DigitsInvalid() {
         let field = SecureExpDateField()
         field.text = "06"

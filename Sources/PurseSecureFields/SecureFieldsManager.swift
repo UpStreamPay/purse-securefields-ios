@@ -60,6 +60,7 @@ public final class SecureFieldsManager {
         expDateField.clearSensitiveData()
         holderNameField.clearSensitiveData()
         lastBinPrefix = nil
+        lastBinResult = nil
         detectedBrands = []
         panField.validLengths = [16]
         cvvField.validLengths = [3]
@@ -71,12 +72,20 @@ public final class SecureFieldsManager {
 
     // MARK: - Private state
 
+    /// When true (default), secure fields are blurred while the app is backgrounded
+    /// or a screen recording is active.
+    public var obscuresOnBackground = true {
+        didSet { setupPrivacyObservers() }
+    }
+
     private let config: SecureFieldsConfig
     private let apiClient: VaultAPIClient
     private var detectedBrands: [CardBrand] = []
+    private var lastBinResult: BinLookupResult?
     private var binLookupWorkItem: DispatchWorkItem?
     private var lastBinPrefix: String?
     private var isSubmitting = false
+    private var privacyObservers: [NSObjectProtocol] = []
 
     // MARK: - Init
 
@@ -95,6 +104,7 @@ public final class SecureFieldsManager {
         setupFieldCallbacks()
         setupBrandSelector()
         applyConfig(config)
+        setupPrivacyObservers()
     }
 
     // MARK: - Config
@@ -137,6 +147,7 @@ public final class SecureFieldsManager {
     private func setupBrandSelector() {
         brandSelectorView.onBrandSelected = { [weak self] brand in
             self?.applySelectedBrand(brand)
+            self?.applyLengthsForBrand(brand)
             self?.delegate?.secureFieldsBrandSelected(brand)
         }
     }
@@ -171,8 +182,10 @@ public final class SecureFieldsManager {
                     guard prefix == String(self.panField.rawValue.prefix(8)) else { return }
                     let allowed = binResult.brands.filter { self.config.brands.contains($0) }
                     self.lastBinPrefix = prefix
+                    self.lastBinResult = binResult
                     self.detectedBrands = allowed
-                    self.panField.validLengths = binResult.panLengths.isEmpty ? [16] : binResult.panLengths
+                    let fallbackPanLengths: [Int] = allowed.contains(.oney) ? [19] : [16]
+                    self.panField.validLengths = binResult.panLengths.isEmpty ? fallbackPanLengths : binResult.panLengths
                     self.cvvField.validLengths = binResult.cvvLengths.isEmpty ? [3] : binResult.cvvLengths
                     self.brandSelectorView.update(brands: allowed)
                     self.applySelectedBrand(self.brandSelectorView.selectedBrand)
@@ -187,6 +200,46 @@ public final class SecureFieldsManager {
 
     private func applySelectedBrand(_ brand: CardBrand?) {
         cvvField.setInputMode(brand == .oney ? .birthdate : .cvv)
+    }
+
+    private func applyLengthsForBrand(_ brand: CardBrand) {
+        guard let lengths = lastBinResult?.perBrandLengths[brand] else { return }
+        if !lengths.panLengths.isEmpty { panField.validLengths = lengths.panLengths }
+        if !lengths.cvvLengths.isEmpty { cvvField.validLengths = lengths.cvvLengths }
+    }
+
+    private func setupPrivacyObservers() {
+        privacyObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        privacyObservers = []
+        guard obscuresOnBackground else { return }
+
+        let nc = NotificationCenter.default
+        privacyObservers = [
+            nc.addObserver(forName: UIApplication.willResignActiveNotification,
+                           object: nil, queue: .main) { [weak self] _ in self?.setPrivacyOverlay(true) },
+            nc.addObserver(forName: UIApplication.didBecomeActiveNotification,
+                           object: nil, queue: .main) { [weak self] _ in self?.setPrivacyOverlay(false) },
+            nc.addObserver(forName: UIScreen.capturedDidChangeNotification,
+                           object: nil, queue: .main) { [weak self] _ in
+                self?.setPrivacyOverlay(UIScreen.main.isCaptured)
+            },
+        ]
+    }
+
+    private func setPrivacyOverlay(_ show: Bool) {
+        let views: [UIView] = [panContainer, cvvView, expDateView, holderNameView]
+        for view in views {
+            if show {
+                guard view.viewWithTag(0xC1A) == nil else { continue }
+                let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
+                blur.tag = 0xC1A
+                blur.frame = view.bounds
+                blur.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+                view.addSubview(blur)
+            } else {
+                view.viewWithTag(0xC1A)?.removeFromSuperview()
+            }
+        }
     }
 
     private func notifyFormValidity() {

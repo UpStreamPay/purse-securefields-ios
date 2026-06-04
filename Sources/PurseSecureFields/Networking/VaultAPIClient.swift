@@ -60,7 +60,7 @@ final class VaultAPIClient {
                 return
             }
             let result = (try? JSONDecoder().decode(BinLookupResponse.self, from: data))?.toBinLookupResult()
-                ?? BinLookupResult(brands: [], panLengths: [16], cvvLengths: [3])
+                ?? BinLookupResult(brands: [], panLengths: [16], cvvLengths: [3], perBrandLengths: [:])
             completion(.success(result))
         }.resume()
     }

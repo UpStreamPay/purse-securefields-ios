@@ -60,11 +60,16 @@ struct APIErrorResponse: Decodable {
 }
 
 struct BinLookupResult {
+    struct BrandLengths {
+        let panLengths: [Int]
+        let cvvLengths: [Int]
+    }
+
     let brands: [CardBrand]
     let panLengths: [Int]
     let cvvLengths: [Int]
+    let perBrandLengths: [CardBrand: BrandLengths]
 
-    var maxPanLength: Int { panLengths.max() ?? 16 }
     var maxCvvLength: Int { cvvLengths.max() ?? 3 }
 }
 
@@ -89,10 +94,22 @@ struct BinLookupResponse: Decodable {
         let parsed = brands ?? []
         let cardBrands = parsed.compactMap { CardBrand(rawValue: Self.normaliseScheme($0.brand)) }
         let main = parsed.first { $0.isMain }
+
+        var perBrand: [CardBrand: BinLookupResult.BrandLengths] = [:]
+        for b in parsed {
+            if let brand = CardBrand(rawValue: Self.normaliseScheme(b.brand)) {
+                perBrand[brand] = BinLookupResult.BrandLengths(
+                    panLengths: b.panLengths ?? [],
+                    cvvLengths: b.cvvLengths ?? []
+                )
+            }
+        }
+
         return BinLookupResult(
             brands: cardBrands,
             panLengths: main?.panLengths ?? [16],
-            cvvLengths: main?.cvvLengths ?? [3]
+            cvvLengths: main?.cvvLengths ?? [3],
+            perBrandLengths: perBrand
         )
     }
 

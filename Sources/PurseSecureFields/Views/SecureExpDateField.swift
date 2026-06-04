@@ -19,7 +19,11 @@ final class SecureExpDateField: SecureBaseField {
     }
 
     @objc override func textDidChange() {
-        let digits = (storedText ?? "").filter { $0.isNumber }
+        var digits = (storedText ?? "").filter { $0.isNumber }
+        // Auto-prepend 0 for months that can't start with 2-9 (e.g. "9" → "09")
+        if digits.count == 1, let d = digits.first?.wholeNumberValue, d >= 2 {
+            digits = "0" + digits
+        }
         let truncated = String(digits.prefix(4))
         text = truncated.count > 2
             ? String(truncated.prefix(2)) + "/" + String(truncated.dropFirst(2))
