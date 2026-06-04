@@ -8,7 +8,7 @@ final class VaultAPIClient {
     private let session: URLSession
     private let maxRetries = 3
 
-    init(baseURL: String, session: URLSession = .shared) {
+    init(baseURL: String, session: URLSession = URLSession(configuration: .pciSecure)) {
         self.baseURL = baseURL
         self.session = session
     }
@@ -18,7 +18,8 @@ final class VaultAPIClient {
         firstDigits: String,
         completion: @escaping (Result<BinLookupResult, SecureFieldsError>) -> Void
     ) {
-        let urlString = "\(baseURL)/v1/tenants/\(tenantId)/bin-lookup"
+        let encoded = tenantId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? tenantId
+        let urlString = "\(baseURL)/v1/tenants/\(encoded)/bin-lookup"
         guard let url = URL(string: urlString) else {
             completion(.failure(.invalidResponse))
             return
@@ -49,6 +50,11 @@ final class VaultAPIClient {
             print("[SecureFields] BIN lookup \(statusCode)")
             #endif
 
+            guard (200..<300).contains(statusCode) else {
+                completion(.failure(.apiError(message: "BIN lookup failed", statusCode: statusCode)))
+                return
+            }
+
             guard let data else {
                 completion(.failure(.invalidResponse))
                 return
@@ -64,7 +70,8 @@ final class VaultAPIClient {
         payload: TokenizationPayload,
         completion: @escaping (Result<TokenizationResponse, SecureFieldsError>) -> Void
     ) {
-        let urlString = "\(baseURL)/v1/tenants/\(tenantId)/forms/secure-fields"
+        let encoded = tenantId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? tenantId
+        let urlString = "\(baseURL)/v1/tenants/\(encoded)/forms/secure-fields"
         guard let url = URL(string: urlString) else {
             completion(.failure(.invalidResponse))
             return
@@ -95,11 +102,9 @@ final class VaultAPIClient {
             guard let self else { return }
 
             if let error {
-                if retries > 0 {
-                    self.perform(request: request, retries: retries - 1, completion: completion)
-                } else {
-                    completion(.failure(.networkError(error)))
-                }
+                // Transport errors are not retried — the request may have been received by the server.
+                // Retrying would risk creating duplicate vault tokens.
+                completion(.failure(.networkError(error)))
                 return
             }
 
@@ -129,10 +134,21 @@ final class VaultAPIClient {
                 completion(.success(result))
             } catch {
                 #if DEBUG
-                print("[SecureFields] tokenize decode error: \(error)")
+                print("[SecureFields] tokenize decode error: \(type(of: error))")
                 #endif
                 completion(.failure(.invalidResponse))
             }
         }.resume()
+    }
+}
+
+private extension URLSessionConfiguration {
+    static var pciSecure: URLSessionConfiguration {
+        let config = URLSessionConfiguration.ephemeral
+        config.urlCache = nil
+        config.httpCookieStorage = nil
+        config.httpShouldSetCookies = false
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return config
     }
 }

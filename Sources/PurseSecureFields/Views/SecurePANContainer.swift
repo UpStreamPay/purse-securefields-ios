@@ -2,8 +2,8 @@ import UIKit
 
 public final class SecurePANContainer: UIView {
 
-    let panField: SecurePANField
-    let brandSelectorView: SecureBrandSelectorView
+    private let panField: SecurePANField
+    private let brandSelectorView: SecureBrandSelectorView
 
     init(panField: SecurePANField, brandSelectorView: SecureBrandSelectorView) {
         self.panField = panField

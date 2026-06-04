@@ -16,7 +16,6 @@ final class SecureExpDateField: SecureBaseField {
         super.setup()
         keyboardType = .numberPad
         autocorrectionType = .no
-        placeholder = "MM/YY"
     }
 
     @objc override func textDidChange() {

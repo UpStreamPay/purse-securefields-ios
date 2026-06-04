@@ -12,9 +12,9 @@ final class SecureCVVField: SecureBaseField {
     var rawValue: String { storedText ?? "" }
     var hasContent: Bool { inputMode == .birthdate || !rawValue.isEmpty }
 
-    var expectedLength = 3 {
+    var validLengths: [Int] = [3] {
         didSet {
-            if oldValue != expectedLength && inputMode == .cvv { textDidChange() }
+            if oldValue != validLengths && inputMode == .cvv { textDidChange() }
         }
     }
 
@@ -71,10 +71,11 @@ final class SecureCVVField: SecureBaseField {
     @objc override func textDidChange() {
         guard inputMode == .cvv else { return }
         let digits = (storedText ?? "").filter { $0.isNumber }
-        let truncated = String(digits.prefix(expectedLength))
+        let maxLen = validLengths.max() ?? 4
+        let truncated = String(digits.prefix(maxLen))
         if storedText != truncated { text = truncated }
         onContentChanged?()
-        setValidity(truncated.count == expectedLength)
+        setValidity(validLengths.contains(truncated.count))
     }
 
     override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {

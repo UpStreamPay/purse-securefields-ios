@@ -53,6 +53,8 @@ public final class SecureFieldsManager {
     }
 
     public func clearFields() {
+        binLookupWorkItem?.cancel()
+        binLookupWorkItem = nil
         panField.clearSensitiveData()
         cvvField.clearSensitiveData()
         expDateField.clearSensitiveData()
@@ -60,7 +62,7 @@ public final class SecureFieldsManager {
         lastBinPrefix = nil
         detectedBrands = []
         panField.validLengths = [16]
-        cvvField.expectedLength = 3
+        cvvField.validLengths = [3]
         cvvField.setInputMode(.cvv)
         brandSelectorView.update(brands: [])
         delegate?.secureFieldsBrandsDetected([])
@@ -74,6 +76,7 @@ public final class SecureFieldsManager {
     private var detectedBrands: [CardBrand] = []
     private var binLookupWorkItem: DispatchWorkItem?
     private var lastBinPrefix: String?
+    private var isSubmitting = false
 
     // MARK: - Init
 
@@ -148,7 +151,7 @@ public final class SecureFieldsManager {
                 lastBinPrefix = nil
                 detectedBrands = []
                 panField.validLengths = [16]
-                cvvField.expectedLength = 3
+                cvvField.validLengths = [3]
                 cvvField.setInputMode(.cvv)
                 brandSelectorView.update(brands: [])
                 delegate?.secureFieldsBrandsDetected([])
@@ -165,14 +168,14 @@ public final class SecureFieldsManager {
             self.apiClient.binLookup(tenantId: self.config.tenantId, firstDigits: prefix) { result in
                 DispatchQueue.main.async {
                     guard case .success(let binResult) = result else { return }
+                    guard prefix == String(self.panField.rawValue.prefix(8)) else { return }
                     let allowed = binResult.brands.filter { self.config.brands.contains($0) }
                     self.lastBinPrefix = prefix
                     self.detectedBrands = allowed
-                    let activeBrand = self.brandSelectorView.selectedBrand ?? allowed.first
                     self.panField.validLengths = binResult.panLengths.isEmpty ? [16] : binResult.panLengths
-                    self.cvvField.expectedLength = binResult.maxCvvLength
-                    self.applySelectedBrand(activeBrand)
+                    self.cvvField.validLengths = binResult.cvvLengths.isEmpty ? [3] : binResult.cvvLengths
                     self.brandSelectorView.update(brands: allowed)
+                    self.applySelectedBrand(self.brandSelectorView.selectedBrand)
                     self.delegate?.secureFieldsBrandsDetected(allowed)
                     self.notifyFormValidity()
                 }
@@ -194,10 +197,12 @@ public final class SecureFieldsManager {
     // MARK: - Submit
 
     public func submit(saveToken: Bool = false) {
+        guard !isSubmitting else { return }
         guard panField.isValid, cvvField.isValid, expDateField.isValid else {
             delegate?.secureFieldsDidFail(.fieldsIncomplete)
             return
         }
+        isSubmitting = true
 
         let selectedBrand = brandSelectorView.selectedBrand ?? detectedBrands.first ?? .visa
         let isOney = selectedBrand == .oney
@@ -220,6 +225,7 @@ public final class SecureFieldsManager {
         apiClient.tokenize(tenantId: config.tenantId, payload: payload) { [weak self] result in
             guard let self else { return }
             DispatchQueue.main.async {
+                self.isSubmitting = false
                 switch result {
                 case .success(let response):
                     let tokenResult = TokenizationResult(

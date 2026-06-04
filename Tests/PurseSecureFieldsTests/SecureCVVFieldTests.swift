@@ -27,20 +27,38 @@ struct SecureCVVFieldTests {
         #expect(!field.isValid)
     }
 
-    // MARK: expectedLength
+    // MARK: validLengths
 
-    @Test func expectedLength4_3digitInvalid() {
+    @Test func validLengths4Only_3digitInvalid() {
         let field = SecureCVVField()
-        field.expectedLength = 4
+        field.validLengths = [4]
 
         field.text = "123"
         field.textDidChange()
         #expect(!field.isValid)
     }
 
-    @Test func expectedLength4_4digitValid() {
+    @Test func validLengths4Only_4digitValid() {
         let field = SecureCVVField()
-        field.expectedLength = 4
+        field.validLengths = [4]
+
+        field.text = "1234"
+        field.textDidChange()
+        #expect(field.isValid)
+    }
+
+    @Test func validLengths3Or4_3digitValid() {
+        let field = SecureCVVField()
+        field.validLengths = [3, 4]
+
+        field.text = "123"
+        field.textDidChange()
+        #expect(field.isValid)
+    }
+
+    @Test func validLengths3Or4_4digitValid() {
+        let field = SecureCVVField()
+        field.validLengths = [3, 4]
 
         field.text = "1234"
         field.textDidChange()
@@ -49,11 +67,19 @@ struct SecureCVVFieldTests {
 
     // MARK: Truncation
 
-    @Test func truncatesToExpectedLength() {
+    @Test func truncatesToMaxValidLength() {
         let field = SecureCVVField()
-        field.text = "12345" // 5 digits, expected = 3
+        field.text = "12345" // 5 digits, max valid = 3
         field.textDidChange()
         #expect(field.storedText == "123")
+    }
+
+    @Test func truncatesToMaxWhenMultipleLengths() {
+        let field = SecureCVVField()
+        field.validLengths = [3, 4]
+        field.text = "12345" // 5 digits, max valid = 4
+        field.textDidChange()
+        #expect(field.storedText == "1234")
     }
 
     @Test func nonDigitsFiltered() {
