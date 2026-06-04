@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Tests
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 16
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+
+      - name: Library Tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -scheme PurseSecureFields \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            CODE_SIGNING_ALLOWED=NO \
+            | grep -E "(Test Suite|Test Case|✔|✘|error:|FAILED|PASSED|run with)"
+
+      - name: Demo Tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Demo/Demo.xcodeproj \
+            -scheme DemoTests \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            CODE_SIGNING_ALLOWED=NO \
+            | grep -E "(Test Suite|Test Case|passed|failed|error:|BUILD)"
