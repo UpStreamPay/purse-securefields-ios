@@ -1,21 +1,22 @@
 name: Release
 
 on:
-  push:
-    tags: ['[0-9]*.[0-9]*.[0-9]*']
+  release:
+    types: [published]
 
 permissions:
   contents: write
 
 jobs:
-  release:
-    name: Build & Release XCFramework
+  xcframework:
+    name: Build & publish XCFramework
     runs-on: macos-15
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.release.tag_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build XCFramework
@@ -49,15 +50,12 @@ jobs:
 
       - name: Update Package.swift to binary target
         run: |
-          VERSION="${{ github.ref_name }}"
-          URL="https://github.com/${{ github.repository }}/releases/download/${VERSION}/PurseSecureFields.xcframework.zip"
-          CHECKSUM="${{ env.CHECKSUM }}"
-
-          python3 - <<PYEOF
+          python3 - <<'PYEOF'
 import os
-url      = os.environ['URL']
+version  = os.environ['VERSION']
+url      = f"https://github.com/{os.environ['REPO']}/releases/download/{version}/PurseSecureFields.xcframework.zip"
 checksum = os.environ['CHECKSUM']
-content  = f'''// swift-tools-version: 5.9
+content  = f"""// swift-tools-version: 5.9
 import PackageDescription
 
 let package = Package(
@@ -74,32 +72,29 @@ let package = Package(
         )
     ]
 )
-'''
+"""
 with open('Package.swift', 'w') as f:
     f.write(content)
 PYEOF
         env:
-          URL: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/PurseSecureFields.xcframework.zip
+          VERSION:  ${{ github.event.release.tag_name }}
+          REPO:     ${{ github.repository }}
           CHECKSUM: ${{ env.CHECKSUM }}
 
       - name: Commit & retag
         run: |
+          TAG="${{ github.event.release.tag_name }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Package.swift
-          git commit -m "release: ${{ github.ref_name }} — binary target"
-          git tag -f "${{ github.ref_name }}"
-          git push origin "${{ github.ref_name }}" --force
+          git commit -m "release: ${TAG} — binary target"
+          git tag -f "${TAG}"
+          git push origin "${TAG}" --force
 
-      - name: Create GitHub release
+      - name: Upload XCFramework to release
         run: |
-          gh release create "${{ github.ref_name }}" \
+          gh release upload "${{ github.event.release.tag_name }}" \
             .build/PurseSecureFields.xcframework.zip \
-            --title "${{ github.ref_name }}" \
-            --notes "## Installation
-
-\`\`\`swift
-.package(url: \"https://github.com/${{ github.repository }}.git\", from: \"${{ github.ref_name }}\")
-\`\`\`"
+            --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
