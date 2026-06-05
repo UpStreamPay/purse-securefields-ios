@@ -48,7 +48,7 @@ public final class SecureFieldsManager {
         case .pan:        return panField.hasContent
         case .cvv:        return cvvField.hasContent
         case .expDate:    return expDateField.hasContent
-        case .holderName: return !holderNameField.rawValue.trimmingCharacters(in: .whitespaces).isEmpty
+        case .holderName: return holderNameField.hasContent
         }
     }
 

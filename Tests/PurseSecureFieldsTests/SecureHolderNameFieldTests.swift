@@ -98,4 +98,17 @@ struct SecureHolderNameFieldTests {
         field.textDidChange()
         #expect(count == 1)
     }
+
+    // MARK: hasContent
+
+    @Test func hasContentFalseWhenEmpty() {
+        #expect(!SecureHolderNameField().hasContent)
+    }
+
+    @Test func hasContentTrueWhenNonEmpty() {
+        let field = SecureHolderNameField()
+        field.text = "J"
+        field.textDidChange()
+        #expect(field.hasContent)
+    }
 }

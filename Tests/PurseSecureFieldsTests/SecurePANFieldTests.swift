@@ -69,6 +69,16 @@ struct SecurePANFieldTests {
         #expect(field.isValid)
     }
 
+    @Test func validLengthsDidSetRetriggersValidation() {
+        let field = SecurePANField()
+        field.text = "4111111111111111"
+        field.textDidChange()
+        #expect(field.isValid)
+
+        field.validLengths = [19] // now 16-digit PAN is invalid
+        #expect(!field.isValid)
+    }
+
     // MARK: PCI — text always nil
 
     @Test func textGetterAlwaysNil() {

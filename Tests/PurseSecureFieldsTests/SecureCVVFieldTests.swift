@@ -144,4 +144,62 @@ struct SecureCVVFieldTests {
         field.textDidChange()
         #expect(field.hasContent)
     }
+
+    // MARK: onValidityChanged
+
+    @Test func onValidityChangedFires() {
+        let field = SecureCVVField()
+        var changes: [Bool] = []
+        field.onValidityChanged = { changes.append($0) }
+
+        field.text = "123"
+        field.textDidChange()
+        #expect(changes == [true])
+
+        field.text = "12"
+        field.textDidChange()
+        #expect(changes == [true, false])
+    }
+
+    // MARK: Birthdate mode
+
+    @Test func birthdateModeHasContentAlwaysTrue() {
+        let field = SecureCVVField()
+        field.setInputMode(.birthdate)
+        #expect(field.hasContent)
+    }
+
+    @Test func birthdateModeIsValidAfterSwitch() {
+        let field = SecureCVVField()
+        field.setInputMode(.birthdate)
+        #expect(field.isValid)
+    }
+
+    @Test func birthdateModeClearsOldCVV() {
+        let field = SecureCVVField()
+        field.text = "123"
+        field.textDidChange()
+
+        field.setInputMode(.birthdate)
+        // picker immediately populates a date — old CVV digits must be gone
+        #expect(field.storedText != "123")
+    }
+
+    @Test func birthdateModeTextDidChangeIsNoop() {
+        let field = SecureCVVField()
+        field.setInputMode(.birthdate)
+        field.text = "should-be-ignored"
+        field.textDidChange()
+        #expect(field.storedText == "should-be-ignored") // not truncated/filtered
+    }
+
+    @Test func switchBackToCVVClearsAndInvalidates() {
+        let field = SecureCVVField()
+        field.setInputMode(.birthdate)
+        #expect(field.isValid)
+
+        field.setInputMode(.cvv)
+        #expect(!field.isValid)
+        #expect(field.storedText == "")
+    }
 }
