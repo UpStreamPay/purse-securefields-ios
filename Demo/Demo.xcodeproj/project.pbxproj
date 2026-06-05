@@ -12,8 +12,6 @@
 		AA00000000000000000003 /* DemoViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000004 /* DemoViewController.swift */; };
 		AA0000000000000000002B /* DemoViewController+Layout.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000002A /* DemoViewController+Layout.swift */; };
 		AA0000000000000000002D /* DemoViewController+Delegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000002C /* DemoViewController+Delegate.swift */; };
-		AA00000000000000000032 /* DemoIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000031 /* DemoIntegrationTests.swift */; };
-		AA0000000000000000003B /* PurseSecureFields in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000003A /* PurseSecureFields */; };
 		AA0000000000000000004C /* MockURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000050 /* MockURLProtocol.swift */; };
 		AA0000000000000000004D /* DemoUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000004F /* DemoUITests.swift */; };
 /* End PBXBuildFile section */
@@ -25,8 +23,6 @@
 		AA0000000000000000000B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AA0000000000000000002A /* DemoViewController+Layout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DemoViewController+Layout.swift"; sourceTree = "<group>"; };
 		AA0000000000000000002C /* DemoViewController+Delegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DemoViewController+Delegate.swift"; sourceTree = "<group>"; };
-		AA00000000000000000031 /* DemoIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoIntegrationTests.swift; sourceTree = "<group>"; };
-		AA00000000000000000036 /* DemoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DemoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000000000000000004E /* DemoUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DemoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000000000000000004F /* DemoUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoUITests.swift; sourceTree = "<group>"; };
 		AA00000000000000000050 /* MockURLProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockURLProtocol.swift; sourceTree = "<group>"; };
@@ -38,14 +34,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				3C1B95BD2FD181C000E5108E /* PurseSecureFields in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		AA00000000000000000035 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				AA0000000000000000003B /* PurseSecureFields in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -63,7 +51,6 @@
 			isa = PBXGroup;
 			children = (
 				AA0000000000000000000A /* Demo.app */,
-				AA00000000000000000036 /* DemoTests.xctest */,
 				AA0000000000000000004E /* DemoUITests.xctest */,
 			);
 			name = Products;
@@ -74,7 +61,6 @@
 			children = (
 				AA0000000000000000001A /* Sources */,
 				AA0000000000000000001B /* Resources */,
-				AA00000000000000000030 /* DemoTests */,
 				AA00000000000000000051 /* DemoUITests */,
 				AA0000000000000000000D /* Products */,
 			);
@@ -98,14 +84,6 @@
 				AA0000000000000000000B /* Info.plist */,
 			);
 			path = Resources;
-			sourceTree = "<group>";
-		};
-		AA00000000000000000030 /* DemoTests */ = {
-			isa = PBXGroup;
-			children = (
-				AA00000000000000000031 /* DemoIntegrationTests.swift */,
-			);
-			path = DemoTests;
 			sourceTree = "<group>";
 		};
 		AA00000000000000000051 /* DemoUITests */ = {
@@ -138,25 +116,6 @@
 			productName = Demo;
 			productReference = AA0000000000000000000A /* Demo.app */;
 			productType = "com.apple.product-type.application";
-		};
-		AA00000000000000000033 /* DemoTests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = AA00000000000000000039 /* Build configuration list for PBXNativeTarget "DemoTests" */;
-			buildPhases = (
-				AA00000000000000000034 /* Sources */,
-				AA00000000000000000035 /* Frameworks */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = DemoTests;
-			packageProductDependencies = (
-				AA0000000000000000003A /* PurseSecureFields */,
-			);
-			productName = DemoTests;
-			productReference = AA00000000000000000036 /* DemoTests.xctest */;
-			productType = "com.apple.product-type.bundle.unit-test";
 		};
 		AA00000000000000000052 /* DemoUITests */ = {
 			isa = PBXNativeTarget;
@@ -206,9 +165,6 @@
 					AA0000000000000000000F = {
 						CreatedOnToolsVersion = 16.0;
 					};
-					AA00000000000000000033 = {
-						CreatedOnToolsVersion = 16.0;
-					};
 					AA00000000000000000052 = {
 						CreatedOnToolsVersion = 16.0;
 						TestTargetID = AA0000000000000000000F;
@@ -232,7 +188,6 @@
 			projectRoot = "";
 			targets = (
 				AA0000000000000000000F /* Demo */,
-				AA00000000000000000033 /* DemoTests */,
 				AA00000000000000000052 /* DemoUITests */,
 			);
 		};
@@ -258,14 +213,6 @@
 				AA0000000000000000002B /* DemoViewController+Layout.swift in Sources */,
 				AA0000000000000000002D /* DemoViewController+Delegate.swift in Sources */,
 				AA0000000000000000004C /* MockURLProtocol.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		AA00000000000000000034 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				AA00000000000000000032 /* DemoIntegrationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -355,40 +302,6 @@
 			};
 			name = Release;
 		};
-		AA00000000000000000037 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.purse.securefields.demotests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		AA00000000000000000038 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.purse.securefields.demotests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_COMPILATION_MODE = wholemodule;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				VALIDATE_PRODUCT = YES;
-			};
-			name = Release;
-		};
 		AA00000000000000000055 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -446,15 +359,6 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		AA00000000000000000039 /* Build configuration list for PBXNativeTarget "DemoTests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				AA00000000000000000037 /* Debug */,
-				AA00000000000000000038 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		AA00000000000000000057 /* Build configuration list for PBXNativeTarget "DemoUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -475,10 +379,6 @@
 
 /* Begin XCSwiftPackageProductDependency section */
 		3C1B95BC2FD181C000E5108E /* PurseSecureFields */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = PurseSecureFields;
-		};
-		AA0000000000000000003A /* PurseSecureFields */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = PurseSecureFields;
 		};
