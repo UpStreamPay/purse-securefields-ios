@@ -106,6 +106,7 @@ final class DemoViewController: UIViewController {
         view.backgroundColor = .systemBackground
         manager.delegate = self
         setupLayout()
+        updateFieldBorders()
         payButton.addTarget(self, action: #selector(payTapped), for: .touchUpInside)
         clearButton.addTarget(self, action: #selector(clearTapped), for: .touchUpInside)
         NotificationCenter.default.addObserver(

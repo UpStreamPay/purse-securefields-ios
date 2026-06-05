@@ -27,6 +27,11 @@ final class DemoUITests: XCTestCase {
         app.launch()
     }
 
+    private func dismissKeyboard() {
+        // Tap the nav bar title area to reliably resign first responder
+        app.navigationBars.firstMatch.tap()
+    }
+
     private func fillValidCard() {
         app.textFields["pan_field"].tap()
         app.textFields["pan_field"].typeText("4111111111111111")
@@ -40,8 +45,7 @@ final class DemoUITests: XCTestCase {
         app.secureTextFields["cvv_field"].tap()
         app.secureTextFields["cvv_field"].typeText("123")
 
-        // Dismiss keyboard so focus is removed (border states update)
-        app.swipeDown()
+        dismissKeyboard()
     }
 
     // MARK: - Tests
@@ -61,8 +65,12 @@ final class DemoUITests: XCTestCase {
         let pan = app.textFields["pan_field"]
         pan.tap()
         pan.typeText("4111111111111112") // bad Luhn
-        app.swipeDown() // unfocus
-        XCTAssertEqual(app.otherElements["pan_container"].value as? String, "invalid")
+        // Move focus to another field to trigger PAN editingDidEnd
+        app.textFields["expiry_field"].tap()
+        dismissKeyboard()
+        let panContainer = app.otherElements["pan_container"]
+        let exp = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == 'invalid'"), object: panContainer)
+        wait(for: [exp], timeout: 3)
     }
 
     func testValidFormEnablesPayButton() {
