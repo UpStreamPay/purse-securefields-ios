@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.2](https://github.com/UpStreamPay/vault-ios/compare/v1.0.1...v1.0.2) (2026-06-05)
+
+
+### Bug Fixes
+
+* **ci:** trigger XCFramework build from release-please job ([6082621](https://github.com/UpStreamPay/vault-ios/commit/6082621f965b8c601fa4b80d0f94a82ec0c248d6))
+* **ci:** use PAT so release-please triggers release workflow ([47da6f5](https://github.com/UpStreamPay/vault-ios/commit/47da6f5204a727a05bd9d7c746ee844eb5effe20))
+
 ## [1.0.1](https://github.com/UpStreamPay/vault-ios/compare/v1.0.0...v1.0.1) (2026-06-05)
 
 
