@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.release.tag_name }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.USP_GITHUB_ADMIN_ACCES_TOKEN }}
 
       - name: Build XCFramework
         run: |
@@ -90,4 +90,4 @@ jobs:
             .build/PurseSecureFields.xcframework.zip \
             --clobber
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.USP_GITHUB_ADMIN_ACCES_TOKEN }}
