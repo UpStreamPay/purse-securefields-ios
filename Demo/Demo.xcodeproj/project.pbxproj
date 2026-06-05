@@ -163,7 +163,7 @@
 			);
 			mainGroup = AA0000000000000000000E;
 			packageReferences = (
-				3C1B95BB2FD181C000E5108E /* XCLocalSwiftPackageReference "../../purse-ios-securefields" */,
+				3C1B95BB2FD181C000E5108E /* XCLocalSwiftPackageReference "../.." */,
 			);
 			productRefGroup = AA0000000000000000000D /* Products */;
 			projectDirPath = "";
@@ -350,9 +350,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		3C1B95BB2FD181C000E5108E /* XCLocalSwiftPackageReference "../../purse-ios-securefields" */ = {
+		3C1B95BB2FD181C000E5108E /* XCLocalSwiftPackageReference "../.." */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "../../purse-ios-securefields";
+			relativePath = "../..";
 		};
 /* End XCLocalSwiftPackageReference section */
 
