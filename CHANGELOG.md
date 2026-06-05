@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.1](https://github.com/UpStreamPay/vault-ios/compare/v1.0.0...v1.0.1) (2026-06-05)
+
+
+### Bug Fixes
+
+* **ci:** correct YAML heredoc indentation in release workflow ([c0627e9](https://github.com/UpStreamPay/vault-ios/commit/c0627e939a28ec0a7220805fc829fa386f562033))
+* **ci:** correct YAML heredoc indentation in release workflow ([33e1e14](https://github.com/UpStreamPay/vault-ios/commit/33e1e143d9db9b7d186b50239d39edc3f2885005))
+
 ## 1.0.0 (2026-06-05)
 
 
