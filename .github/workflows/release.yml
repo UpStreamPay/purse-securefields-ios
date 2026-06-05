@@ -50,36 +50,29 @@ jobs:
 
       - name: Update Package.swift to binary target
         run: |
-          python3 - <<'PYEOF'
-import os
-version  = os.environ['VERSION']
-url      = f"https://github.com/{os.environ['REPO']}/releases/download/{version}/PurseSecureFields.xcframework.zip"
-checksum = os.environ['CHECKSUM']
-content  = f"""// swift-tools-version: 5.9
-import PackageDescription
+          VERSION="${{ github.event.release.tag_name }}"
+          REPO="${{ github.repository }}"
+          CHECKSUM="${{ env.CHECKSUM }}"
+          URL="https://github.com/${REPO}/releases/download/${VERSION}/PurseSecureFields.xcframework.zip"
+          cat > Package.swift << EOF
+          // swift-tools-version: 5.9
+          import PackageDescription
 
-let package = Package(
-    name: "PurseSecureFields",
-    platforms: [.iOS(.v15)],
-    products: [
-        .library(name: "PurseSecureFields", targets: ["PurseSecureFields"])
-    ],
-    targets: [
-        .binaryTarget(
-            name: "PurseSecureFields",
-            url: "{url}",
-            checksum: "{checksum}"
-        )
-    ]
-)
-"""
-with open('Package.swift', 'w') as f:
-    f.write(content)
-PYEOF
-        env:
-          VERSION:  ${{ github.event.release.tag_name }}
-          REPO:     ${{ github.repository }}
-          CHECKSUM: ${{ env.CHECKSUM }}
+          let package = Package(
+              name: "PurseSecureFields",
+              platforms: [.iOS(.v15)],
+              products: [
+                  .library(name: "PurseSecureFields", targets: ["PurseSecureFields"])
+              ],
+              targets: [
+                  .binaryTarget(
+                      name: "PurseSecureFields",
+                      url: "${URL}",
+                      checksum: "${CHECKSUM}"
+                  )
+              ]
+          )
+          EOF
 
       - name: Commit & retag
         run: |
