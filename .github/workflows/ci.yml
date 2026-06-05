@@ -37,7 +37,7 @@ jobs:
             -scheme PurseSecureFields \
             -destination "platform=iOS Simulator,id=$SIM_ID" \
             CODE_SIGNING_ALLOWED=NO \
-            | grep -E "(Test Suite|Test Case|✔|✘|error:|FAILED|PASSED|run with)"
+            | grep --line-buffered -E "(Test Suite|Test Case|✔|✘|error:|FAILED|PASSED|run with)"
 
   demo-ui-tests:
     name: Demo UI Tests
@@ -68,5 +68,7 @@ jobs:
             -project Demo/Demo.xcodeproj \
             -scheme DemoUITests \
             -destination "platform=iOS Simulator,id=$SIM_ID" \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 60 \
             CODE_SIGNING_ALLOWED=NO \
-            | grep -E "(Test Suite|Test Case|passed|failed|error:|BUILD)"
+            | grep --line-buffered -E "(Test Suite|Test Case|passed|failed|error:|BUILD)"
