@@ -1,0 +1,105 @@
+name: Release
+
+on:
+  push:
+    tags: ['[0-9]*.[0-9]*.[0-9]*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Release XCFramework
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build XCFramework
+        run: |
+          set -o pipefail
+
+          xcodebuild archive \
+            -scheme PurseSecureFields \
+            -destination "generic/platform=iOS" \
+            -archivePath .build/ios.xcarchive \
+            SKIP_INSTALL=NO \
+            BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+            CODE_SIGNING_ALLOWED=NO
+
+          xcodebuild archive \
+            -scheme PurseSecureFields \
+            -destination "generic/platform=iOS Simulator" \
+            -archivePath .build/ios-sim.xcarchive \
+            SKIP_INSTALL=NO \
+            BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+            CODE_SIGNING_ALLOWED=NO
+
+          xcodebuild -create-xcframework \
+            -framework .build/ios.xcarchive/Products/Library/Frameworks/PurseSecureFields.framework \
+            -framework .build/ios-sim.xcarchive/Products/Library/Frameworks/PurseSecureFields.framework \
+            -output .build/PurseSecureFields.xcframework
+
+          cd .build
+          zip -r PurseSecureFields.xcframework.zip PurseSecureFields.xcframework
+          echo "CHECKSUM=$(swift package compute-checksum PurseSecureFields.xcframework.zip)" >> $GITHUB_ENV
+
+      - name: Update Package.swift to binary target
+        run: |
+          VERSION="${{ github.ref_name }}"
+          URL="https://github.com/${{ github.repository }}/releases/download/${VERSION}/PurseSecureFields.xcframework.zip"
+          CHECKSUM="${{ env.CHECKSUM }}"
+
+          python3 - <<PYEOF
+import os
+url      = os.environ['URL']
+checksum = os.environ['CHECKSUM']
+content  = f'''// swift-tools-version: 5.9
+import PackageDescription
+
+let package = Package(
+    name: "PurseSecureFields",
+    platforms: [.iOS(.v15)],
+    products: [
+        .library(name: "PurseSecureFields", targets: ["PurseSecureFields"])
+    ],
+    targets: [
+        .binaryTarget(
+            name: "PurseSecureFields",
+            url: "{url}",
+            checksum: "{checksum}"
+        )
+    ]
+)
+'''
+with open('Package.swift', 'w') as f:
+    f.write(content)
+PYEOF
+        env:
+          URL: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/PurseSecureFields.xcframework.zip
+          CHECKSUM: ${{ env.CHECKSUM }}
+
+      - name: Commit & retag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Package.swift
+          git commit -m "release: ${{ github.ref_name }} — binary target"
+          git tag -f "${{ github.ref_name }}"
+          git push origin "${{ github.ref_name }}" --force
+
+      - name: Create GitHub release
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            .build/PurseSecureFields.xcframework.zip \
+            --title "${{ github.ref_name }}" \
+            --notes "## Installation
+
+\`\`\`swift
+.package(url: \"https://github.com/${{ github.repository }}.git\", from: \"${{ github.ref_name }}\")
+\`\`\`"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
