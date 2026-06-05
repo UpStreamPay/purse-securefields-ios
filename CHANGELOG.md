@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.4](https://github.com/UpStreamPay/vault-ios/compare/v1.0.3...v1.0.4) (2026-06-05)
+
+
+### Bug Fixes
+
+* **ci:** add INSTALL_PATH to archive commands + update README ([eb43be0](https://github.com/UpStreamPay/vault-ios/commit/eb43be0fdc8197887754b7c540c13340c07a5455))
+* **ci:** add INSTALL_PATH to archive commands + update README ([538e524](https://github.com/UpStreamPay/vault-ios/commit/538e524c8943c0ae495df9fc96034ad486488a58))
+
 ## [1.0.3](https://github.com/UpStreamPay/vault-ios/compare/v1.0.2...v1.0.3) (2026-06-05)
 
 
