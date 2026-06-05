@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.3](https://github.com/UpStreamPay/vault-ios/compare/v1.0.2...v1.0.3) (2026-06-05)
+
+
+### Bug Fixes
+
+* mark library as dynamic for XCFramework distribution ([c27458c](https://github.com/UpStreamPay/vault-ios/commit/c27458c59544a0ad86548d1f5d16796d94c0a3b0))
+* mark library as dynamic for XCFramework distribution ([5f80a04](https://github.com/UpStreamPay/vault-ios/commit/5f80a04fa051f7cc8d45be68f6e10d2e69eac20e))
+
 ## [1.0.2](https://github.com/UpStreamPay/vault-ios/compare/v1.0.1...v1.0.2) (2026-06-05)
 
 
