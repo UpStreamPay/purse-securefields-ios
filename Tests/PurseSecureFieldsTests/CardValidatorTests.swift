@@ -6,77 +6,57 @@ struct CardValidatorTests {
 
     // MARK: Luhn
 
-    @Test func luhnValidVisa() {
-        #expect(CardValidator.luhn("4111111111111111"))
+    @Test(arguments: [
+        ("4111111111111111", true),   // Visa
+        ("378282246310005",  true),   // Amex
+        ("5500005555555559", true),   // Mastercard
+        ("6011111111111117", true),   // Discover
+        ("0",                true),   // Mathematically valid (sum=0)
+        ("4111111111111112", false),  // Bad last digit
+        ("4111111111111161", false),  // Transposition
+        ("",                 false),
+    ])
+    func luhn(pan: String, expected: Bool) {
+        #expect(CardValidator.luhn(pan) == expected)
     }
 
-    @Test func luhnValidAmex() {
-        #expect(CardValidator.luhn("378282246310005"))
+    // MARK: Expiry — static cases (no Calendar dependency)
+
+    @Test(arguments: [
+        (12, 2000, false),  // past year
+        (0,  2000, false),  // past year, month 0
+        (13, 2000, false),  // past year, month 13
+    ])
+    func expiryStaticInvalid(month: Int, year: Int, expected: Bool) {
+        #expect(CardValidator.isExpiryValid(month: month, year: year) == expected)
     }
 
-    @Test func luhnValidMastercard() {
-        #expect(CardValidator.luhn("5500005555555559"))
-    }
-
-    @Test func luhnValidDiscover() {
-        #expect(CardValidator.luhn("6011111111111117"))
-    }
-
-    @Test func luhnInvalidLastDigit() {
-        #expect(!CardValidator.luhn("4111111111111112"))
-    }
-
-    @Test func luhnInvalidTransposition() {
-        #expect(!CardValidator.luhn("4111111111111161"))
-    }
-
-    @Test func luhnEmptyInvalid() {
-        #expect(!CardValidator.luhn(""))
-    }
-
-    @Test func luhnSingleZeroValid() {
-        // Mathematically valid: sum=0, 0%10==0. No real card, but algorithm is correct.
-        #expect(CardValidator.luhn("0"))
-    }
-
-    // MARK: Expiry
+    // MARK: Expiry — dynamic (relative to today)
 
     @Test func expiryFutureYearValid() {
-        let futureYear = Calendar.current.component(.year, from: .now) + 1
-        #expect(CardValidator.isExpiryValid(month: 1, year: futureYear))
+        #expect(CardValidator.isExpiryValid(month: 1, year: Calendar.current.component(.year, from: .now) + 1))
     }
 
-    @Test func expiryCurrentMonthCurrentYearValid() {
+    @Test func expiryCurrentMonthValid() {
         let cal = Calendar.current
-        let year = cal.component(.year, from: .now)
-        let month = cal.component(.month, from: .now)
-        #expect(CardValidator.isExpiryValid(month: month, year: year))
+        #expect(CardValidator.isExpiryValid(
+            month: cal.component(.month, from: .now),
+            year: cal.component(.year, from: .now)
+        ))
     }
 
     @Test func expiryPastYearInvalid() {
-        let pastYear = Calendar.current.component(.year, from: .now) - 1
-        #expect(!CardValidator.isExpiryValid(month: 12, year: pastYear))
+        #expect(!CardValidator.isExpiryValid(month: 12, year: Calendar.current.component(.year, from: .now) - 1))
     }
 
     @Test func expiryPastMonthCurrentYearInvalid() {
         let cal = Calendar.current
-        let year = cal.component(.year, from: .now)
         let month = cal.component(.month, from: .now)
         guard month > 1 else { return }
-        #expect(!CardValidator.isExpiryValid(month: month - 1, year: year))
+        #expect(!CardValidator.isExpiryValid(month: month - 1, year: cal.component(.year, from: .now)))
     }
 
-    @Test func expiryDecemberFarFutureValid() {
-        let farFuture = Calendar.current.component(.year, from: .now) + 10
-        #expect(CardValidator.isExpiryValid(month: 12, year: farFuture))
-    }
-
-    @Test func expiryPastYearMonthZeroInvalid() {
-        // CardValidator only checks date expiry, not month range (1-12). Past year → always false.
-        #expect(!CardValidator.isExpiryValid(month: 0, year: 2000))
-    }
-
-    @Test func expiryPastYearMonth13Invalid() {
-        #expect(!CardValidator.isExpiryValid(month: 13, year: 2000))
+    @Test func expiryFarFutureValid() {
+        #expect(CardValidator.isExpiryValid(month: 12, year: Calendar.current.component(.year, from: .now) + 10))
     }
 }
