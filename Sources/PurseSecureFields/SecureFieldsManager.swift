@@ -91,7 +91,15 @@ public final class SecureFieldsManager {
 
     public init(config: SecureFieldsConfig) {
         self.config = config
+        #if DEBUG
+        if let testSession = config.testURLSession {
+            self.apiClient = VaultAPIClient(baseURL: config.baseURL, session: testSession)
+        } else {
+            self.apiClient = VaultAPIClient(baseURL: config.baseURL)
+        }
+        #else
         self.apiClient = VaultAPIClient(baseURL: config.baseURL)
+        #endif
         let pan = SecurePANField()
         let cvv = SecureCVVField()
         let exp = SecureExpDateField()

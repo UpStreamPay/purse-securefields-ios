@@ -5,16 +5,36 @@ final class DemoViewController: UIViewController {
 
     // MARK: - SecureFields
 
-    let manager = SecureFieldsManager(config: SecureFieldsConfig(
-        tenantId: "61ff8a6a-edd5-4f40-aa32-8410a73e79ac",
-        baseURL: "https://api.vault.purse-test.com",
-        placeholders: SecureFieldsPlaceholders(
-            pan: "1234 5678 9012 3456",
-            cvv: "123",
-            expDate: "MM/YY",
-            holderName: "Name Surname"
-        )
-    ))
+    lazy var manager: SecureFieldsManager = makeManager()
+
+    private func makeManager() -> SecureFieldsManager {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--uitesting") {
+            var config = SecureFieldsConfig(
+                tenantId: "test",
+                baseURL: "https://api.test.example.com",
+                placeholders: SecureFieldsPlaceholders(
+                    pan: "1234 5678 9012 3456",
+                    cvv: "123",
+                    expDate: "MM/YY",
+                    holderName: "Name Surname"
+                )
+            )
+            config.testURLSession = MockURLProtocol.makeSession()
+            return SecureFieldsManager(config: config)
+        }
+        #endif
+        return SecureFieldsManager(config: SecureFieldsConfig(
+            tenantId: "61ff8a6a-edd5-4f40-aa32-8410a73e79ac",
+            baseURL: "https://api.vault.purse-test.com",
+            placeholders: SecureFieldsPlaceholders(
+                pan: "1234 5678 9012 3456",
+                cvv: "123",
+                expDate: "MM/YY",
+                holderName: "Name Surname"
+            )
+        ))
+    }
 
     // MARK: - UI
 

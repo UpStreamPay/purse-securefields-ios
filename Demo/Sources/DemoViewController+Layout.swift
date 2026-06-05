@@ -81,6 +81,19 @@ extension DemoViewController {
         ])
         stackView.addArrangedSubview(debugContainer)
 
+        // Accessibility — used by XCUITest
+        manager.panContainer.accessibilityIdentifier = "pan_container"
+        manager.panContainer.panFieldAccessibilityIdentifier = "pan_field"
+        manager.cvvView.accessibilityIdentifier = "cvv_field"
+        manager.expDateView.accessibilityIdentifier = "expiry_field"
+        manager.holderNameView.accessibilityIdentifier = "holder_field"
+        cvvContainerView.accessibilityIdentifier = "cvv_container"
+        expiryContainerView.accessibilityIdentifier = "expiry_container"
+        holderContainerView.accessibilityIdentifier = "holder_container"
+        payButton.accessibilityIdentifier = "pay_button"
+        clearButton.accessibilityIdentifier = "clear_button"
+        resultLabel.accessibilityIdentifier = "result_label"
+
         stackView.addArrangedSubview(divider())
         stackView.addArrangedSubview(sectionLabel("Result"))
         stackView.addArrangedSubview(resultLabel)
@@ -141,12 +154,15 @@ extension DemoViewController {
         if isValid {
             view.layer.borderColor = UIColor.systemGreen.cgColor
             view.layer.borderWidth = 1.5
+            view.accessibilityValue = "valid"
         } else if hasContent && !isFocused {
             view.layer.borderColor = UIColor.systemRed.cgColor
             view.layer.borderWidth = 1.5
+            view.accessibilityValue = "invalid"
         } else {
             view.layer.borderColor = UIColor.separator.cgColor
             view.layer.borderWidth = 1
+            view.accessibilityValue = isFocused ? "focused" : "empty"
         }
     }
 }

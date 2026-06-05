@@ -1,0 +1,40 @@
+#if DEBUG
+import Foundation
+
+final class MockURLProtocol: URLProtocol {
+    struct MockResponse {
+        let data: Data
+        let statusCode: Int
+    }
+    static var handlers: [String: MockResponse] = [:]
+
+    static func makeSession() -> URLSession {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        return URLSession(configuration: config)
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let path = request.url?.path ?? ""
+        let key = Self.handlers.keys.first { path.hasSuffix($0) } ?? ""
+        guard let mock = Self.handlers[key] else {
+            client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+            return
+        }
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: mock.statusCode,
+            httpVersion: nil,
+            headerFields: ["Content-Type": "application/json"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: mock.data)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+#endif

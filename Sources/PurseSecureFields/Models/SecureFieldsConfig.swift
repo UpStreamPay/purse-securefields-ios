@@ -50,6 +50,10 @@ public struct SecureFieldsConfig {
     public let style: SecureFieldsStyle
     public let placeholders: SecureFieldsPlaceholders
 
+    #if DEBUG
+    public var testURLSession: URLSession? = nil
+    #endif
+
     public init(
         tenantId: String,
         baseURL: String,

@@ -14,6 +14,11 @@ public final class SecurePANContainer: UIView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    public var panFieldAccessibilityIdentifier: String? {
+        get { panField.accessibilityIdentifier }
+        set { panField.accessibilityIdentifier = newValue }
+    }
+
     private func setup() {
         backgroundColor = .secondarySystemBackground
         layer.cornerRadius = 10
