@@ -8,7 +8,7 @@ let package = Package(
         .iOS(.v15)
     ],
     products: [
-        .library(name: "PurseSecureFields", targets: ["PurseSecureFields"])
+        .library(name: "PurseSecureFields", type: .dynamic, targets: ["PurseSecureFields"])
     ],
     targets: [
         .target(name: "PurseSecureFields", resources: [.process("Resources")]),
