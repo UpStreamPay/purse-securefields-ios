@@ -95,10 +95,10 @@ public final class SecureFieldsManager {
         if let testSession = config.testURLSession {
             self.apiClient = VaultAPIClient(baseURL: config.baseURL, session: testSession)
         } else {
-            self.apiClient = VaultAPIClient(baseURL: config.baseURL)
+            self.apiClient = VaultAPIClient(baseURL: config.baseURL, pinnedPublicKeyHashes: config.pinnedPublicKeyHashes)
         }
         #else
-        self.apiClient = VaultAPIClient(baseURL: config.baseURL)
+        self.apiClient = VaultAPIClient(baseURL: config.baseURL, pinnedPublicKeyHashes: config.pinnedPublicKeyHashes)
         #endif
         let pan = SecurePANField()
         let cvv = SecureCVVField()
@@ -230,6 +230,13 @@ public final class SecureFieldsManager {
             nc.addObserver(forName: UIScreen.capturedDidChangeNotification,
                            object: nil, queue: .main) { [weak self] _ in
                 self?.setPrivacyOverlay(UIScreen.main.isCaptured)
+            },
+            // Screenshot detection: the OS screenshot has already been saved at this point;
+            // we cannot prevent it. Notify the host so it can call clearFields() and warn
+            // the cardholder. This fires after the shutter animation completes.
+            nc.addObserver(forName: UIApplication.userDidTakeScreenshotNotification,
+                           object: nil, queue: .main) { [weak self] _ in
+                self?.delegate?.secureFieldsScreenshotDetected()
             },
         ]
     }
