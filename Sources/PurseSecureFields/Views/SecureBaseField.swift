@@ -9,9 +9,29 @@ class SecureBaseField: UITextField {
 
     private(set) var isValid = false
 
+    // MARK: - PCI field isolation
+    //
+    // The three overrides below prevent the host app from reading raw card data
+    // by casting any exposed UIView back to UITextField.
+    //
+    // UIKit renders from its internal backing storage (bypasses these getters),
+    // so display is unaffected. Only external readers are blocked.
+
     override var text: String? {
         get { nil }
         set { super.text = newValue }
+    }
+
+    /// Blocks `(field as? UITextField)?.attributedText` from leaking card data.
+    override var attributedText: NSAttributedString? {
+        get { nil }
+        set { super.attributedText = newValue }
+    }
+
+    /// Blocks VoiceOver / accessibility APIs from announcing card data.
+    override var accessibilityValue: String? {
+        get { nil }
+        set { super.accessibilityValue = newValue }
     }
 
     /// Reads the real UITextField backing value. Subclasses use this instead of super.text,

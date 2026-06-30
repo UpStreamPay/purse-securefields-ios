@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 final class VaultAPIClient {
@@ -8,8 +9,34 @@ final class VaultAPIClient {
     private let session: URLSession
     private let maxRetries = 3
 
-    init(baseURL: String, session: URLSession = URLSession(configuration: .pciSecure)) {
+    // Retained strongly because URLSession only holds a weak reference to its delegate.
+    private let pinningDelegate: PinningDelegate?
+
+    /// Production init — creates an ephemeral, cache-free session.
+    /// When `pinnedPublicKeyHashes` is non-empty, certificate pinning is enforced.
+    init(baseURL: String, pinnedPublicKeyHashes: [String] = []) {
         self.baseURL = baseURL
+        if pinnedPublicKeyHashes.isEmpty {
+            #if DEBUG
+            print("[SecureFields] WARNING: pinnedPublicKeyHashes is empty — SPKI pinning disabled. Set SecureFieldsConfig.pinnedPublicKeyHashes for production deployments.")
+            #endif
+            self.pinningDelegate = nil
+            self.session = URLSession(configuration: .pciSecure)
+        } else {
+            let delegate = PinningDelegate(hashes: pinnedPublicKeyHashes)
+            self.pinningDelegate = delegate
+            self.session = URLSession(
+                configuration: .pciSecure,
+                delegate: delegate,
+                delegateQueue: nil
+            )
+        }
+    }
+
+    /// Test-only init — bypasses pinning entirely.
+    init(baseURL: String, session: URLSession) {
+        self.baseURL = baseURL
+        self.pinningDelegate = nil
         self.session = session
     }
 
@@ -150,5 +177,109 @@ private extension URLSessionConfiguration {
         config.httpShouldSetCookies = false
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         return config
+    }
+}
+
+// MARK: - SPKI Certificate Pinning
+
+/// `URLSessionDelegate` that enforces SubjectPublicKeyInfo (SPKI) pinning.
+/// Any server certificate whose public-key SHA-256 hash matches a pinned value is trusted;
+/// all others are rejected, even if they have a valid chain to a system root CA.
+///
+/// Supported key types: RSA-2048, RSA-4096, EC-256 (P-256), EC-384 (P-384).
+private final class PinningDelegate: NSObject, URLSessionDelegate {
+
+    private let pinnedHashes: Set<String>
+
+    init(hashes: [String]) {
+        self.pinnedHashes = Set(hashes)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+              let serverTrust = challenge.protectionSpace.serverTrust else {
+            // Non-TLS challenge (e.g. client certificate) — reject
+            completionHandler(.cancelAuthenticationChallenge, nil)
+            return
+        }
+
+        // Evaluate system trust first — reject expired / untrusted chains outright
+        var cfError: CFError?
+        guard SecTrustEvaluateWithError(serverTrust, &cfError) else {
+            completionHandler(.cancelAuthenticationChallenge, nil)
+            return
+        }
+
+        // Walk the certificate chain; accept if any cert's public key matches a pin
+        let certChain = SecTrustCopyCertificateChain(serverTrust) as? [SecCertificate] ?? []
+        for cert in certChain {
+            if let hash = spkiHash(for: cert), pinnedHashes.contains(hash) {
+                completionHandler(.useCredential, URLCredential(trust: serverTrust))
+                return
+            }
+        }
+
+        // No pin matched — reject, even though system trust passed
+        completionHandler(.cancelAuthenticationChallenge, nil)
+    }
+
+    // MARK: - SPKI hash computation
+
+    /// Returns the Base64-encoded SHA-256 hash of the certificate's SubjectPublicKeyInfo DER encoding.
+    private func spkiHash(for certificate: SecCertificate) -> String? {
+        guard let publicKey = SecCertificateCopyKey(certificate) else { return nil }
+        var cfError: Unmanaged<CFError>?
+        guard let keyData = SecKeyCopyExternalRepresentation(publicKey, &cfError) as Data? else { return nil }
+        guard let attrs = SecKeyCopyAttributes(publicKey) as? [CFString: Any] else { return nil }
+
+        let keyType = attrs[kSecAttrKeyType] as? String ?? ""
+        let keySize = attrs[kSecAttrKeySizeInBits] as? Int ?? 0
+        guard let header = spkiHeader(type: keyType, size: keySize) else { return nil }
+
+        let digest = SHA256.hash(data: header + keyData)
+        return Data(digest).base64EncodedString()
+    }
+
+    /// Returns the fixed ASN.1 DER header that precedes the raw key bytes for a given key type/size.
+    /// These are well-known constants (same as TrustKit / OkHttp CertificatePinner).
+    private func spkiHeader(type: String, size: Int) -> Data? {
+        // RSA keys
+        if type == (kSecAttrKeyTypeRSA as String) {
+            switch size {
+            case 2048:
+                return Data([0x30, 0x82, 0x01, 0x22, 0x30, 0x0d, 0x06, 0x09,
+                             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01,
+                             0x01, 0x05, 0x00, 0x03, 0x82, 0x01, 0x0f, 0x00])
+            case 4096:
+                return Data([0x30, 0x82, 0x02, 0x22, 0x30, 0x0d, 0x06, 0x09,
+                             0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01,
+                             0x01, 0x05, 0x00, 0x03, 0x82, 0x02, 0x0f, 0x00])
+            default:
+                return nil
+            }
+        }
+
+        // EC keys
+        if type == (kSecAttrKeyTypeEC as String) {
+            switch size {
+            case 256: // P-256
+                return Data([0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86,
+                             0x48, 0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a,
+                             0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, 0x03,
+                             0x42, 0x00])
+            case 384: // P-384
+                return Data([0x30, 0x76, 0x30, 0x10, 0x06, 0x07, 0x2a, 0x86,
+                             0x48, 0xce, 0x3d, 0x02, 0x01, 0x06, 0x05, 0x2b,
+                             0x81, 0x04, 0x00, 0x22, 0x03, 0x62, 0x00])
+            default:
+                return nil
+            }
+        }
+
+        return nil
     }
 }

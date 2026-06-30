@@ -50,6 +50,27 @@ public struct SecureFieldsConfig {
     public let style: SecureFieldsStyle
     public let placeholders: SecureFieldsPlaceholders
 
+    /// SHA-256 hashes (Base64-encoded) of the vault server's SubjectPublicKeyInfo (SPKI).
+    ///
+    /// When non-empty, every request to `baseURL` is rejected unless the server presents a
+    /// certificate whose public key matches at least one hash — preventing MITM attacks even
+    /// when a rogue root CA is installed on the device (MDM/BYOD profiles, malware).
+    ///
+    /// Supported key types: RSA-2048, RSA-4096, EC-256 (P-256), EC-384 (P-384).
+    ///
+    /// Best practice: provide at least **two** hashes (primary + one rotation backup) so a
+    /// certificate renewal does not break existing app versions in the field.
+    ///
+    /// To extract a hash from a live server:
+    /// ```
+    /// openssl s_client -connect <host>:443 2>/dev/null </dev/null \
+    ///   | openssl x509 -pubkey -noout \
+    ///   | openssl pkey -pubin -outform DER \
+    ///   | openssl dgst -sha256 -binary \
+    ///   | base64
+    /// ```
+    public let pinnedPublicKeyHashes: [String]
+
     #if DEBUG
     public var testURLSession: URLSession? = nil
     #endif
@@ -59,7 +80,8 @@ public struct SecureFieldsConfig {
         baseURL: String,
         brands: [CardBrand] = CardBrand.allCases,
         style: SecureFieldsStyle = .default,
-        placeholders: SecureFieldsPlaceholders = .init()
+        placeholders: SecureFieldsPlaceholders = .init(),
+        pinnedPublicKeyHashes: [String] = []
     ) {
         precondition(baseURL.hasPrefix("https://"), "SecureFields: baseURL must use HTTPS")
         precondition(!tenantId.trimmingCharacters(in: .whitespaces).isEmpty, "SecureFields: tenantId must not be empty")
@@ -68,5 +90,6 @@ public struct SecureFieldsConfig {
         self.brands = brands
         self.style = style
         self.placeholders = placeholders
+        self.pinnedPublicKeyHashes = pinnedPublicKeyHashes
     }
 }

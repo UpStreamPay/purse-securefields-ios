@@ -28,10 +28,17 @@ Tests/              — SecureFieldsTests
 
 ### Field isolation (PCI)
 - `SecureBaseField` is `internal` — never make it or its subclasses `public`
-- `override var text: String? { get { nil } set { super.text = newValue } }` is defined in `SecureBaseField` and blocks all UITextField casts from reading card data. Do not remove.
-- All internal reads use `super.text` directly (bypasses the nil override). Never change these to `self.text`.
+- Three read-blocking overrides in `SecureBaseField` prevent the host app from reading card data via UITextField casts. Do not remove any of them:
+  - `override var text: String? { get { nil } … }` — blocks `(field as? UITextField)?.text`
+  - `override var attributedText: NSAttributedString? { get { nil } … }` — blocks `attributedText` reads (which would expose card data even with the `text` override)
+  - `override var accessibilityValue: String? { get { nil } … }` — blocks VoiceOver / accessibility API reads
+- UIKit renders from its internal backing storage and is unaffected by these getter overrides.
+- All internal reads use `super.text` (bypasses the nil override). Never change these to `self.text`.
 - PAN, CVV, expDate, holderName fields are `private` in the manager. They are exposed only as `UIView` (`cvvView`, `expDateView`, `holderNameView`) or `SecurePANContainer` (`panContainer`).
 - CVV paste is blocked via `canPerformAction`. Do not remove.
+- PAN copy and cut are blocked via `canPerformAction` on `SecurePANField`. Paste is intentionally allowed (required for 19-digit Oney PAN pasting). Do not add a paste block to SecurePANField.
+- PAN drag-out is blocked by `SecurePANField` conforming to `UITextDragDelegate` and returning `[]` from `itemsForDrag`. Do not remove.
+- Screenshot detection: `setupPrivacyObservers()` observes `UIApplication.userDidTakeScreenshotNotification` and calls `delegate?.secureFieldsScreenshotDetected()`. Host app should call `manager.clearFields()` in response.
 
 ### BIN lookup behaviour
 - Triggered at ≥ 6 digits, debounced 300ms, cached by 8-digit prefix.
@@ -52,6 +59,8 @@ Tests/              — SecureFieldsTests
 - `X-Purse-SDK-Version` header on every request. Version string is in `VaultAPIClient.sdkVersion`.
 - `X-Request-ID` (UUID) on tokenization only.
 - No card data in logs. Body logging is fully removed. `#if DEBUG` guards on status codes only.
+- **SPKI certificate pinning**: `SecureFieldsConfig.pinnedPublicKeyHashes` accepts Base64-encoded SHA-256 SPKI hashes. When set, `VaultAPIClient` enforces pinning via `PinningDelegate` (a private `URLSessionDelegate`). Supported key types: RSA-2048, RSA-4096, EC-256, EC-384. Provide ≥ 2 hashes (primary + rotation backup). A `#if DEBUG` warning is printed when hashes are empty. **Production integrations must set this field.**
+- `VaultAPIClient` has two inits: `init(baseURL:pinnedPublicKeyHashes:)` for production (creates pinned session), and `init(baseURL:session:)` for test injection only (pinning skipped). Never call the test init in production code.
 
 ## Style / placeholder config
 - Applied once at init via `applyConfig(_:)` in the manager.
