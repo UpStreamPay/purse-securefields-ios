@@ -10,7 +10,7 @@ concurrency:
 jobs:
   library-tests:
     name: Library Tests
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,7 +41,7 @@ jobs:
 
   demo-ui-tests:
     name: Demo UI Tests
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - name: Checkout
         uses: actions/checkout@v4
