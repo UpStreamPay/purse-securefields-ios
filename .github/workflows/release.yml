@@ -61,24 +61,26 @@ jobs:
           rm -f certificate.p12 openssl_err
 
       - name: Build XCFramework
+        env:
+          SIGN_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: |
           set -o pipefail
 
-          # Device archive — signed with Apple Distribution certificate.
-          # Distribution certs cannot sign simulator slices; signing is intentionally
-          # deferred to the xcframework creation step which handles slice-level decisions.
+          # Device archive — built UNSIGNED. A library XCFramework does not need a
+          # signed slice; the whole .xcframework bundle is signed after creation
+          # (below). Forcing a manual identity here also fails the SPM-generated
+          # resource-bundle target (PurseSecureFields_PurseSecureFields), which has
+          # no development team.
           xcodebuild archive \
             -scheme PurseSecureFields \
             -destination "generic/platform=iOS" \
             -archivePath .build/ios.xcarchive \
             SKIP_INSTALL=NO \
             BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
+            CODE_SIGNING_ALLOWED=NO \
             INSTALL_PATH='/Library/Frameworks'
 
-          # Simulator archive — code signing disabled.
-          # Apple does not issue distribution certificates for simulator binaries.
+          # Simulator archive — also unsigned (Apple issues no simulator distribution certs).
           xcodebuild archive \
             -scheme PurseSecureFields \
             -destination "generic/platform=iOS Simulator" \
@@ -88,14 +90,17 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             INSTALL_PATH='/Library/Frameworks'
 
-          # Create and sign the XCFramework.
-          # -codesign signs the device slice with the distribution certificate.
-          # Requires Xcode 14+ (available on macos-15 runners).
+          # Create the (unsigned) XCFramework. Note: `xcodebuild -create-xcframework`
+          # has no -codesign flag — the bundle is signed separately below.
           xcodebuild -create-xcframework \
             -framework .build/ios.xcarchive/Products/Library/Frameworks/PurseSecureFields.framework \
             -framework .build/ios-sim.xcarchive/Products/Library/Frameworks/PurseSecureFields.framework \
-            -output .build/PurseSecureFields.xcframework \
-            -codesign "${{ secrets.APPLE_SIGNING_IDENTITY }}"
+            -output .build/PurseSecureFields.xcframework
+
+          # Sign the finished .xcframework bundle with the distribution identity so
+          # consumers can verify it (Xcode 15+ third-party XCFramework signatures).
+          # The identity is resolved from signing.keychain imported in the previous step.
+          codesign --timestamp -v --sign "$SIGN_IDENTITY" .build/PurseSecureFields.xcframework
 
           cd .build
           zip -r PurseSecureFields.xcframework.zip PurseSecureFields.xcframework
