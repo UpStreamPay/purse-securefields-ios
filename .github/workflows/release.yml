@@ -20,20 +20,45 @@ jobs:
           token: ${{ secrets.USP_GITHUB_ADMIN_ACCES_TOKEN }}
 
       - name: Import signing certificate
+        env:
+          P12_B64: ${{ secrets.APPLE_SIGNING_CERT_P12_BASE64 }}
+          P12_PASS: ${{ secrets.APPLE_SIGNING_CERT_P12_PASSWORD }}
         run: |
-          echo "${{ secrets.APPLE_SIGNING_CERT_P12_BASE64 }}" | base64 --decode > certificate.p12
+          set -euo pipefail
+
+          # Decode the certificate. Passing the secret via env (not inline
+          # interpolation) avoids the shell re-interpreting characters in the value.
+          echo "$P12_B64" | base64 --decode > certificate.p12
+
+          # Fail fast with a clear diagnosis: a MAC verification failure at
+          # `security import` is identical whether the .p12 bytes are corrupt
+          # (bad base64 round-trip) or the password is wrong. Check both here.
+          if [ ! -s certificate.p12 ]; then
+            echo "::error::Decoded certificate.p12 is empty — APPLE_SIGNING_CERT_P12_BASE64 is missing or did not decode."
+            exit 1
+          fi
+          echo "Decoded certificate.p12 size: $(wc -c < certificate.p12) bytes"
+          if ! openssl pkcs12 -in certificate.p12 -noout -passin pass:"$P12_PASS" 2>openssl_err; then
+            echo "::error::Could not open certificate.p12 with the provided password."
+            echo "::error::Either APPLE_SIGNING_CERT_P12_PASSWORD is wrong, or the .p12 bytes are corrupt (re-check the base64 has no wrapping/whitespace)."
+            cat openssl_err
+            rm -f certificate.p12 openssl_err
+            exit 1
+          fi
+          echo "p12 verified OK — password and file integrity both good."
+
           security create-keychain -p "ci-temp" signing.keychain
           security default-keychain -s signing.keychain
           security unlock-keychain -p "ci-temp" signing.keychain
           security import certificate.p12 \
             -k signing.keychain \
-            -P "${{ secrets.APPLE_SIGNING_CERT_P12_PASSWORD }}" \
+            -P "$P12_PASS" \
             -T /usr/bin/codesign
           security set-key-partition-list \
             -S apple-tool:,apple: \
             -s -k "ci-temp" \
             signing.keychain
-          rm certificate.p12
+          rm -f certificate.p12 openssl_err
 
       - name: Build XCFramework
         run: |
