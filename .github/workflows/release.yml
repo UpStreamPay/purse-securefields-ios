@@ -30,30 +30,37 @@ jobs:
           # interpolation) avoids the shell re-interpreting characters in the value.
           echo "$P12_B64" | base64 --decode > certificate.p12
 
-          # Fail fast with a clear diagnosis: a MAC verification failure at
-          # `security import` is identical whether the .p12 bytes are corrupt
-          # (bad base64 round-trip) or the password is wrong. Check both here.
+          # Hard-fail only on the one thing that is unambiguously broken: an empty
+          # file (missing secret or a base64 round-trip that produced nothing).
           if [ ! -s certificate.p12 ]; then
             echo "::error::Decoded certificate.p12 is empty — APPLE_SIGNING_CERT_P12_BASE64 is missing or did not decode."
             exit 1
           fi
           echo "Decoded certificate.p12 size: $(wc -c < certificate.p12) bytes"
-          if ! openssl pkcs12 -in certificate.p12 -noout -passin pass:"$P12_PASS" 2>openssl_err; then
-            echo "::error::Could not open certificate.p12 with the provided password."
-            echo "::error::Either APPLE_SIGNING_CERT_P12_PASSWORD is wrong, or the .p12 bytes are corrupt (re-check the base64 has no wrapping/whitespace)."
-            cat openssl_err
-            rm -f certificate.p12 openssl_err
-            exit 1
+
+          # Informational only — DO NOT gate the build on this. macOS `.p12` files
+          # are typically encrypted with legacy ciphers (e.g. RC2-40-CBC) that
+          # OpenSSL 3.x refuses unless the legacy provider is loaded (`-legacy`).
+          # `security import` below handles those files natively, so an openssl
+          # failure here is not a real problem — it's just a diagnostic hint.
+          if openssl pkcs12 -legacy -in certificate.p12 -noout -passin pass:"$P12_PASS" 2>/dev/null \
+             || openssl pkcs12 -in certificate.p12 -noout -passin pass:"$P12_PASS" 2>/dev/null; then
+            echo "p12 opened by openssl — password verified."
+          else
+            echo "::warning::openssl could not open the .p12 (often just a legacy-cipher/OpenSSL-3 quirk). Deferring to 'security import', which handles legacy PKCS#12."
           fi
-          echo "p12 verified OK — password and file integrity both good."
 
           security create-keychain -p "ci-temp" signing.keychain
           security default-keychain -s signing.keychain
           security unlock-keychain -p "ci-temp" signing.keychain
-          security import certificate.p12 \
-            -k signing.keychain \
-            -P "$P12_PASS" \
-            -T /usr/bin/codesign
+          if ! security import certificate.p12 \
+                 -k signing.keychain \
+                 -P "$P12_PASS" \
+                 -T /usr/bin/codesign; then
+            echo "::error::security import failed. With the empty-file case ruled out above, this means APPLE_SIGNING_CERT_P12_PASSWORD does not match this .p12, or the base64 in APPLE_SIGNING_CERT_P12_BASE64 was corrupted (wrapping/whitespace). Re-export the cert and regenerate the secret with: base64 -i cert.p12 | pbcopy"
+            rm -f certificate.p12
+            exit 1
+          fi
           security set-key-partition-list \
             -S apple-tool:,apple: \
             -s -k "ci-temp" \
