@@ -1,0 +1,300 @@
+# API Reference
+
+Module: `PurseSecureFields`
+
+---
+
+## Table of Contents
+
+- [SecureFieldsManager](#securefieldsmanager)
+- [SecureFieldsConfig](#securefieldsconfig)
+- [SecureFieldsStyle](#securefieldsstyle)
+- [SecureFieldsPlaceholders](#securefieldsplaceholders)
+- [SecureFieldsDelegate](#securefieldsdelegate)
+- [SecureField](#securefield)
+- [CardBrand](#cardbrand)
+- [TokenizationResult](#tokenizationresult)
+- [SecureFieldsError](#securefieldsError)
+
+---
+
+## `SecureFieldsManager`
+
+Main SDK entry point. Owns all card input views and coordinates BIN lookup, validation, and
+tokenization.
+
+### Initialisation
+
+```swift
+public final class SecureFieldsManager {
+    public init(config: SecureFieldsConfig)
+}
+```
+
+### Views
+
+```swift
+public let panContainer: SecurePANContainer   // PAN input + optional brand selector
+public var cvvView: UIView                     // CVV or date-of-birth input
+public var expDateView: UIView                 // Expiry date (MM/YY)
+public var holderNameView: UIView              // Cardholder name
+```
+
+All views are opaque `UIView` instances. The underlying `UITextField` subclasses are `internal`
+to the SDK — any attempt to read card data through a cast is blocked at the `text` getter level.
+
+### Delegate
+
+```swift
+public weak var delegate: SecureFieldsDelegate?
+```
+
+### Field state queries
+
+```swift
+// Returns true when the field has passed all validation rules.
+public func isFieldValid(_ field: SecureField) -> Bool
+
+// Returns true when the field is the first responder (focused).
+public func isFieldFocused(_ field: SecureField) -> Bool
+
+// Returns true when the field has any content (without revealing the value).
+public func hasFieldContent(_ field: SecureField) -> Bool
+
+// Number of PAN digits typed. Never exposes the digits themselves.
+public var panDigitCount: Int { get }
+```
+
+### Submission
+
+```swift
+// Validates all fields and initiates tokenization.
+// Fires secureFieldsDidTokenize or secureFieldsDidFail on the delegate.
+public func submit(saveToken: Bool = false)
+```
+
+Calling `submit()` while any required field is invalid is safe — it fires
+`secureFieldsDidFail(.fieldsIncomplete)` without making a network request.
+
+### Clear
+
+```swift
+// Zeroes all field buffers, cancels pending BIN lookup, resets brand state.
+public func clearFields()
+```
+
+### Privacy
+
+```swift
+// When true (default), a UIBlurEffect overlay is placed over all card fields
+// while the app is backgrounded or screen recording is active.
+public var obscuresOnBackground: Bool
+```
+
+---
+
+## `SecureFieldsConfig`
+
+Passed to `SecureFieldsManager.init()`. All configuration is immutable after initialisation.
+
+```swift
+public struct SecureFieldsConfig {
+    public init(
+        tenantId: String,
+        baseURL: String,
+        brands: [CardBrand] = CardBrand.allCases,
+        style: SecureFieldsStyle = .default,
+        placeholders: SecureFieldsPlaceholders = .init(),
+        pinnedPublicKeyHashes: [String] = []
+    )
+}
+```
+
+| Parameter | Required | Description |
+|---|---|---|
+| `tenantId` | Yes | Your merchant/tenant identifier |
+| `baseURL` | Yes | Vault API base URL — must use `https://` |
+| `brands` | No | Accepted card networks. Defaults to all supported brands. |
+| `style` | No | Visual style applied to all fields |
+| `placeholders` | No | Placeholder text for each field |
+| `pinnedPublicKeyHashes` | No | SHA-256 SPKI hashes (Base64) for certificate pinning |
+
+**Preconditions** (crash at init time if violated):
+- `baseURL` must start with `https://`
+- `tenantId` must not be blank
+
+---
+
+## `SecureFieldsStyle`
+
+Visual configuration applied to all card input fields.
+
+```swift
+public struct SecureFieldsStyle {
+    public init(
+        font: UIFont = .systemFont(ofSize: 16),
+        textColor: UIColor = .label,
+        placeholderColor: UIColor = .placeholderText,
+        tintColor: UIColor = .systemBlue,
+        keyboardAppearance: UIKeyboardAppearance = .default
+    )
+
+    public static let `default`: SecureFieldsStyle
+}
+```
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `font` | `UIFont` | `.systemFont(ofSize: 16)` | Text font for all inputs |
+| `textColor` | `UIColor` | `.label` | Input text color |
+| `placeholderColor` | `UIColor` | `.placeholderText` | Placeholder text color |
+| `tintColor` | `UIColor` | `.systemBlue` | Cursor and selection highlight color |
+| `keyboardAppearance` | `UIKeyboardAppearance` | `.default` | Light or dark keyboard |
+
+---
+
+## `SecureFieldsPlaceholders`
+
+Placeholder strings for each field. Shown when the field is empty.
+
+```swift
+public struct SecureFieldsPlaceholders {
+    public init(
+        pan: String = "1234 5678 9012 3456",
+        cvv: String = "123",
+        expDate: String = "MM/YY",
+        holderName: String = "Cardholder Name"
+    )
+}
+```
+
+---
+
+## `SecureFieldsDelegate`
+
+A protocol for receiving events from `SecureFieldsManager`. All methods except
+`secureFieldsDidTokenize` and `secureFieldsDidFail` have default no-op implementations.
+
+```swift
+public protocol SecureFieldsDelegate: AnyObject {
+
+    // MARK: Required
+
+    /// Tokenization succeeded. `result.vaultFormToken` is the token to send to your backend.
+    func secureFieldsDidTokenize(_ result: TokenizationResult)
+
+    /// Tokenization or submission failed. See SecureFieldsError.
+    func secureFieldsDidFail(_ error: SecureFieldsError)
+
+    // MARK: Optional (default no-op)
+
+    /// Fires when aggregate form validity changes.
+    /// Use this to enable/disable the Pay button.
+    func secureFieldsFormValidityChanged(_ isValid: Bool)
+
+    /// Fires when the BIN lookup returns results (brands detected) or when
+    /// the card number drops below 8 digits (brands cleared — empty array).
+    func secureFieldsBrandsDetected(_ brands: [CardBrand])
+
+    /// Fires when the user selects a brand from the in-PAN brand selector.
+    func secureFieldsBrandSelected(_ brand: CardBrand)
+
+    /// Fires on any keystroke in any field.
+    func secureFieldsContentChanged()
+
+    /// Fires on focus and blur for any field.
+    func secureFieldsFocusChanged(field: SecureField, isFocused: Bool)
+
+    /// Fires immediately after UIApplication.userDidTakeScreenshotNotification.
+    /// The screenshot has already been saved — the SDK cannot prevent it.
+    /// Respond by calling clearFields() and notifying the user.
+    func secureFieldsScreenshotDetected()
+}
+```
+
+---
+
+## `SecureField`
+
+Identifies a specific card input field.
+
+```swift
+public enum SecureField {
+    case pan        // Primary account number
+    case cvv        // Card verification value (or date-of-birth for Oney)
+    case expDate    // Expiry date
+    case holderName // Cardholder name
+}
+```
+
+Used in:
+- `isFieldValid(_ field: SecureField) -> Bool`
+- `isFieldFocused(_ field: SecureField) -> Bool`
+- `hasFieldContent(_ field: SecureField) -> Bool`
+- `secureFieldsFocusChanged(field:isFocused:)`
+
+---
+
+## `CardBrand`
+
+Supported card networks.
+
+```swift
+public enum CardBrand: String, CaseIterable, Equatable {
+    case visa          = "VISA"
+    case mastercard    = "MASTERCARD"
+    case amex          = "AMEX"
+    case maestro       = "MAESTRO"
+    case carteBancaire = "CARTE_BANCAIRE"
+    case oney          = "ONEY"
+}
+```
+
+The `rawValue` matches the network string returned by the BIN lookup API. `CardBrand.allCases`
+is the default accepted brand list if none is specified in `SecureFieldsConfig`.
+
+**Oney special behaviour:** when `oney` is the selected brand, the CVV field switches to
+date-of-birth input mode (date picker, stored as `YYYY-MM-DD`). The tokenization request sends
+`birthDate` instead of `cvv`.
+
+---
+
+## `TokenizationResult`
+
+Returned via `secureFieldsDidTokenize(_:)` on successful submission.
+
+```swift
+public struct TokenizationResult {
+    public let vaultFormToken: String     // opaque token — send to your backend
+    public let bin: String               // first 8 digits — never the full PAN
+    public let lastFourDigits: String    // last 4 digits
+    public let detectedBrands: [CardBrand]
+}
+```
+
+> `bin` and `lastFourDigits` are safe to display in a payment confirmation UI. `vaultFormToken`
+> is sent to your backend to complete the transaction — it never contains card data.
+
+---
+
+## `SecureFieldsError`
+
+Passed to `secureFieldsDidFail(_:)`.
+
+```swift
+public enum SecureFieldsError: Error {
+    /// submit() called while one or more required fields are invalid.
+    case fieldsIncomplete
+
+    /// URLSession transport failure (no network, timeout, TLS error).
+    case networkError(Error)
+
+    /// Non-2xx HTTP response from the vault API.
+    /// - message: error message from the response body
+    /// - statusCode: HTTP status code (e.g. 400, 422, 500)
+    case apiError(message: String, statusCode: Int)
+
+    /// Response was received but could not be decoded.
+    case invalidResponse
+}
+```

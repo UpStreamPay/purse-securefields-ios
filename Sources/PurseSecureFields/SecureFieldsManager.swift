@@ -290,6 +290,14 @@ public final class SecureFieldsManager {
             )
         )
 
+        // PCI compliance: raw values are copied into `payload` above — zero the field
+        // buffers immediately, before the network round-trip, not on completion.
+        panField.clearSensitiveData()
+        cvvField.clearSensitiveData()
+        expDateField.clearSensitiveData()
+        holderNameField.clearSensitiveData()
+        notifyFormValidity()
+
         apiClient.tokenize(tenantId: config.tenantId, payload: payload) { [weak self] result in
             guard let self else { return }
             DispatchQueue.main.async {

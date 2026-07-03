@@ -19,19 +19,41 @@ jobs:
           ref: ${{ github.event.release.tag_name }}
           token: ${{ secrets.USP_GITHUB_ADMIN_ACCES_TOKEN }}
 
+      - name: Import signing certificate
+        run: |
+          echo "${{ secrets.APPLE_SIGNING_CERT_P12_BASE64 }}" | base64 --decode > certificate.p12
+          security create-keychain -p "ci-temp" signing.keychain
+          security default-keychain -s signing.keychain
+          security unlock-keychain -p "ci-temp" signing.keychain
+          security import certificate.p12 \
+            -k signing.keychain \
+            -P "${{ secrets.APPLE_SIGNING_CERT_P12_PASSWORD }}" \
+            -T /usr/bin/codesign
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s -k "ci-temp" \
+            signing.keychain
+          rm certificate.p12
+
       - name: Build XCFramework
         run: |
           set -o pipefail
 
+          # Device archive — signed with Apple Distribution certificate.
+          # Distribution certs cannot sign simulator slices; signing is intentionally
+          # deferred to the xcframework creation step which handles slice-level decisions.
           xcodebuild archive \
             -scheme PurseSecureFields \
             -destination "generic/platform=iOS" \
             -archivePath .build/ios.xcarchive \
             SKIP_INSTALL=NO \
             BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             INSTALL_PATH='/Library/Frameworks'
 
+          # Simulator archive — code signing disabled.
+          # Apple does not issue distribution certificates for simulator binaries.
           xcodebuild archive \
             -scheme PurseSecureFields \
             -destination "generic/platform=iOS Simulator" \
@@ -41,14 +63,22 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             INSTALL_PATH='/Library/Frameworks'
 
+          # Create and sign the XCFramework.
+          # -codesign signs the device slice with the distribution certificate.
+          # Requires Xcode 14+ (available on macos-15 runners).
           xcodebuild -create-xcframework \
             -framework .build/ios.xcarchive/Products/Library/Frameworks/PurseSecureFields.framework \
             -framework .build/ios-sim.xcarchive/Products/Library/Frameworks/PurseSecureFields.framework \
-            -output .build/PurseSecureFields.xcframework
+            -output .build/PurseSecureFields.xcframework \
+            -codesign "${{ secrets.APPLE_SIGNING_IDENTITY }}"
 
           cd .build
           zip -r PurseSecureFields.xcframework.zip PurseSecureFields.xcframework
           echo "CHECKSUM=$(swift package compute-checksum PurseSecureFields.xcframework.zip)" >> $GITHUB_ENV
+
+      - name: Clean up keychain
+        if: always()
+        run: security delete-keychain signing.keychain || true
 
       - name: Update Package.swift to binary target
         run: |

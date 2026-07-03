@@ -51,8 +51,8 @@ Tests/              — SecureFieldsTests
 - CVV field switches to `UIDatePicker` (birthdate mode) when brand is Oney.
 - Tokenization payload sends `birth_date` instead of `cvv` for Oney.
 
-### No auto-clear on submit
-- `submit()` does NOT clear fields on success. Host app calls `manager.clearFields()` explicitly.
+### Field buffers cleared on submit
+- `submit()` calls `clearSensitiveData()` on all four fields immediately after building the tokenization payload (before the network call), per PCI compliance requirements. This only zeroes text/validity — it does NOT reset BIN lookup state, detected brands, or the brand selector. Host app still calls `manager.clearFields()` for a full reset (e.g. to start a new form).
 
 ## Networking
 - All requests require HTTPS (enforced via `precondition` in `SecureFieldsConfig`).
@@ -89,7 +89,7 @@ Standard Luhn in `CardValidator.luhn(_:)`. Double every second digit from the ri
 - Do not re-add `setPlaceholders` to the manager — use `SecureFieldsConfig`.
 - Do not truncate PAN input — `maxLength` was replaced by `validLengths` for a reason (pasting a 19-char Oney PAN before BIN lookup would be truncated).
 - Do not use `self.text` inside field implementations — always `super.text`.
-- Do not call `clearFields()` automatically after `submit()` — the host app decides lifecycle.
+- Do not call the full `clearFields()` automatically after `submit()` — only `clearSensitiveData()` per field runs there; BIN/brand state reset is still host-triggered.
 
 ## Adding a new card brand
 1. Add case to `CardBrand` enum with the API raw value string.
