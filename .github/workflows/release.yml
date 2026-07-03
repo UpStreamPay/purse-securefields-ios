@@ -52,6 +52,10 @@ jobs:
 
           security create-keychain -p "ci-temp" signing.keychain
           security default-keychain -s signing.keychain
+          # Add the new keychain to the search list — `codesign` searches the
+          # keychain SEARCH LIST, not just the default, so without this it reports
+          # "no identity found" even though the cert imported fine.
+          security list-keychains -d user -s signing.keychain login.keychain-db
           security unlock-keychain -p "ci-temp" signing.keychain
           if ! security import certificate.p12 \
                  -k signing.keychain \
@@ -68,8 +72,6 @@ jobs:
           rm -f certificate.p12 openssl_err
 
       - name: Build XCFramework
-        env:
-          SIGN_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: |
           set -o pipefail
 
@@ -104,10 +106,19 @@ jobs:
             -framework .build/ios-sim.xcarchive/Products/Library/Frameworks/PurseSecureFields.framework \
             -output .build/PurseSecureFields.xcframework
 
-          # Sign the finished .xcframework bundle with the distribution identity so
-          # consumers can verify it (Xcode 15+ third-party XCFramework signatures).
-          # The identity is resolved from signing.keychain imported in the previous step.
-          codesign --timestamp -v --sign "$SIGN_IDENTITY" .build/PurseSecureFields.xcframework
+          # Sign the finished .xcframework bundle so consumers can verify it
+          # (Xcode 15+ third-party XCFramework signatures). Resolve the identity's
+          # SHA-1 hash straight from the keychain we imported — since exactly one
+          # cert was imported, this cannot mismatch and needs no identity string.
+          IDENTITY=$(security find-identity -v -p codesigning signing.keychain \
+                     | awk '/^[[:space:]]*[0-9]+\)/ {print $2; exit}')
+          if [ -z "$IDENTITY" ]; then
+            echo "::error::No codesigning identity found in signing.keychain — the certificate import step did not produce a usable signing identity."
+            security find-identity -v -p codesigning signing.keychain || true
+            exit 1
+          fi
+          echo "Signing xcframework with identity $IDENTITY"
+          codesign --timestamp -v --sign "$IDENTITY" .build/PurseSecureFields.xcframework
 
           cd .build
           zip -r PurseSecureFields.xcframework.zip PurseSecureFields.xcframework
