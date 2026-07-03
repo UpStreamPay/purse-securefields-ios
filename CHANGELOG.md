@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.4](https://github.com/UpStreamPay/vault-ios/compare/v1.1.3...v1.1.4) (2026-07-03)
+
+
+### Bug Fixes
+
+* find cert in keychain ([508b195](https://github.com/UpStreamPay/vault-ios/commit/508b19550c4eaaa4a3bbd24a1d62ba072e602801))
+* find cert in keychain ([557f24d](https://github.com/UpStreamPay/vault-ios/commit/557f24ddc20601d398c000b70179e7832fbb43d5))
+
 ## [1.1.3](https://github.com/UpStreamPay/vault-ios/compare/v1.1.2...v1.1.3) (2026-07-03)
 
 
