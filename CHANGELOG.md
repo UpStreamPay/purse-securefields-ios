@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.3](https://github.com/UpStreamPay/vault-ios/compare/v1.1.2...v1.1.3) (2026-07-03)
+
+
+### Bug Fixes
+
+* i dont get it ([110b711](https://github.com/UpStreamPay/vault-ios/commit/110b71182e31627b7abf9406299b7083ec8a5c5b))
+* i dont get it ([c7b9bf7](https://github.com/UpStreamPay/vault-ios/commit/c7b9bf7a6a544198e8ed75776bf7d9e39669904f))
+
 ## [1.1.2](https://github.com/UpStreamPay/vault-ios/compare/v1.1.1...v1.1.2) (2026-07-03)
 
 
