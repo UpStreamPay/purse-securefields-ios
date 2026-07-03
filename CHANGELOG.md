@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.1](https://github.com/UpStreamPay/vault-ios/compare/v1.1.0...v1.1.1) (2026-07-03)
+
+
+### Bug Fixes
+
+* ci signing ([3a6fabb](https://github.com/UpStreamPay/vault-ios/commit/3a6fabb8f2fbaa4b343948e266edb66a1d1aba2b))
+* ci signing ([f9c73d3](https://github.com/UpStreamPay/vault-ios/commit/f9c73d3a227bbb7226cb93e98489c1fab1e6840c))
+
 ## [1.1.0](https://github.com/UpStreamPay/vault-ios/compare/v1.0.4...v1.1.0) (2026-07-03)
 
 
