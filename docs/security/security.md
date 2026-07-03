@@ -133,8 +133,8 @@ if deviceIsJailbroken() {
 | **Privacy overlay on background** | `UIBlurEffect` placed over all card fields on `willResignActiveNotification` — card data not visible in app-switcher thumbnails |
 | **Screen recording detection** | `UIScreen.capturedDidChangeNotification` triggers the privacy overlay automatically when screen recording starts |
 | **Screenshot notification** | `UIApplication.userDidTakeScreenshotNotification` fires `secureFieldsScreenshotDetected()` — host app can clear fields and warn the user |
-| **Keyboard learning disabled** | `autocorrectionType = .no`, `spellCheckingType = .no`, `smartQuotesType = .no` on all fields — keyboard never stores PAN or CVV digits |
-| **Autofill disabled** | `textContentType = .none` on all card fields — password managers and iCloud Keychain cannot cache card values |
+| **Keyboard learning disabled** | `autocorrectionType = .no` on all four fields; `spellCheckingType = .no` on PAN and cardholder name — keyboard never stores PAN, CVV, or name input |
+| **Autofill scoped intentionally** | PAN uses `textContentType = .creditCardNumber` (enables Wallet-saved-card suggestions and camera card scan); cardholder name uses `.name` (contact autofill); CVV and expiry leave it unset since no matching autofill type exists — password managers and iCloud Keychain never see or cache these values, as none are exposed via `text`/`attributedText` getters (see above) |
 | **isSecureTextEntry on CVV** | CVV field uses `isSecureTextEntry = true` — input is masked and excluded from screenshots |
 | **Memory cleared on submit** | `clearSensitiveData()` zeroes internal field content immediately after the tokenization request is built |
 | **Memory cleared on clearFields()** | All field buffers are zeroed; pending BIN lookups are cancelled |

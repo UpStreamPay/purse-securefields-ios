@@ -200,10 +200,12 @@ cost of UI flexibility.
 
 Adyen, Checkout.com, Primer, and the Vault SDK all operate at SAQ A-EP: native inputs inside
 the merchant app's process, with the SDK responsible for tokenization before any sensitive data
-reaches the merchant's backend. The plaintext PAN exists in memory briefly. iOS Swift structs
-are value types allocated on the stack, which are deterministically released when they go out
-of scope. Unlike the JVM (where `String` is immutable and GC-managed), Swift allows zeroing
-stack memory through `withUnsafeMutableBytes` — the SDK uses this in `clearSensitiveData()`.
+reaches the merchant's backend. The plaintext PAN exists in memory briefly, held in the internal
+field's `text` storage. `clearSensitiveData()` reassigns that storage to an empty string, which
+drops the SDK's only reference to the previous buffer and makes it eligible for ARC
+deallocation; it is not an explicit byte-level wipe (Swift's `String` gives no supported API for
+synchronously zeroing its backing storage, and a PAN-length string is heap-allocated via a
+copy-on-write buffer, not stack memory).
 
 The key distinction in the Vault SDK compared to Adyen and Checkout.com is that raw card values
 are never passed through a public API. Adyen's `EncryptedCard(cardNumber:...)` and Checkout.com's
@@ -226,10 +228,10 @@ How each SDK prevents keyboard apps and system services from learning card data:
 | Control | Stripe | Adyen | Checkout.com | VGS | Purse Vault |
 |---|---|---|---|---|---|
 | `autocorrectionType = .no` | Yes | Yes | Yes | Partial | Yes — all fields |
-| `spellCheckingType = .no` | Yes | Yes | Varies | Partial | Yes — all fields |
-| `textContentType = .none` | Yes | Yes | Yes | Partial | Yes — all fields |
+| `spellCheckingType = .no` | Yes | Yes | Varies | Partial | PAN and cardholder name |
+| `textContentType` scoped | Yes | Yes | Yes | Partial | `.creditCardNumber` on PAN, `.name` on cardholder name (intentional, for Wallet/camera-scan and contact autofill), unset on CVV/expiry |
 | `isSecureTextEntry` on CVV | Yes | Yes | Yes | No | Yes — CVV field |
-| Keyboard learning prevention | Yes | Yes | Partial | No | Yes — `.no` on all relevant types |
+| Keyboard learning prevention | Yes | Yes | Partial | No | `autocorrectionType = .no` on all fields; no card data reaches third-party keyboards regardless of `textContentType` |
 
 ---
 

@@ -32,8 +32,12 @@ managed by the SDK — raw card values are never accessible to your application 
 | `holderNameView` | `UIView` | Cardholder name (free text) |
 
 All four are `UIView` instances — place them anywhere in your view hierarchy using Auto Layout or
-frame-based layout. The underlying `UITextField` subclasses are `internal` to the SDK and cannot
-be accessed through any cast.
+frame-based layout. The underlying `UITextField` subclasses (`SecureCVVField`, etc.) are
+`internal` to the SDK, so your code cannot name or cast to those concrete types. A cast to the
+public `UITextField` superclass will still succeed, but that is not a way to read card data: the
+`text`/`attributedText` getters are overridden to always return `nil` to external callers (see
+[Security](../security/security.md#what-your-application-cannot-do)), so no raw value is ever
+exposed regardless of how the view is cast.
 
 ---
 

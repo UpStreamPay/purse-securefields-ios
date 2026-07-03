@@ -380,6 +380,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		3C1B95BC2FD181C000E5108E /* PurseSecureFields */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = 3C1B95BB2FD181C000E5108E /* XCLocalSwiftPackageReference ".." */;
 			productName = PurseSecureFields;
 		};
 /* End XCSwiftPackageProductDependency section */
