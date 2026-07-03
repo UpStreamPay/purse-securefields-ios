@@ -108,13 +108,27 @@ jobs:
 
           # Sign the finished .xcframework bundle so consumers can verify it
           # (Xcode 15+ third-party XCFramework signatures). Resolve the identity's
-          # SHA-1 hash straight from the keychain we imported — since exactly one
-          # cert was imported, this cannot mismatch and needs no identity string.
+          # SHA-1 hash straight from the keychain we imported.
+          echo "--- Codesigning identities (valid only) ---"
+          security find-identity -v -p codesigning signing.keychain || true
+          echo "--- Codesigning identities (any validity) ---"
+          security find-identity -p codesigning signing.keychain || true
+          echo "--- Certificates in keychain ---"
+          security find-certificate -a signing.keychain | grep -i "labl" || true
+
+          # Prefer a fully-valid identity; if none, fall back to any identity that
+          # has a private key. `-v` rejects identities with an untrusted chain
+          # (e.g. missing Apple WWDR intermediate) or expiry, but codesign can
+          # still sign with them — only verification needs the full chain.
           IDENTITY=$(security find-identity -v -p codesigning signing.keychain \
                      | awk '/^[[:space:]]*[0-9]+\)/ {print $2; exit}')
           if [ -z "$IDENTITY" ]; then
-            echo "::error::No codesigning identity found in signing.keychain — the certificate import step did not produce a usable signing identity."
-            security find-identity -v -p codesigning signing.keychain || true
+            IDENTITY=$(security find-identity -p codesigning signing.keychain \
+                       | awk '/^[[:space:]]*[0-9]+\)/ {print $2; exit}')
+            [ -n "$IDENTITY" ] && echo "::warning::No *valid* identity (untrusted chain or expired?). Falling back to identity $IDENTITY, which has a private key."
+          fi
+          if [ -z "$IDENTITY" ]; then
+            echo "::error::No codesigning identity with a private key exists in signing.keychain. The .p12 almost certainly contains only the certificate, not the private key — re-export it from Keychain Access selecting BOTH the certificate and its private key, then regenerate APPLE_SIGNING_CERT_P12_BASE64."
             exit 1
           fi
           echo "Signing xcframework with identity $IDENTITY"
