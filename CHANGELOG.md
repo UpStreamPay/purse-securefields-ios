@@ -1,5 +1,43 @@
 # Changelog
 
+## [1.1.0](https://github.com/UpStreamPay/vault-ios/compare/v1.0.4...v1.1.0) (2026-07-03)
+
+
+### Features
+
+* add local documentation following the android's structure and signing step ([3310736](https://github.com/UpStreamPay/vault-ios/commit/3310736e1f658bb11ffef72bbddcdd480215b92a))
+* add XCUITest suite for Demo UX flows ([88dd760](https://github.com/UpStreamPay/vault-ios/commit/88dd76055adeb057a0414249f5ebefb9d27773c8))
+* PurseSecureFields iOS SDK — initial implementation ([ed580df](https://github.com/UpStreamPay/vault-ios/commit/ed580df93fb9049f79b384ab2ca07715cbd91725))
+
+
+### Bug Fixes
+
+* address code review findings H1-H7, M1, M5-M7 ([607282d](https://github.com/UpStreamPay/vault-ios/commit/607282d65473c9cfd12a705e2a31ea83a4980b55))
+* **ci:** add INSTALL_PATH to archive commands + update README ([eb43be0](https://github.com/UpStreamPay/vault-ios/commit/eb43be0fdc8197887754b7c540c13340c07a5455))
+* **ci:** add INSTALL_PATH to archive commands + update README ([538e524](https://github.com/UpStreamPay/vault-ios/commit/538e524c8943c0ae495df9fc96034ad486488a58))
+* **ci:** correct YAML heredoc indentation in release workflow ([c0627e9](https://github.com/UpStreamPay/vault-ios/commit/c0627e939a28ec0a7220805fc829fa386f562033))
+* **ci:** correct YAML heredoc indentation in release workflow ([33e1e14](https://github.com/UpStreamPay/vault-ios/commit/33e1e143d9db9b7d186b50239d39edc3f2885005))
+* **ci:** trigger XCFramework build from release-please job ([6082621](https://github.com/UpStreamPay/vault-ios/commit/6082621f965b8c601fa4b80d0f94a82ec0c248d6))
+* **ci:** use PAT so release-please triggers release workflow ([47da6f5](https://github.com/UpStreamPay/vault-ios/commit/47da6f5204a727a05bd9d7c746ee844eb5effe20))
+* **demo:** correct local package ref path to .. ([645e491](https://github.com/UpStreamPay/vault-ios/commit/645e491f7957a0e0468a0c3c6f3fe0455dc9aa18))
+* **demo:** use relative path ../.. for local package ref ([4e9cf82](https://github.com/UpStreamPay/vault-ios/commit/4e9cf8286596b99b8acef932650146462cc23a30))
+* mark library as dynamic for XCFramework distribution ([c27458c](https://github.com/UpStreamPay/vault-ios/commit/c27458c59544a0ad86548d1f5d16796d94c0a3b0))
+* mark library as dynamic for XCFramework distribution ([5f80a04](https://github.com/UpStreamPay/vault-ios/commit/5f80a04fa051f7cc8d45be68f6e10d2e69eac20e))
+* remaining review items — M2, M4, L3, L4 + CI destination ([f92579d](https://github.com/UpStreamPay/vault-ios/commit/f92579da7c49c58bcedb93dfe1536e18e55c3004))
+* **security:** close PCI field isolation gaps and add TLS pinning infrastructure ([17b192d](https://github.com/UpStreamPay/vault-ios/commit/17b192dfa0faaa1e73b6ccf687bc2a1300e19041))
+* **uitests:** call updateFieldBorders on init + reliable focus dismissal ([4e2228a](https://github.com/UpStreamPay/vault-ios/commit/4e2228a85d99a07db4027ad0a7063bddabc7475b))
+
+
+### Documentation
+
+* add local documentation following the android's structure ([3e715a7](https://github.com/UpStreamPay/vault-ios/commit/3e715a74cad53aebf2800d43e4252d38f08a33ca))
+
+
+### Refactoring
+
+* doc compliance ([00a21af](https://github.com/UpStreamPay/vault-ios/commit/00a21afd71d7106a26f4f10015e1e4a3166af1f8))
+* remove DemoTests target — coverage owned by library tests + UI tests ([549225c](https://github.com/UpStreamPay/vault-ios/commit/549225c3f77c4048b55576abaf96335cd3215764))
+
 ## [1.0.4](https://github.com/UpStreamPay/vault-ios/compare/v1.0.3...v1.0.4) (2026-06-05)
 
 
