@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.5](https://github.com/UpStreamPay/vault-ios/compare/v1.1.4...v1.1.5) (2026-07-03)
+
+
+### Bug Fixes
+
+* claudio en sueur ([d25e248](https://github.com/UpStreamPay/vault-ios/commit/d25e2487b83b26913252ce059eecdc7a848de1b6))
+* claudio en sueur ([478bd6a](https://github.com/UpStreamPay/vault-ios/commit/478bd6a61f4e4b85931727dff532f6411b5512db))
+
 ## [1.1.4](https://github.com/UpStreamPay/vault-ios/compare/v1.1.3...v1.1.4) (2026-07-03)
 
 
