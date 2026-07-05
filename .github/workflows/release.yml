@@ -10,7 +10,7 @@ permissions:
 jobs:
   xcframework:
     name: Build & publish XCFramework
-    runs-on: macos-26
+    runs-on: macos-15
 
     steps:
       - name: Checkout
@@ -20,56 +20,10 @@ jobs:
           token: ${{ secrets.USP_GITHUB_ADMIN_ACCES_TOKEN }}
 
       - name: Import signing certificate
-        env:
-          P12_B64: ${{ secrets.APPLE_SIGNING_CERT_P12_BASE64 }}
-          P12_PASS: ${{ secrets.APPLE_SIGNING_CERT_P12_PASSWORD }}
-        run: |
-          set -euo pipefail
-
-          # Decode the certificate. Passing the secret via env (not inline
-          # interpolation) avoids the shell re-interpreting characters in the value.
-          echo "$P12_B64" | base64 --decode > certificate.p12
-
-          # Hard-fail only on the one thing that is unambiguously broken: an empty
-          # file (missing secret or a base64 round-trip that produced nothing).
-          if [ ! -s certificate.p12 ]; then
-            echo "::error::Decoded certificate.p12 is empty — APPLE_SIGNING_CERT_P12_BASE64 is missing or did not decode."
-            exit 1
-          fi
-          echo "Decoded certificate.p12 size: $(wc -c < certificate.p12) bytes"
-
-          # Informational only — DO NOT gate the build on this. macOS `.p12` files
-          # are typically encrypted with legacy ciphers (e.g. RC2-40-CBC) that
-          # OpenSSL 3.x refuses unless the legacy provider is loaded (`-legacy`).
-          # `security import` below handles those files natively, so an openssl
-          # failure here is not a real problem — it's just a diagnostic hint.
-          if openssl pkcs12 -legacy -in certificate.p12 -noout -passin pass:"$P12_PASS" 2>/dev/null \
-             || openssl pkcs12 -in certificate.p12 -noout -passin pass:"$P12_PASS" 2>/dev/null; then
-            echo "p12 opened by openssl — password verified."
-          else
-            echo "::warning::openssl could not open the .p12 (often just a legacy-cipher/OpenSSL-3 quirk). Deferring to 'security import', which handles legacy PKCS#12."
-          fi
-
-          security create-keychain -p "ci-temp" signing.keychain
-          security default-keychain -s signing.keychain
-          # Add the new keychain to the search list — `codesign` searches the
-          # keychain SEARCH LIST, not just the default, so without this it reports
-          # "no identity found" even though the cert imported fine.
-          security list-keychains -d user -s signing.keychain login.keychain-db
-          security unlock-keychain -p "ci-temp" signing.keychain
-          if ! security import certificate.p12 \
-                 -k signing.keychain \
-                 -P "$P12_PASS" \
-                 -T /usr/bin/codesign; then
-            echo "::error::security import failed. With the empty-file case ruled out above, this means APPLE_SIGNING_CERT_P12_PASSWORD does not match this .p12, or the base64 in APPLE_SIGNING_CERT_P12_BASE64 was corrupted (wrapping/whitespace). Re-export the cert and regenerate the secret with: base64 -i cert.p12 | pbcopy"
-            rm -f certificate.p12
-            exit 1
-          fi
-          security set-key-partition-list \
-            -S apple-tool:,apple: \
-            -s -k "ci-temp" \
-            signing.keychain
-          rm -f certificate.p12 openssl_err
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.APPLE_SIGNING_CERT_P12_BASE64 }}
+          p12-password: ${{ secrets.APPLE_SIGNING_CERT_P12_PASSWORD }}
 
       - name: Build XCFramework
         run: |
@@ -107,28 +61,17 @@ jobs:
             -output .build/PurseSecureFields.xcframework
 
           # Sign the finished .xcframework bundle so consumers can verify it
-          # (Xcode 15+ third-party XCFramework signatures). Resolve the identity's
-          # SHA-1 hash straight from the keychain we imported.
-          echo "--- Codesigning identities (valid only) ---"
-          security find-identity -v -p codesigning signing.keychain || true
-          echo "--- Codesigning identities (any validity) ---"
-          security find-identity -p codesigning signing.keychain || true
-          echo "--- Certificates in keychain ---"
-          security find-certificate -a signing.keychain | grep -i "labl" || true
-
-          # Prefer a fully-valid identity; if none, fall back to any identity that
-          # has a private key. `-v` rejects identities with an untrusted chain
-          # (e.g. missing Apple WWDR intermediate) or expiry, but codesign can
-          # still sign with them — only verification needs the full chain.
-          IDENTITY=$(security find-identity -v -p codesigning signing.keychain \
-                     | awk '/^[[:space:]]*[0-9]+\)/ {print $2; exit}')
+          # (Xcode 15+ third-party XCFramework signatures). Prefer a fully-valid
+          # identity; fall back to any identity with a private key, since `-v`
+          # rejects an untrusted chain (e.g. missing Apple WWDR intermediate) or
+          # expiry even though codesign can still sign with it.
+          IDENTITY=$(security find-identity -v -p codesigning | awk '/^[[:space:]]*[0-9]+\)/ {print $2; exit}')
           if [ -z "$IDENTITY" ]; then
-            IDENTITY=$(security find-identity -p codesigning signing.keychain \
-                       | awk '/^[[:space:]]*[0-9]+\)/ {print $2; exit}')
+            IDENTITY=$(security find-identity -p codesigning | awk '/^[[:space:]]*[0-9]+\)/ {print $2; exit}')
             [ -n "$IDENTITY" ] && echo "::warning::No *valid* identity (untrusted chain or expired?). Falling back to identity $IDENTITY, which has a private key."
           fi
           if [ -z "$IDENTITY" ]; then
-            echo "::error::No codesigning identity with a private key exists in signing.keychain. The .p12 almost certainly contains only the certificate, not the private key — re-export it from Keychain Access selecting BOTH the certificate and its private key, then regenerate APPLE_SIGNING_CERT_P12_BASE64."
+            echo "::error::No codesigning identity with a private key found. The .p12 likely contains only the certificate, not the private key — re-export it from Keychain Access selecting BOTH the certificate and its private key, then regenerate APPLE_SIGNING_CERT_P12_BASE64."
             exit 1
           fi
           echo "Signing xcframework with identity $IDENTITY"
@@ -137,10 +80,6 @@ jobs:
           cd .build
           zip -r PurseSecureFields.xcframework.zip PurseSecureFields.xcframework
           echo "CHECKSUM=$(swift package compute-checksum PurseSecureFields.xcframework.zip)" >> $GITHUB_ENV
-
-      - name: Clean up keychain
-        if: always()
-        run: security delete-keychain signing.keychain || true
 
       - name: Update Package.swift to binary target
         run: |
