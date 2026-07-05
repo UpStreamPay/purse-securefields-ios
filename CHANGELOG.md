@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.6](https://github.com/UpStreamPay/vault-ios/compare/v1.1.5...v1.1.6) (2026-07-05)
+
+
+### Bug Fixes
+
+* use macos-15 ([62ff181](https://github.com/UpStreamPay/vault-ios/commit/62ff1810ce6972cecfa74ee36e0947b494be5478))
+* use macos-15 ([8384d16](https://github.com/UpStreamPay/vault-ios/commit/8384d160ae02bca67f7c9cd9e85d35aca2e80274))
+
 ## [1.1.5](https://github.com/UpStreamPay/vault-ios/compare/v1.1.4...v1.1.5) (2026-07-03)
 
 
