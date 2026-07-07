@@ -102,6 +102,7 @@ struct RemoteLogClientTests {
         #expect(array.count == 1)
         #expect(array[0]["tenantId"] as? String == "tenant-1")
         #expect(array[0]["instanceId"] as? String == "instance-1")
+        #expect(array[0]["platform"] as? String == "ios")
         #expect(array[0]["level"] as? String == "OK")
         #expect(array[0]["code"] as? String == "INIT_SDK")
     }

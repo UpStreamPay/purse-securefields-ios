@@ -48,4 +48,5 @@ struct SecureFieldsLog: Encodable {
     let level: LogLevel
     let code: String
     let payload: [String: JSONValue]
+    let platform = "ios"
 }
