@@ -247,6 +247,29 @@ public struct TokenizationResult {
 }
 ```
 
+## Demo app
+
+`Demo/Demo.xcodeproj` is a manual-testing-only UIKit app — it is not shipped. Open it in Xcode
+and run the **Demo** scheme on a simulator or device.
+
+### Configuration (optional)
+
+The demo reads `TENANT_ID` and `MONITORING_API_KEY` via `Demo/Resources/Info.plist`'s
+`$(VAR)` build-setting substitution. Xcode resolves these from whatever's in the environment of
+the process that builds the app — a plain `export` only reaches `xcodebuild` run from that same
+shell, not Xcode.app opened via Finder/Dock. To set both, use the provided script instead:
+
+```bash
+cp .env.example .env
+# then edit .env with real values
+source scripts/load-env.sh   # exports for this shell AND launchctl setenv for GUI-launched Xcode
+```
+
+`load-env.sh` needs re-running whenever a value in `.env` changes (it persists via `launchctl`
+until logout/reboot otherwise). Without any `.env` file, the demo still builds and runs fine —
+`TENANT_ID` falls back to a shared sandbox tenant and `MONITORING_API_KEY` falls back to `nil`
+(remote log monitoring disabled).
+
 ## License
 
 Copyright © Purse. All rights reserved.

@@ -25,7 +25,7 @@ final class DemoViewController: UIViewController {
         }
         #endif
         return SecureFieldsManager(config: SecureFieldsConfig(
-            tenantId: "61ff8a6a-edd5-4f40-aa32-8410a73e79ac",
+            tenantId: Self.tenantId,
             baseURL: "https://api.vault.purse-sandbox.com",
             placeholders: SecureFieldsPlaceholders(
                 pan: "1234 5678 9012 3456",
@@ -38,9 +38,16 @@ final class DemoViewController: UIViewController {
         ))
     }
 
-    // Set via the MONITORING_API_KEY env var when launching Xcode/xcodebuild (see
-    // Demo/Resources/Info.plist) — never commit a real key here. `nil` when unset, which
-    // leaves remote log monitoring disabled.
+    // Set via env vars when launching Xcode/xcodebuild, or a gitignored .env file loaded with
+    // `source scripts/load-env.sh` (see Demo/Resources/Info.plist) — never commit real values
+    // here. Falls back to a shared sandbox tenant when unset, so the demo still runs out of
+    // the box.
+    private static var tenantId: String {
+        let value = Bundle.main.object(forInfoDictionaryKey: "TENANT_ID") as? String
+        return value?.isEmpty == false ? value! : "61ff8a6a-edd5-4f40-aa32-8410a73e79ac"
+    }
+
+    // Blank when unset, which leaves remote log monitoring disabled.
     private static var monitoringApiKey: String? {
         let value = Bundle.main.object(forInfoDictionaryKey: "MONITORING_API_KEY") as? String
         return value?.isEmpty == false ? value : nil
