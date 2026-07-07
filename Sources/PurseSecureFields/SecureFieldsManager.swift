@@ -80,16 +80,37 @@ public final class SecureFieldsManager {
 
     private let config: SecureFieldsConfig
     private let apiClient: VaultAPIClient
+    // Remote log monitoring — observes submit start/result via explicit hooks (below) rather
+    // than tracking submit counters inline here. See MonitoringCoordinator for everything this
+    // manager doesn't need to know about monitoring.
+    private let monitoring: MonitoringCoordinator
     private var detectedBrands: [CardBrand] = []
     private var lastBinResult: BinLookupResult?
     private var binLookupWorkItem: DispatchWorkItem?
     private var lastBinPrefix: String?
     private var isSubmitting = false
     private var privacyObservers: [NSObjectProtocol] = []
+    private var monitoringObservers: [NSObjectProtocol] = []
 
     // MARK: - Init
 
     public init(config: SecureFieldsConfig) {
+        // Constructed and started first, using the local `config` parameter — Swift requires
+        // every stored property be assigned before `self` is used, so `monitoring` (a `let`)
+        // is built here and assigned to `self.monitoring` below.
+        let monitoring = MonitoringCoordinator(
+            tenantId: config.tenantId,
+            version: VaultAPIClient.sdkVersion,
+            env: config.monitoringEnvironment.rawValue,
+            monitoringApiRoot: config.monitoringEnvironment.apiRoot,
+            apiKey: config.apiKey,
+            monitoringEnabled: config.monitoringEnabled
+        )
+        monitoring.start(config: config)
+        // The manager's lifetime *is* the card-entry window: suppress from here until deinit.
+        monitoring.mount()
+        self.monitoring = monitoring
+
         self.config = config
         #if DEBUG
         if let testSession = config.testURLSession {
@@ -113,6 +134,12 @@ public final class SecureFieldsManager {
         setupBrandSelector()
         applyConfig(config)
         setupPrivacyObservers()
+        setupMonitoringObservers()
+    }
+
+    deinit {
+        monitoringObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        monitoring.unmount()
     }
 
     // MARK: - Config
@@ -241,6 +268,19 @@ public final class SecureFieldsManager {
         ]
     }
 
+    /// Unlike `setupPrivacyObservers()`, these run regardless of `obscuresOnBackground` and are
+    /// only ever registered once, at init — flushing buffered logs must not depend on a privacy
+    /// setting the host app may turn off.
+    private func setupMonitoringObservers() {
+        let nc = NotificationCenter.default
+        monitoringObservers = [
+            nc.addObserver(forName: UIApplication.didEnterBackgroundNotification,
+                           object: nil, queue: .main) { [weak self] _ in self?.monitoring.flush() },
+            nc.addObserver(forName: UIApplication.willTerminateNotification,
+                           object: nil, queue: .main) { [weak self] _ in self?.monitoring.flush() },
+        ]
+    }
+
     private func setPrivacyOverlay(_ show: Bool) {
         let views: [UIView] = [panContainer, cvvView, expDateView, holderNameView]
         for view in views {
@@ -298,12 +338,14 @@ public final class SecureFieldsManager {
         holderNameField.clearSensitiveData()
         notifyFormValidity()
 
+        monitoring.recordSubmitStart()
         apiClient.tokenize(tenantId: config.tenantId, payload: payload) { [weak self] result in
             guard let self else { return }
             DispatchQueue.main.async {
                 self.isSubmitting = false
                 switch result {
                 case .success(let response):
+                    self.monitoring.recordSubmitSuccess()
                     let tokenResult = TokenizationResult(
                         vaultFormToken: response.formToken,
                         bin: response.card.bin,
@@ -312,6 +354,7 @@ public final class SecureFieldsManager {
                     )
                     self.delegate?.secureFieldsDidTokenize(tokenResult)
                 case .failure(let error):
+                    self.monitoring.recordSubmitFailure(error)
                     self.delegate?.secureFieldsDidFail(error)
                 }
             }

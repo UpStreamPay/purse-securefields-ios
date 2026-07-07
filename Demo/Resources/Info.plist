@@ -18,6 +18,11 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- Remote log monitoring API key for the demo app — set via the MONITORING_API_KEY env
+	     var when launching Xcode/xcodebuild (never commit a real key). Resolves to an empty
+	     string when unset, which leaves remote log monitoring disabled. -->
+	<key>MONITORING_API_KEY</key>
+	<string>$(MONITORING_API_KEY)</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

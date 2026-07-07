@@ -57,7 +57,7 @@ class CheckoutViewController: UIViewController {
     lazy var secureFields = SecureFieldsManager(
         config: SecureFieldsConfig(
             tenantId: "YOUR_TENANT_ID",
-            baseURL: "https://api.vault.purse-test.com"
+            baseURL: "https://api.vault.purse-sandbox.com"
         )
     )
 

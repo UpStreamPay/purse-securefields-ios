@@ -14,8 +14,9 @@ Always run a clean build after changes. BUILD SUCCEEDED is the acceptance bar.
 
 ```
 Sources/PurseSecureFields/
-  Models/           — CardBrand, SecureFieldsConfig (+ Style + Placeholders), SecureFieldsError, TokenizationResult
+  Models/           — CardBrand, SecureFieldsConfig (+ Style + Placeholders), SecureFieldsError, TokenizationResult, MonitoringEnvironment
   Networking/       — VaultAPIClient, NetworkModels (BIN lookup + tokenization payloads)
+  Monitoring/       — RemoteLogger, RemoteLogClient, LogQueue, SecureFieldsLog (remote log monitoring, separate from VaultAPIClient)
   Internal/         — CardFormatter (PAN display grouping), CardValidator (Luhn, expiry)
   Views/            — SecureBaseField, SecurePAN/CVV/ExpDate/HolderNameField, SecurePANContainer, SecureBrandSelectorView
   SecureFieldsManager.swift   — public API entry point
@@ -62,6 +63,14 @@ Tests/              — SecureFieldsTests
 - **SPKI certificate pinning**: `SecureFieldsConfig.pinnedPublicKeyHashes` accepts Base64-encoded SHA-256 SPKI hashes. When set, `VaultAPIClient` enforces pinning via `PinningDelegate` (a private `URLSessionDelegate`). Supported key types: RSA-2048, RSA-4096, EC-256, EC-384. Provide ≥ 2 hashes (primary + rotation backup). A `#if DEBUG` warning is printed when hashes are empty. **Production integrations must set this field.**
 - `VaultAPIClient` has two inits: `init(baseURL:pinnedPublicKeyHashes:)` for production (creates pinned session), and `init(baseURL:session:)` for test injection only (pinning skipped). Never call the test init in production code.
 
+## Remote log monitoring
+- `SecureFieldsManager` carries **no monitoring state** — no counters, no payload-building. It owns one `MonitoringCoordinator` (in `Monitoring/`) and only ever calls `start(config:)`/`mount()`/`unmount()` (construction/`deinit`) and `recordSubmitStart()`/`recordSubmitSuccess()`/`recordSubmitFailure(_:)` (the same two points in `submit()` where it already calls its own `delegate`). If you're about to add a counter or `JSONValue` payload directly to `SecureFieldsManager`, stop — that logic belongs in `MonitoringCoordinator`.
+- `MonitoringCoordinator` owns a `RemoteLogger` — a separate, opt-out logger from `VaultAPIClient`'s local `#if DEBUG` prints — which forwards `info`/`warn`/`error` events to the `cf-widget-logger` worker for Datadog. Configured via `SecureFieldsConfig.apiKey`/`monitoringEnabled`/`monitoringEnvironment`; disables itself silently when `apiKey` is missing.
+- PCI: `MonitoringCoordinator.mount()`/`.unmount()` toggle `RemoteLogger.mounted`, which suppresses **all** logging while `true`. `mount()` runs at the top of `SecureFieldsManager.init` and `unmount()` in `deinit` — the manager's whole lifetime is the card-entry window, so nothing is ever sent while it's alive. Never log from inside that window; only `INIT_SDK` (from `start(config:)`, before `mount()`) and `DESTROY` (from `unmount()`) fire in normal operation.
+- Log payloads carry only structural metadata (brand list, submit outcome counts, non-sensitive error codes like `"NETWORK_ERROR"` or an HTTP status string) — never the error `message`, which could echo back arbitrary server text.
+- Kept as a separate class/network stack from `VaultAPIClient` on purpose, so a telemetry failure can never affect PCI flows.
+- `MonitoringEnvironment.test` is wrapped in `#if DEBUG` — never remove that guard or add a similar always-compiled "internal/test" option. The distributed XCFramework is always built in `Release` configuration (`xcodebuild archive` in release.yml), so `#if DEBUG` is the only mechanism that actually keeps something out of what merchants integrate — a runtime check (like Android's `FLAG_DEBUGGABLE` guard) would NOT work here, since this framework isn't recompiled per host app.
+
 ## Style / placeholder config
 - Applied once at init via `applyConfig(_:)` in the manager.
 - `SecureFieldsStyle` sets font, textColor, tintColor, keyboardAppearance, placeholderColor.
@@ -85,6 +94,7 @@ Standard Luhn in `CardValidator.luhn(_:)`. Double every second digit from the ri
 
 ## What NOT to do
 - Do not add logging of card data anywhere, including in debug builds.
+- Do not add a `RemoteLogger.info/warn/error` call anywhere between `SecureFieldsManager.init` setting `mounted = true` and `deinit` setting it back to `false` — that entire window must stay silent by design (PCI). If you need new telemetry, add it to the `INIT_SDK` or `DESTROY` payloads instead.
 - Do not add `public` to `SecureBaseField`, `SecurePANField`, `SecureCVVField`, `SecureExpDateField`, or `SecureHolderNameField`.
 - Do not re-add `setPlaceholders` to the manager — use `SecureFieldsConfig`.
 - Do not truncate PAN input — `maxLength` was replaced by `validLengths` for a reason (pasting a 19-char Oney PAN before BIN lookup would be truncated).

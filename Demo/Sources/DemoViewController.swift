@@ -26,14 +26,24 @@ final class DemoViewController: UIViewController {
         #endif
         return SecureFieldsManager(config: SecureFieldsConfig(
             tenantId: "61ff8a6a-edd5-4f40-aa32-8410a73e79ac",
-            baseURL: "https://api.vault.purse-test.com",
+            baseURL: "https://api.vault.purse-sandbox.com",
             placeholders: SecureFieldsPlaceholders(
                 pan: "1234 5678 9012 3456",
                 cvv: "123",
                 expDate: "MM/YY",
                 holderName: "Name Surname"
-            )
+            ),
+            apiKey: Self.monitoringApiKey,
+            monitoringEnvironment: .sandbox
         ))
+    }
+
+    // Set via the MONITORING_API_KEY env var when launching Xcode/xcodebuild (see
+    // Demo/Resources/Info.plist) — never commit a real key here. `nil` when unset, which
+    // leaves remote log monitoring disabled.
+    private static var monitoringApiKey: String? {
+        let value = Bundle.main.object(forInfoDictionaryKey: "MONITORING_API_KEY") as? String
+        return value?.isEmpty == false ? value : nil
     }
 
     // MARK: - UI

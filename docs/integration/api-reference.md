@@ -8,6 +8,8 @@ Module: `PurseSecureFields`
 
 - [SecureFieldsManager](#securefieldsmanager)
 - [SecureFieldsConfig](#securefieldsconfig)
+- [Remote log monitoring](#remote-log-monitoring)
+- [MonitoringEnvironment](#monitoringenvironment)
 - [SecureFieldsStyle](#securefieldsstyle)
 - [SecureFieldsPlaceholders](#securefieldsplaceholders)
 - [SecureFieldsDelegate](#securefieldsdelegate)
@@ -105,7 +107,10 @@ public struct SecureFieldsConfig {
         brands: [CardBrand] = CardBrand.allCases,
         style: SecureFieldsStyle = .default,
         placeholders: SecureFieldsPlaceholders = .init(),
-        pinnedPublicKeyHashes: [String] = []
+        pinnedPublicKeyHashes: [String] = [],
+        apiKey: String? = nil,
+        monitoringEnabled: Bool = true,
+        monitoringEnvironment: MonitoringEnvironment = .production
     )
 }
 ```
@@ -118,10 +123,51 @@ public struct SecureFieldsConfig {
 | `style` | No | Visual style applied to all fields |
 | `placeholders` | No | Placeholder text for each field |
 | `pinnedPublicKeyHashes` | No | SHA-256 SPKI hashes (Base64) for certificate pinning |
+| `apiKey` | No | Api key for remote log monitoring (Datadog). Monitoring silently disables itself when omitted — see [Remote log monitoring](#remote-log-monitoring) |
+| `monitoringEnabled` | No | Opt-out for remote log monitoring (default `true`) |
+| `monitoringEnvironment` | No | Which environment remote monitoring logs are sent to (default `.production`) — see [MonitoringEnvironment](#monitoringenvironment) |
 
 **Preconditions** (crash at init time if violated):
 - `baseURL` must start with `https://`
 - `tenantId` must not be blank
+
+---
+
+## Remote log monitoring
+
+The SDK forwards `info`/`warn`/`error` health logs (SDK init, teardown, submit outcome counts —
+never card data) to Datadog via Purse's log ingestion worker (`cf-widget-logger`), so we can
+monitor SDK health in production. The wire format matches the web vault SDK's monitoring module.
+
+- **Enable/disable**: on by default whenever `apiKey` is provided to `SecureFieldsConfig`.
+  Omitting `apiKey`, or passing `monitoringEnabled: false`, disables it — nothing is sent, and no
+  network calls are made.
+- **PCI**: remote logging is fully suppressed for `SecureFieldsManager`'s entire lifetime — from
+  `init(config:)` until deallocation. Only an `INIT_SDK` log (at construction) and a `DESTROY`
+  summary log (in `deinit`, with submit-outcome counts only) are sent in normal operation.
+- This is unrelated to the SDK's local `#if DEBUG` status-code prints, which never leave the
+  device.
+- See [Security](../security/security.md) for the full PCI rationale.
+
+---
+
+## `MonitoringEnvironment`
+
+Selects which `cf-widget-logger` environment remote monitoring logs are tagged with and sent to.
+Independent of `SecureFieldsConfig.baseURL`, which the host app already controls directly.
+
+```swift
+public enum MonitoringEnvironment: String {
+    case test          // Debug builds only — see below
+    case sandbox
+    case production
+}
+```
+
+`.test` only exists in `Debug` builds. The distributed XCFramework is always built in `Release`
+configuration, so `#if DEBUG` code — including this case entirely — is compiled out of what every
+merchant integrates, in both their own Debug and Release builds. `.test` is only reachable when
+building this package from source in a Debug configuration (local development).
 
 ---
 

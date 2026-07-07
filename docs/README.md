@@ -35,7 +35,8 @@ types.
 
 - **[Security](security/security.md)** — what your app receives vs. what it can never access, the
   card data lifecycle, required production hardening, and the full list of built-in mitigations
-  (privacy overlay, screenshot detection, keyboard learning, accessibility blocking, memory wipe).
+  (privacy overlay, screenshot detection, keyboard learning, accessibility blocking, memory wipe,
+  remote monitoring suppressed during card entry).
 
 - **[iOS Payment SDK Comparison](security/pci-comparison.md)** — SAQ A vs SAQ A-EP analysis
   comparing five payment SDKs (Stripe, Adyen, Checkout.com, Primer, VGS) across iOS-specific PCI
@@ -47,7 +48,7 @@ types.
 
 - **[Internals](contributing/internals.md)** — native field layer architecture: `SecureFieldsManager`,
   `SecureBaseField`, BIN lookup, card number formatting, expiry validation, CVV/birthdate mode,
-  and privacy overlay mechanics.
+  privacy overlay mechanics, and remote log monitoring (`RemoteLogger`).
 
 ---
 

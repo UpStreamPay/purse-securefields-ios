@@ -71,6 +71,18 @@ public struct SecureFieldsConfig {
     /// ```
     public let pinnedPublicKeyHashes: [String]
 
+    /// Api key used to authenticate remote log monitoring (Datadog, via the widget log worker).
+    /// Monitoring silently disables itself when omitted.
+    public let apiKey: String?
+
+    /// Opt-out for remote log monitoring. Defaults to enabled. Remote logging is always fully
+    /// suppressed while the secure fields are on screen, regardless of this flag — see
+    /// `RemoteLogger`.
+    public let monitoringEnabled: Bool
+
+    /// Which `cf-widget-logger` environment remote monitoring logs are sent to.
+    public let monitoringEnvironment: MonitoringEnvironment
+
     #if DEBUG
     public var testURLSession: URLSession? = nil
     #endif
@@ -81,7 +93,10 @@ public struct SecureFieldsConfig {
         brands: [CardBrand] = CardBrand.allCases,
         style: SecureFieldsStyle = .default,
         placeholders: SecureFieldsPlaceholders = .init(),
-        pinnedPublicKeyHashes: [String] = []
+        pinnedPublicKeyHashes: [String] = [],
+        apiKey: String? = nil,
+        monitoringEnabled: Bool = true,
+        monitoringEnvironment: MonitoringEnvironment = .production
     ) {
         precondition(baseURL.hasPrefix("https://"), "SecureFields: baseURL must use HTTPS")
         precondition(!tenantId.trimmingCharacters(in: .whitespaces).isEmpty, "SecureFields: tenantId must not be empty")
@@ -91,5 +106,8 @@ public struct SecureFieldsConfig {
         self.style = style
         self.placeholders = placeholders
         self.pinnedPublicKeyHashes = pinnedPublicKeyHashes
+        self.apiKey = apiKey
+        self.monitoringEnabled = monitoringEnabled
+        self.monitoringEnvironment = monitoringEnvironment
     }
 }

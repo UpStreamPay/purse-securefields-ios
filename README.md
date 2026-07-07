@@ -96,6 +96,20 @@ class CheckoutViewController: UIViewController, SecureFieldsDelegate {
 | `brands` | `[CardBrand]` | all | Accepted card brands |
 | `style` | `SecureFieldsStyle` | `.default` | Visual appearance |
 | `placeholders` | `SecureFieldsPlaceholders` | built-in | Placeholder text per field |
+| `apiKey` | `String?` | `nil` | Api key for remote log monitoring (Datadog). Monitoring silently disables itself when omitted |
+| `monitoringEnabled` | `Bool` | `true` | Opt-out for remote log monitoring |
+| `monitoringEnvironment` | `MonitoringEnvironment` | `.production` | Which environment remote monitoring logs are tagged with and sent to |
+
+### Remote log monitoring
+
+The SDK forwards `info`/`warn`/`error` health logs (SDK init, teardown, submit outcome counts —
+never card data) to Datadog via Purse's log ingestion worker, so we can monitor SDK health in
+production. It's on by default when an `apiKey` is provided to `SecureFieldsConfig`; omit
+`apiKey`, or pass `monitoringEnabled: false`, to disable it.
+
+For PCI compliance, remote logging is fully suppressed for `SecureFieldsManager`'s entire
+lifetime — nothing is sent while the cardholder is interacting with the form, and no card data is
+ever placed in a log payload.
 
 ### `SecureFieldsStyle`
 

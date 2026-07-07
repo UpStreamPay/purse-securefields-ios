@@ -141,6 +141,8 @@ if deviceIsJailbroken() {
 | **Ephemeral URLSession** | No URL cache, no cookie storage, `reloadIgnoringLocalCacheData` policy — no card data persists in the HTTP layer |
 | **HTTPS enforced at init** | `SecureFieldsConfig` crashes if `baseURL` does not start with `https://` |
 | **No card data logging** | Debug prints are guarded by `#if DEBUG` — they produce no output in production builds |
+| **Remote monitoring suppressed during card entry** | `RemoteLogger` (separate from local debug prints, opt-out via `monitoringEnabled`/omitting `apiKey`) only ever logs structural metadata (init config, submit outcome counts) — never card data — and is fully suppressed for `SecureFieldsManager`'s entire lifetime (`init` to `deinit`) |
+| **`MonitoringEnvironment.test` cannot ship to merchants** | Wrapped in `#if DEBUG`; the distributed XCFramework is always built in `Release` configuration, so the case is compiled out of every merchant integration entirely |
 
 ---
 

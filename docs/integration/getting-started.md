@@ -41,14 +41,14 @@ Pass the correct `baseURL` for your deployment stage. The SDK enforces HTTPS —
 
 | Environment | Base URL |
 |---|---|
-| Sandbox (development) | `https://api.vault.purse-test.com` |
+| Sandbox (development) | `https://api.vault.purse-sandbox.com` |
 | Production | `https://api.vault.purse-secure.com` |
 
 For a release build, drive this from a build configuration flag:
 
 ```swift
 let baseURL = Bundle.main.object(forInfoDictionaryKey: "VAULT_BASE_URL") as? String
-    ?? "https://api.vault.purse-test.com"
+    ?? "https://api.vault.purse-sandbox.com"
 ```
 
 ---
@@ -66,7 +66,7 @@ class CheckoutViewController: UIViewController {
     lazy var secureFields = SecureFieldsManager(
         config: SecureFieldsConfig(
             tenantId: "YOUR_TENANT_ID",
-            baseURL: "https://api.vault.purse-test.com"   // or purse-secure.com in production
+            baseURL: "https://api.vault.purse-sandbox.com"   // or purse-secure.com in production
         )
     )
 
@@ -88,7 +88,7 @@ Restrict accepted card networks and apply a custom style:
 ```swift
 SecureFieldsConfig(
     tenantId: "YOUR_TENANT_ID",
-    baseURL: "https://api.vault.purse-test.com",
+    baseURL: "https://api.vault.purse-sandbox.com",
     brands: [.visa, .mastercard, .carteBancaire],
     style: SecureFieldsStyle(
         font: .systemFont(ofSize: 16),
@@ -129,6 +129,25 @@ openssl s_client -connect api.vault.purse-secure.com:443 2>/dev/null </dev/null 
   | openssl dgst -sha256 -binary \
   | base64
 ```
+
+### Optional: enable remote log monitoring
+
+Pass an `apiKey` to enable remote log monitoring — the SDK forwards `info`/`warn`/`error` health
+logs to Datadog so you and Purse can monitor SDK health in production. It's on by default whenever
+`apiKey` is provided:
+
+```swift
+SecureFieldsConfig(
+    tenantId: "YOUR_TENANT_ID",
+    baseURL: "https://api.vault.purse-secure.com",
+    apiKey: "YOUR_MONITORING_API_KEY",
+    monitoringEnvironment: .production   // or .sandbox
+)
+```
+
+Omit `apiKey`, or pass `monitoringEnabled: false`, to disable it entirely. No card data is ever
+included, and it's fully suppressed for `SecureFieldsManager`'s entire lifetime — see
+[Remote log monitoring](api-reference.md#remote-log-monitoring) in the API Reference for details.
 
 ---
 
