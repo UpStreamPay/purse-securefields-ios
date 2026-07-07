@@ -1,11 +1,15 @@
 import Foundation
 
-/// Bridges `SecureFieldsManager`'s submit lifecycle to `RemoteLogger`, mirroring the web vault
-/// SDK's `WithMonitoringProxy`: telemetry is derived by observing submit start/result — the same
-/// two points `SecureFieldsManager` already reports to its own delegate — rather than storing
-/// counters as `SecureFieldsManager`'s own properties. `SecureFieldsManager` only ever calls
-/// `start`, `mount`, `unmount`, `recordSubmitStart`, `recordSubmitSuccess`, and
-/// `recordSubmitFailure` — everything else (payload shape, the submit-outcome summary) lives here.
+/// Bridges `SecureFieldsManager`'s event points to `RemoteLogger`, mirroring the web vault SDK's
+/// `WithMonitoringProxy`: telemetry is derived by observing events at the same points
+/// `SecureFieldsManager` already reports to its own delegate, rather than storing counters as
+/// `SecureFieldsManager`'s own properties. `SecureFieldsManager` only ever calls the `record*`
+/// methods below plus `start`/`unmount` — everything else (payload shape, log codes, the
+/// DESTROY session summary) lives here.
+///
+/// Events are sent as they happen, matching the web vault SDK — there is no suppression window.
+/// Every payload built here is structural metadata only (field names, brand lists, outcome
+/// codes); no caller ever has access to raw field values in the first place.
 final class MonitoringCoordinator {
 
     private let logger: RemoteLogger
@@ -40,14 +44,8 @@ final class MonitoringCoordinator {
         ])
     }
 
-    /// PCI: suppress all remote logging for as long as the secure fields are on screen.
-    func mount() {
-        logger.mounted = true
-    }
-
-    /// Fields are torn down — safe to resume logging, emit the session summary, and flush.
+    /// Fields are torn down — emit the session summary and flush.
     func unmount() {
-        logger.mounted = false
         logger.info(LogCode.destroy, payload: [
             "submitAttempts": .int(submitAttempts),
             "submitSuccesses": .int(submitSuccessCount),
@@ -60,20 +58,44 @@ final class MonitoringCoordinator {
         logger.flush()
     }
 
+    func recordFocusChanged(field: SecureField, isFocused: Bool) {
+        logger.info(isFocused ? LogCode.fieldFocus : LogCode.fieldBlur, payload: [
+            "fieldName": .string(String(describing: field)),
+        ])
+    }
+
+    func recordBrandsDetected(_ brands: [CardBrand]) {
+        if brands.isEmpty {
+            logger.warn(LogCode.brandNotDetected)
+        } else {
+            logger.info(LogCode.brandDetected, payload: [
+                "brands": .array(brands.map { .string($0.rawValue) }),
+            ])
+        }
+    }
+
+    func recordBrandSelected(_ brand: CardBrand) {
+        logger.info(LogCode.brandSelectionChanged, payload: ["brand": .string(brand.rawValue)])
+    }
+
     func recordSubmitStart() {
         submitAttempts += 1
+        logger.info(LogCode.submit)
     }
 
     func recordSubmitSuccess() {
         submitSuccessCount += 1
+        logger.info(LogCode.submitSuccess)
     }
 
     func recordSubmitFailure(_ error: SecureFieldsError) {
-        submitErrorCodes.append(Self.errorCode(for: error))
+        let code = Self.errorCode(for: error)
+        submitErrorCodes.append(code)
+        logger.error(LogCode.error, payload: ["code": .string(code)])
     }
 
-    /// A short, non-sensitive tag for the DESTROY session summary — never the error message,
-    /// which could (in principle) echo back arbitrary server-provided text.
+    /// A short, non-sensitive tag — never the error message, which could (in principle) echo
+    /// back arbitrary server-provided text.
     private static func errorCode(for error: SecureFieldsError) -> String {
         switch error {
         case .fieldsIncomplete: return "FIELDS_INCOMPLETE"

@@ -50,7 +50,7 @@ class CheckoutViewController: UIViewController, SecureFieldsDelegate {
 
     let manager = SecureFieldsManager(config: SecureFieldsConfig(
         tenantId: "your-tenant-id",
-        baseURL: "https://api.vault.purse.com"
+        environment: .sandbox   // or .production
     ))
 
     override func viewDidLoad() {
@@ -92,24 +92,24 @@ class CheckoutViewController: UIViewController, SecureFieldsDelegate {
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `tenantId` | `String` | required | Your Purse tenant identifier |
-| `baseURL` | `String` | required | Vault API base URL (must be HTTPS) |
+| `environment` | `VaultEnvironment` | `.sandbox` | `.sandbox` or `.production`. The SDK resolves both the tokenization gateway and the remote monitoring endpoint internally — no URL configuration needed |
 | `brands` | `[CardBrand]` | all | Accepted card brands |
 | `style` | `SecureFieldsStyle` | `.default` | Visual appearance |
 | `placeholders` | `SecureFieldsPlaceholders` | built-in | Placeholder text per field |
 | `apiKey` | `String?` | `nil` | Api key for remote log monitoring (Datadog). Monitoring silently disables itself when omitted |
 | `monitoringEnabled` | `Bool` | `true` | Opt-out for remote log monitoring |
-| `monitoringEnvironment` | `MonitoringEnvironment` | `.production` | Which environment remote monitoring logs are tagged with and sent to |
 
 ### Remote log monitoring
 
-The SDK forwards `info`/`warn`/`error` health logs (SDK init, teardown, submit outcome counts —
-never card data) to Datadog via Purse's log ingestion worker, so we can monitor SDK health in
-production. It's on by default when an `apiKey` is provided to `SecureFieldsConfig`; omit
-`apiKey`, or pass `monitoringEnabled: false`, to disable it.
+The SDK forwards health logs (SDK init, field focus/blur, brand detection, submit attempts and
+results, teardown — never card data) to Datadog via Purse's log ingestion worker, so we can
+monitor SDK health in production, in real time. It's on by default when an `apiKey` is provided
+to `SecureFieldsConfig`; omit `apiKey`, or pass `monitoringEnabled: false`, to disable it.
 
-For PCI compliance, remote logging is fully suppressed for `SecureFieldsManager`'s entire
-lifetime — nothing is sent while the cardholder is interacting with the form, and no card data is
-ever placed in a log payload.
+For PCI compliance, safety comes from what's in a log payload, not from when logs are sent:
+every event is structural metadata only (field names, brand lists, outcome codes) — no caller of
+the SDK's internal logger ever has access to raw field values (PAN, CVV, expiry, cardholder
+name) in the first place, so there is nothing to suppress.
 
 ### `SecureFieldsStyle`
 
@@ -139,7 +139,7 @@ SecureFieldsPlaceholders(
 ```swift
 SecureFieldsConfig(
     tenantId: "...",
-    baseURL: "...",
+    environment: .production,
     brands: [.visa, .mastercard, .carteBancaire]
 )
 ```

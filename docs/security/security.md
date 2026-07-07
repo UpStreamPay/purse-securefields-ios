@@ -86,7 +86,7 @@ for production deployments:
 ```swift
 SecureFieldsConfig(
     tenantId: "...",
-    baseURL: "https://api.vault.purse-secure.com",
+    environment: .production,
     pinnedPublicKeyHashes: [
         "YOUR_PRIMARY_SPKI_HASH",
         "YOUR_BACKUP_SPKI_HASH",    // rotation backup — prevents downtime on cert renewal
@@ -139,10 +139,10 @@ if deviceIsJailbroken() {
 | **Memory cleared on submit** | `clearSensitiveData()` zeroes internal field content immediately after the tokenization request is built |
 | **Memory cleared on clearFields()** | All field buffers are zeroed; pending BIN lookups are cancelled |
 | **Ephemeral URLSession** | No URL cache, no cookie storage, `reloadIgnoringLocalCacheData` policy — no card data persists in the HTTP layer |
-| **HTTPS enforced at init** | `SecureFieldsConfig` crashes if `baseURL` does not start with `https://` |
+| **HTTPS by construction** | `SecureFieldsConfig` takes a `VaultEnvironment`, not a raw URL — `apiRoot` is a fixed `https://` literal per case, so there's no host-app-supplied string that could be `http://` |
 | **No card data logging** | Debug prints are guarded by `#if DEBUG` — they produce no output in production builds |
-| **Remote monitoring suppressed during card entry** | `RemoteLogger` (separate from local debug prints, opt-out via `monitoringEnabled`/omitting `apiKey`) only ever logs structural metadata (init config, submit outcome counts) — never card data — and is fully suppressed for `SecureFieldsManager`'s entire lifetime (`init` to `deinit`) |
-| **`MonitoringEnvironment.test` cannot ship to merchants** | Wrapped in `#if DEBUG`; the distributed XCFramework is always built in `Release` configuration, so the case is compiled out of every merchant integration entirely |
+| **Remote monitoring never carries card data** | `RemoteLogger` (separate from local debug prints, opt-out via `monitoringEnabled`/omitting `apiKey`) sends events continuously as they happen — safety comes from every payload being structural metadata only (field names, brand lists, outcome codes), not from a time window. No caller has raw field values (PAN, CVV, expiry, cardholder name) to log in the first place |
+| **`VaultEnvironment.test` cannot ship to merchants** | Wrapped in `#if DEBUG`; the distributed XCFramework is always built in `Release` configuration, so the case is compiled out of every merchant integration entirely |
 
 ---
 

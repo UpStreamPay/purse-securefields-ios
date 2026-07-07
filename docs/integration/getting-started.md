@@ -36,19 +36,23 @@ Integrate the Vault iOS SDK into your project in three steps.
 
 ## Step 2 — Choose an environment
 
-Pass the correct `baseURL` for your deployment stage. The SDK enforces HTTPS — passing an
-`http://` URL will crash at init time.
+Pass `VaultEnvironment.sandbox` during development and `.production` for live traffic. The SDK
+resolves both the tokenization gateway and the remote monitoring endpoint internally — no URL
+configuration is required.
 
-| Environment | Base URL |
-|---|---|
-| Sandbox (development) | `https://api.vault.purse-sandbox.com` |
-| Production | `https://api.vault.purse-secure.com` |
+| Value | Tokenization gateway | Monitoring endpoint |
+|---|---|---|
+| `VaultEnvironment.sandbox` | `https://api.vault.purse-sandbox.com` | `https://api.purse-sandbox.com` |
+| `VaultEnvironment.production` | `https://api.vault.purse-secure.com` | `https://api.purse-secure.com` |
 
 For a release build, drive this from a build configuration flag:
 
 ```swift
-let baseURL = Bundle.main.object(forInfoDictionaryKey: "VAULT_BASE_URL") as? String
-    ?? "https://api.vault.purse-sandbox.com"
+#if DEBUG
+let environment: VaultEnvironment = .sandbox
+#else
+let environment: VaultEnvironment = .production
+#endif
 ```
 
 ---
@@ -66,7 +70,7 @@ class CheckoutViewController: UIViewController {
     lazy var secureFields = SecureFieldsManager(
         config: SecureFieldsConfig(
             tenantId: "YOUR_TENANT_ID",
-            baseURL: "https://api.vault.purse-sandbox.com"   // or purse-secure.com in production
+            environment: .sandbox   // or .production
         )
     )
 
@@ -88,7 +92,7 @@ Restrict accepted card networks and apply a custom style:
 ```swift
 SecureFieldsConfig(
     tenantId: "YOUR_TENANT_ID",
-    baseURL: "https://api.vault.purse-sandbox.com",
+    environment: .sandbox,
     brands: [.visa, .mastercard, .carteBancaire],
     style: SecureFieldsStyle(
         font: .systemFont(ofSize: 16),
@@ -112,7 +116,7 @@ Pin the vault server's public key to prevent MITM attacks even when a rogue CA i
 ```swift
 SecureFieldsConfig(
     tenantId: "YOUR_TENANT_ID",
-    baseURL: "https://api.vault.purse-secure.com",
+    environment: .production,
     pinnedPublicKeyHashes: [
         "YOUR_PRIMARY_SPKI_HASH",    // primary certificate
         "YOUR_BACKUP_SPKI_HASH",     // rotation backup — prevents breakage on renewal
@@ -139,15 +143,15 @@ logs to Datadog so you and Purse can monitor SDK health in production. It's on b
 ```swift
 SecureFieldsConfig(
     tenantId: "YOUR_TENANT_ID",
-    baseURL: "https://api.vault.purse-secure.com",
-    apiKey: "YOUR_MONITORING_API_KEY",
-    monitoringEnvironment: .production   // or .sandbox
+    environment: .production,   // or .sandbox
+    apiKey: "YOUR_MONITORING_API_KEY"
 )
 ```
 
 Omit `apiKey`, or pass `monitoringEnabled: false`, to disable it entirely. No card data is ever
-included, and it's fully suppressed for `SecureFieldsManager`'s entire lifetime — see
-[Remote log monitoring](api-reference.md#remote-log-monitoring) in the API Reference for details.
+included — every log payload is structural metadata only (field names, brand lists, outcome
+codes) — see [Remote log monitoring](api-reference.md#remote-log-monitoring) in the API
+Reference for details.
 
 ---
 

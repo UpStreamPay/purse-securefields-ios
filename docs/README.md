@@ -36,7 +36,7 @@ types.
 - **[Security](security/security.md)** — what your app receives vs. what it can never access, the
   card data lifecycle, required production hardening, and the full list of built-in mitigations
   (privacy overlay, screenshot detection, keyboard learning, accessibility blocking, memory wipe,
-  remote monitoring suppressed during card entry).
+  remote monitoring payloads never carrying card data).
 
 - **[iOS Payment SDK Comparison](security/pci-comparison.md)** — SAQ A vs SAQ A-EP analysis
   comparing five payment SDKs (Stripe, Adyen, Checkout.com, Primer, VGS) across iOS-specific PCI

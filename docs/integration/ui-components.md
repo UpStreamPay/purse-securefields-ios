@@ -57,7 +57,7 @@ class CheckoutViewController: UIViewController {
     lazy var secureFields = SecureFieldsManager(
         config: SecureFieldsConfig(
             tenantId: "YOUR_TENANT_ID",
-            baseURL: "https://api.vault.purse-sandbox.com"
+            environment: .sandbox
         )
     )
 
@@ -155,7 +155,7 @@ Pass `brands` in `SecureFieldsConfig` to restrict which card networks are accept
 ```swift
 SecureFieldsConfig(
     tenantId: "...",
-    baseURL: "...",
+    environment: .sandbox,
     brands: [.visa, .mastercard, .carteBancaire, .oney]
 )
 ```
@@ -173,7 +173,7 @@ all fields at once.
 ```swift
 SecureFieldsConfig(
     tenantId: "...",
-    baseURL: "...",
+    environment: .sandbox,
     style: SecureFieldsStyle(
         font: UIFont.systemFont(ofSize: 16, weight: .regular),
         textColor: UIColor.label,
@@ -203,7 +203,7 @@ Placeholders are set at init time through `SecureFieldsPlaceholders`:
 ```swift
 SecureFieldsConfig(
     tenantId: "...",
-    baseURL: "...",
+    environment: .sandbox,
     placeholders: SecureFieldsPlaceholders(
         pan: "1234 5678 9012 3456",
         cvv: "CVV",

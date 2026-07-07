@@ -3,9 +3,11 @@ import Foundation
 /// Separate, opt-out remote logger for the secure fields SDK. Forwards error/warn/info events
 /// to the widget log worker for Datadog monitoring.
 ///
-/// PCI: while `mounted` is `true` (i.e. while the secure fields are on screen), all logging is
-/// suppressed — nothing is ever sent between `SecureFieldsManager.init` and `deinit`. No card
-/// data is ever placed in a log payload by any caller of this class.
+/// Events are sent continuously, as they happen — matching the web vault SDK's monitoring
+/// proxy. PCI safety comes from every payload being structural metadata only (field names,
+/// brand lists, outcome codes) and NEVER card data — never from a suppression window. No caller
+/// of this class may ever place raw field values (PAN, CVV, expiry, cardholder name) in a log
+/// payload.
 final class RemoteLogger {
 
     private let tenantId: String
@@ -14,9 +16,6 @@ final class RemoteLogger {
     private let instanceId: String
     private let enabled: Bool
     private let queue: LogQueue
-
-    /// Toggles PCI suppression. `true` for the entire lifetime the secure fields are on screen.
-    var mounted = false
 
     init(
         tenantId: String,
@@ -45,6 +44,11 @@ final class RemoteLogger {
             resolvedClient = nil
         }
         self.enabled = resolvedClient != nil
+        #if DEBUG
+        if !self.enabled {
+            print("[SecureFields] Remote log monitoring disabled (missing apiKey or monitoringEnabled=false)")
+        }
+        #endif
 
         self.queue = LogQueue(batchSize: batchSize, flushDelay: flushDelay, maxBatchBytes: maxBatchBytes) { events in
             resolvedClient?.send(events)
@@ -59,7 +63,7 @@ final class RemoteLogger {
     func flush() -> [SecureFieldsLog] { queue.flush() }
 
     private func log(_ level: LogLevel, _ code: String, _ payload: [String: JSONValue]) {
-        guard enabled, !mounted else { return }
+        guard enabled else { return }
         queue.enqueue(
             SecureFieldsLog(
                 tenantId: tenantId,

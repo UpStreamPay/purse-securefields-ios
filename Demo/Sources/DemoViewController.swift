@@ -10,9 +10,11 @@ final class DemoViewController: UIViewController {
     private func makeManager() -> SecureFieldsManager {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--uitesting") {
+            // The URL itself is irrelevant here — MockURLProtocol intercepts by path suffix,
+            // not host, so requests never actually leave the device regardless of environment.
             var config = SecureFieldsConfig(
                 tenantId: "test",
-                baseURL: "https://api.test.example.com",
+                environment: .test,
                 placeholders: SecureFieldsPlaceholders(
                     pan: "1234 5678 9012 3456",
                     cvv: "123",
@@ -26,15 +28,14 @@ final class DemoViewController: UIViewController {
         #endif
         return SecureFieldsManager(config: SecureFieldsConfig(
             tenantId: Self.tenantId,
-            baseURL: "https://api.vault.purse-sandbox.com",
+            environment: .test,
             placeholders: SecureFieldsPlaceholders(
                 pan: "1234 5678 9012 3456",
                 cvv: "123",
                 expDate: "MM/YY",
                 holderName: "Name Surname"
             ),
-            apiKey: Self.monitoringApiKey,
-            monitoringEnvironment: .sandbox
+            apiKey: Self.monitoringApiKey
         ))
     }
 

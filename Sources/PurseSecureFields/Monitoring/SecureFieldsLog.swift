@@ -33,10 +33,18 @@ enum LogLevel: String, Encodable {
     case error = "ERROR"
 }
 
+/// Mirrors the web vault SDK's `LOG_CODES` (monitoring/types.ts).
 enum LogCode {
     static let initSDK = "INIT_SDK"
-    static let destroy = "DESTROY"
+    static let fieldFocus = "FIELD_FOCUS"
+    static let fieldBlur = "FIELD_BLUR"
+    static let brandDetected = "BRAND_DETECTED"
+    static let brandNotDetected = "BRAND_NOT_DETECTED"
+    static let brandSelectionChanged = "BRAND_SELECTION_CHANGED"
+    static let submit = "SUBMIT"
+    static let submitSuccess = "SUBMIT_SUCCESS"
     static let error = "ERROR"
+    static let destroy = "DESTROY"
 }
 
 struct SecureFieldsLog: Encodable {

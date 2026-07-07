@@ -67,6 +67,7 @@ public final class SecureFieldsManager {
         cvvField.setInputMode(.cvv)
         brandSelectorView.update(brands: [])
         delegate?.secureFieldsBrandsDetected([])
+        monitoring.recordBrandsDetected([])
         notifyFormValidity()
     }
 
@@ -101,25 +102,23 @@ public final class SecureFieldsManager {
         let monitoring = MonitoringCoordinator(
             tenantId: config.tenantId,
             version: VaultAPIClient.sdkVersion,
-            env: config.monitoringEnvironment.rawValue,
-            monitoringApiRoot: config.monitoringEnvironment.apiRoot,
+            env: config.environment.rawValue,
+            monitoringApiRoot: config.environment.monitoringApiRoot,
             apiKey: config.apiKey,
             monitoringEnabled: config.monitoringEnabled
         )
         monitoring.start(config: config)
-        // The manager's lifetime *is* the card-entry window: suppress from here until deinit.
-        monitoring.mount()
         self.monitoring = monitoring
 
         self.config = config
         #if DEBUG
         if let testSession = config.testURLSession {
-            self.apiClient = VaultAPIClient(baseURL: config.baseURL, session: testSession)
+            self.apiClient = VaultAPIClient(baseURL: config.environment.apiRoot, session: testSession)
         } else {
-            self.apiClient = VaultAPIClient(baseURL: config.baseURL, pinnedPublicKeyHashes: config.pinnedPublicKeyHashes)
+            self.apiClient = VaultAPIClient(baseURL: config.environment.apiRoot, pinnedPublicKeyHashes: config.pinnedPublicKeyHashes)
         }
         #else
-        self.apiClient = VaultAPIClient(baseURL: config.baseURL, pinnedPublicKeyHashes: config.pinnedPublicKeyHashes)
+        self.apiClient = VaultAPIClient(baseURL: config.environment.apiRoot, pinnedPublicKeyHashes: config.pinnedPublicKeyHashes)
         #endif
         let pan = SecurePANField()
         let cvv = SecureCVVField()
@@ -164,19 +163,24 @@ public final class SecureFieldsManager {
             self?.delegate?.secureFieldsContentChanged()
         }
         panField.onValidityChanged = { [weak self] _ in self?.notifyFormValidity() }
-        panField.onFocusChanged    = { [weak self] f in self?.delegate?.secureFieldsFocusChanged(field: .pan, isFocused: f) }
+        panField.onFocusChanged    = { [weak self] f in self?.focusChanged(.pan, f) }
 
         cvvField.onContentChanged  = { [weak self] in self?.delegate?.secureFieldsContentChanged() }
         cvvField.onValidityChanged = { [weak self] _ in self?.notifyFormValidity() }
-        cvvField.onFocusChanged    = { [weak self] f in self?.delegate?.secureFieldsFocusChanged(field: .cvv, isFocused: f) }
+        cvvField.onFocusChanged    = { [weak self] f in self?.focusChanged(.cvv, f) }
 
         expDateField.onContentChanged  = { [weak self] in self?.delegate?.secureFieldsContentChanged() }
         expDateField.onValidityChanged = { [weak self] _ in self?.notifyFormValidity() }
-        expDateField.onFocusChanged    = { [weak self] f in self?.delegate?.secureFieldsFocusChanged(field: .expDate, isFocused: f) }
+        expDateField.onFocusChanged    = { [weak self] f in self?.focusChanged(.expDate, f) }
 
         holderNameField.onContentChanged  = { [weak self] in self?.delegate?.secureFieldsContentChanged() }
         holderNameField.onValidityChanged = { [weak self] _ in self?.notifyFormValidity() }
-        holderNameField.onFocusChanged    = { [weak self] f in self?.delegate?.secureFieldsFocusChanged(field: .holderName, isFocused: f) }
+        holderNameField.onFocusChanged    = { [weak self] f in self?.focusChanged(.holderName, f) }
+    }
+
+    private func focusChanged(_ field: SecureField, _ isFocused: Bool) {
+        delegate?.secureFieldsFocusChanged(field: field, isFocused: isFocused)
+        monitoring.recordFocusChanged(field: field, isFocused: isFocused)
     }
 
     private func setupBrandSelector() {
@@ -184,6 +188,7 @@ public final class SecureFieldsManager {
             self?.applySelectedBrand(brand)
             self?.applyLengthsForBrand(brand)
             self?.delegate?.secureFieldsBrandSelected(brand)
+            self?.monitoring.recordBrandSelected(brand)
         }
     }
 
@@ -201,6 +206,7 @@ public final class SecureFieldsManager {
                 cvvField.setInputMode(.cvv)
                 brandSelectorView.update(brands: [])
                 delegate?.secureFieldsBrandsDetected([])
+                monitoring.recordBrandsDetected([])
                 notifyFormValidity()
             }
             return
@@ -225,6 +231,7 @@ public final class SecureFieldsManager {
                     self.brandSelectorView.update(brands: allowed)
                     self.applySelectedBrand(self.brandSelectorView.selectedBrand)
                     self.delegate?.secureFieldsBrandsDetected(allowed)
+                    self.monitoring.recordBrandsDetected(allowed)
                     self.notifyFormValidity()
                 }
             }

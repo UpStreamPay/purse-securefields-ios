@@ -57,29 +57,6 @@ struct RemoteLoggerTests {
         #expect(result == ["OK", "WARNING", "ERROR"])
     }
 
-    @Test func suppressesAllLoggingWhileMounted() {
-        var sendCount = 0
-        let lock = NSLock()
-        let semaphore = DispatchSemaphore(value: 0)
-        let client = capturingClient { _ in
-            lock.lock(); sendCount += 1; lock.unlock()
-            semaphore.signal()
-        }
-        let sut = logger(client: client)
-
-        // Suppressed while mounted: log() returns before ever touching the queue, so there is
-        // nothing in flight to race against here.
-        sut.mounted = true
-        sut.info("SHOULD_NOT_SEND")
-        sut.error("SHOULD_NOT_SEND_EITHER")
-        lock.lock(); #expect(sendCount == 0); lock.unlock()
-
-        sut.mounted = false
-        sut.info("SHOULD_SEND")
-        #expect(semaphore.wait(timeout: .now() + 2) == .success)
-        lock.lock(); #expect(sendCount == 1); lock.unlock()
-    }
-
     @Test func isDisabledWhenApiKeyIsMissing() {
         var called = false
         RequestCapturingURLProtocol.register(apiKey: UUID().uuidString) { _ in called = true }

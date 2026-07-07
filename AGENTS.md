@@ -14,7 +14,7 @@ Always run a clean build after changes. BUILD SUCCEEDED is the acceptance bar.
 
 ```
 Sources/PurseSecureFields/
-  Models/           — CardBrand, SecureFieldsConfig (+ Style + Placeholders), SecureFieldsError, TokenizationResult, MonitoringEnvironment
+  Models/           — CardBrand, SecureFieldsConfig (+ Style + Placeholders), SecureFieldsError, TokenizationResult, VaultEnvironment
   Networking/       — VaultAPIClient, NetworkModels (BIN lookup + tokenization payloads)
   Monitoring/       — RemoteLogger, RemoteLogClient, LogQueue, SecureFieldsLog (remote log monitoring, separate from VaultAPIClient)
   Internal/         — CardFormatter (PAN display grouping), CardValidator (Luhn, expiry)
@@ -56,7 +56,7 @@ Tests/              — SecureFieldsTests
 - `submit()` calls `clearSensitiveData()` on all four fields immediately after building the tokenization payload (before the network call), per PCI compliance requirements. This only zeroes text/validity — it does NOT reset BIN lookup state, detected brands, or the brand selector. Host app still calls `manager.clearFields()` for a full reset (e.g. to start a new form).
 
 ## Networking
-- All requests require HTTPS (enforced via `precondition` in `SecureFieldsConfig`).
+- All requests are HTTPS by construction — `VaultEnvironment.apiRoot` is a fixed `https://` literal per case, so there's no raw URL for a host app to get wrong. `SecureFieldsConfig` no longer takes a `baseURL` parameter at all.
 - `X-Purse-SDK-Version` header on every request. Version string is in `VaultAPIClient.sdkVersion`.
 - `X-Request-ID` (UUID) on tokenization only.
 - No card data in logs. Body logging is fully removed. `#if DEBUG` guards on status codes only.
@@ -64,12 +64,12 @@ Tests/              — SecureFieldsTests
 - `VaultAPIClient` has two inits: `init(baseURL:pinnedPublicKeyHashes:)` for production (creates pinned session), and `init(baseURL:session:)` for test injection only (pinning skipped). Never call the test init in production code.
 
 ## Remote log monitoring
-- `SecureFieldsManager` carries **no monitoring state** — no counters, no payload-building. It owns one `MonitoringCoordinator` (in `Monitoring/`) and only ever calls `start(config:)`/`mount()`/`unmount()` (construction/`deinit`) and `recordSubmitStart()`/`recordSubmitSuccess()`/`recordSubmitFailure(_:)` (the same two points in `submit()` where it already calls its own `delegate`). If you're about to add a counter or `JSONValue` payload directly to `SecureFieldsManager`, stop — that logic belongs in `MonitoringCoordinator`.
-- `MonitoringCoordinator` owns a `RemoteLogger` — a separate, opt-out logger from `VaultAPIClient`'s local `#if DEBUG` prints — which forwards `info`/`warn`/`error` events to the `cf-widget-logger` worker for Datadog. Configured via `SecureFieldsConfig.apiKey`/`monitoringEnabled`/`monitoringEnvironment`; disables itself silently when `apiKey` is missing.
-- PCI: `MonitoringCoordinator.mount()`/`.unmount()` toggle `RemoteLogger.mounted`, which suppresses **all** logging while `true`. `mount()` runs at the top of `SecureFieldsManager.init` and `unmount()` in `deinit` — the manager's whole lifetime is the card-entry window, so nothing is ever sent while it's alive. Never log from inside that window; only `INIT_SDK` (from `start(config:)`, before `mount()`) and `DESTROY` (from `unmount()`) fire in normal operation.
+- `SecureFieldsManager` carries **no monitoring state** — no counters, no payload-building. It owns one `MonitoringCoordinator` (in `Monitoring/`) and only ever calls `start(config:)`/`unmount()` (construction/`deinit`) and `recordFocusChanged`/`recordBrandsDetected`/`recordBrandSelected`/`recordSubmitStart`/`recordSubmitSuccess`/`recordSubmitFailure` at the same points it already calls its own `delegate`. If you're about to add a counter or `JSONValue` payload directly to `SecureFieldsManager`, stop — that logic belongs in `MonitoringCoordinator`.
+- `MonitoringCoordinator` owns a `RemoteLogger` — a separate, opt-out logger from `VaultAPIClient`'s local `#if DEBUG` prints — which forwards `info`/`warn`/`error` events to the `cf-widget-logger` worker for Datadog. Configured via `SecureFieldsConfig.apiKey`/`monitoringEnabled`/`environment`; disables itself silently when `apiKey` is missing.
+- **No suppression window.** Events are sent continuously, as they happen — including while the secure fields are on screen. This matches the web vault SDK's `WithMonitoringProxy` exactly. PCI safety comes from every payload being structural metadata only (field names, brand lists, outcome codes) — `MonitoringCoordinator` never has access to raw field values in the first place, so there's nothing to accidentally log. If you're adding a new event, the question is never "should this wait until `deinit`" — it's "does this payload contain anything other than a field name, brand, count, or non-sensitive code."
 - Log payloads carry only structural metadata (brand list, submit outcome counts, non-sensitive error codes like `"NETWORK_ERROR"` or an HTTP status string) — never the error `message`, which could echo back arbitrary server text.
 - Kept as a separate class/network stack from `VaultAPIClient` on purpose, so a telemetry failure can never affect PCI flows.
-- `MonitoringEnvironment.test` is wrapped in `#if DEBUG` — never remove that guard or add a similar always-compiled "internal/test" option. The distributed XCFramework is always built in `Release` configuration (`xcodebuild archive` in release.yml), so `#if DEBUG` is the only mechanism that actually keeps something out of what merchants integrate — a runtime check (like Android's `FLAG_DEBUGGABLE` guard) would NOT work here, since this framework isn't recompiled per host app.
+- `VaultEnvironment.test` is wrapped in `#if DEBUG` — never remove that guard or add a similar always-compiled "internal/test" option. The distributed XCFramework is always built in `Release` configuration (`xcodebuild archive` in release.yml), so `#if DEBUG` is the only mechanism that actually keeps something out of what merchants integrate — a runtime check (like Android's `FLAG_DEBUGGABLE` guard) would NOT work here, since this framework isn't recompiled per host app.
 
 ## Style / placeholder config
 - Applied once at init via `applyConfig(_:)` in the manager.
