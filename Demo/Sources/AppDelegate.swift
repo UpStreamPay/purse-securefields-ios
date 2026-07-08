@@ -13,10 +13,25 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         configureMockIfUITesting()
         #endif
         let window = UIWindow(frame: UIScreen.main.bounds)
-        window.rootViewController = UINavigationController(rootViewController: DemoViewController())
+        window.rootViewController = UINavigationController(rootViewController: makeRootViewController())
         window.makeKeyAndVisible()
         self.window = window
         return true
+    }
+
+    /// `DemoUITests` always launches with `--uitesting` and expects `DemoViewController` to be
+    /// the very first screen (it looks up `pan_field` etc. immediately after `app.launch()`), so
+    /// that flow keeps the original root untouched. Everyday manual runs land on the bug
+    /// reproduction gallery instead, with the classic demo one tap away via its nav bar button.
+    private func makeRootViewController() -> UIViewController {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--uitesting") {
+            return DemoViewController()
+        }
+        return BugListViewController()
+        #else
+        return DemoViewController()
+        #endif
     }
 
     #if DEBUG

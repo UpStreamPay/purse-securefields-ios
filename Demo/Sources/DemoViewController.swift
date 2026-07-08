@@ -123,6 +123,16 @@ final class DemoViewController: UIViewController {
         title = "SecureFields Demo"
         view.backgroundColor = .systemBackground
         manager.delegate = self
+        #if DEBUG
+        if !ProcessInfo.processInfo.arguments.contains("--uitesting") {
+            navigationItem.rightBarButtonItem = UIBarButtonItem(
+                title: "Bugs",
+                style: .plain,
+                target: self,
+                action: #selector(openBugGallery)
+            )
+        }
+        #endif
         setupLayout()
         updateFieldBorders()
         payButton.addTarget(self, action: #selector(payTapped), for: .touchUpInside)
@@ -149,6 +159,12 @@ final class DemoViewController: UIViewController {
     }
 
     // MARK: - Actions
+
+    #if DEBUG
+    @objc private func openBugGallery() {
+        navigationController?.pushViewController(BugListViewController(), animated: true)
+    }
+    #endif
 
     @objc private func payTapped() {
         resultLabel.textColor = .secondaryLabel

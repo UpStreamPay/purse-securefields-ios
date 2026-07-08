@@ -8,13 +8,55 @@
 
 /* Begin PBXBuildFile section */
 		3C1B95BD2FD181C000E5108E /* PurseSecureFields in Frameworks */ = {isa = PBXBuildFile; productRef = 3C1B95BC2FD181C000E5108E /* PurseSecureFields */; };
+		3C1B95BE2FD181C000E5108E /* PurseSecureFields in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 3C1B95BC2FD181C000E5108E /* PurseSecureFields */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		AA00000000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000002 /* AppDelegate.swift */; };
 		AA00000000000000000003 /* DemoViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000004 /* DemoViewController.swift */; };
 		AA0000000000000000002B /* DemoViewController+Layout.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000002A /* DemoViewController+Layout.swift */; };
 		AA0000000000000000002D /* DemoViewController+Delegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000002C /* DemoViewController+Delegate.swift */; };
 		AA0000000000000000004C /* MockURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000050 /* MockURLProtocol.swift */; };
 		AA0000000000000000004D /* DemoUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000004F /* DemoUITests.swift */; };
+		AA000000000000000000A0 /* BugBaseViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000060 /* BugBaseViewController.swift */; };
+		AA000000000000000000A1 /* EventLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000061 /* EventLogView.swift */; };
+		AA000000000000000000A2 /* FieldScripting.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000062 /* FieldScripting.swift */; };
+		AA000000000000000000A3 /* MockScenarios.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000063 /* MockScenarios.swift */; };
+		AA000000000000000000A4 /* SecureFieldsDelegateDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000064 /* SecureFieldsDelegateDefaults.swift */; };
+		AA000000000000000000A5 /* BugCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000065 /* BugCatalog.swift */; };
+		AA000000000000000000A6 /* BugListViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000066 /* BugListViewController.swift */; };
+		AA000000000000000000A7 /* Bug01ExpiryCalendarViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000067 /* Bug01ExpiryCalendarViewController.swift */; };
+		AA000000000000000000A8 /* Bug02OneyLengthViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000068 /* Bug02OneyLengthViewController.swift */; };
+		AA000000000000000000A9 /* Bug03BirthDateLocaleViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000069 /* Bug03BirthDateLocaleViewController.swift */; };
+		AA000000000000000000AA /* Bug04BirthDatePrefillViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000006A /* Bug04BirthDatePrefillViewController.swift */; };
+		AA000000000000000000AB /* Bug05NetworkFallbackViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000006B /* Bug05NetworkFallbackViewController.swift */; };
+		AA000000000000000000AC /* Bug06CursorJumpViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000006C /* Bug06CursorJumpViewController.swift */; };
+		AA000000000000000000AD /* Bug07MissingInvalidationViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000006D /* Bug07MissingInvalidationViewController.swift */; };
+		AA000000000000000000AE /* Bug08BrandOverrideViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000006E /* Bug08BrandOverrideViewController.swift */; };
+		AA000000000000000000AF /* Bug09StaleStateViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000006F /* Bug09StaleStateViewController.swift */; };
+		AA000000000000000000B0 /* Bug10DuplicateEventsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000070 /* Bug10DuplicateEventsViewController.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		AA00000000000000000058 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA00000000000000000013 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA0000000000000000000F;
+			remoteInfo = Demo;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		3C1B95BF2FD181C000E5108E /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				3C1B95BE2FD181C000E5108E /* PurseSecureFields in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		AA00000000000000000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -26,6 +68,23 @@
 		AA0000000000000000004E /* DemoUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DemoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000000000000000004F /* DemoUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoUITests.swift; sourceTree = "<group>"; };
 		AA00000000000000000050 /* MockURLProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockURLProtocol.swift; sourceTree = "<group>"; };
+		AA00000000000000000060 /* BugBaseViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugBaseViewController.swift; sourceTree = "<group>"; };
+		AA00000000000000000061 /* EventLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventLogView.swift; sourceTree = "<group>"; };
+		AA00000000000000000062 /* FieldScripting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldScripting.swift; sourceTree = "<group>"; };
+		AA00000000000000000063 /* MockScenarios.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockScenarios.swift; sourceTree = "<group>"; };
+		AA00000000000000000064 /* SecureFieldsDelegateDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureFieldsDelegateDefaults.swift; sourceTree = "<group>"; };
+		AA00000000000000000065 /* BugCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugCatalog.swift; sourceTree = "<group>"; };
+		AA00000000000000000066 /* BugListViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugListViewController.swift; sourceTree = "<group>"; };
+		AA00000000000000000067 /* Bug01ExpiryCalendarViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bug01ExpiryCalendarViewController.swift; sourceTree = "<group>"; };
+		AA00000000000000000068 /* Bug02OneyLengthViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bug02OneyLengthViewController.swift; sourceTree = "<group>"; };
+		AA00000000000000000069 /* Bug03BirthDateLocaleViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bug03BirthDateLocaleViewController.swift; sourceTree = "<group>"; };
+		AA0000000000000000006A /* Bug04BirthDatePrefillViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bug04BirthDatePrefillViewController.swift; sourceTree = "<group>"; };
+		AA0000000000000000006B /* Bug05NetworkFallbackViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bug05NetworkFallbackViewController.swift; sourceTree = "<group>"; };
+		AA0000000000000000006C /* Bug06CursorJumpViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bug06CursorJumpViewController.swift; sourceTree = "<group>"; };
+		AA0000000000000000006D /* Bug07MissingInvalidationViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bug07MissingInvalidationViewController.swift; sourceTree = "<group>"; };
+		AA0000000000000000006E /* Bug08BrandOverrideViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bug08BrandOverrideViewController.swift; sourceTree = "<group>"; };
+		AA0000000000000000006F /* Bug09StaleStateViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bug09StaleStateViewController.swift; sourceTree = "<group>"; };
+		AA00000000000000000070 /* Bug10DuplicateEventsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bug10DuplicateEventsViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -74,6 +133,7 @@
 				AA0000000000000000002A /* DemoViewController+Layout.swift */,
 				AA0000000000000000002C /* DemoViewController+Delegate.swift */,
 				AA00000000000000000050 /* MockURLProtocol.swift */,
+				AA00000000000000000071 /* BugGallery */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -94,6 +154,30 @@
 			path = DemoUITests;
 			sourceTree = "<group>";
 		};
+		AA00000000000000000071 /* BugGallery */ = {
+			isa = PBXGroup;
+			children = (
+				AA00000000000000000060 /* BugBaseViewController.swift */,
+				AA00000000000000000061 /* EventLogView.swift */,
+				AA00000000000000000062 /* FieldScripting.swift */,
+				AA00000000000000000063 /* MockScenarios.swift */,
+				AA00000000000000000064 /* SecureFieldsDelegateDefaults.swift */,
+				AA00000000000000000065 /* BugCatalog.swift */,
+				AA00000000000000000066 /* BugListViewController.swift */,
+				AA00000000000000000067 /* Bug01ExpiryCalendarViewController.swift */,
+				AA00000000000000000068 /* Bug02OneyLengthViewController.swift */,
+				AA00000000000000000069 /* Bug03BirthDateLocaleViewController.swift */,
+				AA0000000000000000006A /* Bug04BirthDatePrefillViewController.swift */,
+				AA0000000000000000006B /* Bug05NetworkFallbackViewController.swift */,
+				AA0000000000000000006C /* Bug06CursorJumpViewController.swift */,
+				AA0000000000000000006D /* Bug07MissingInvalidationViewController.swift */,
+				AA0000000000000000006E /* Bug08BrandOverrideViewController.swift */,
+				AA0000000000000000006F /* Bug09StaleStateViewController.swift */,
+				AA00000000000000000070 /* Bug10DuplicateEventsViewController.swift */,
+			);
+			path = BugGallery;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -104,6 +188,7 @@
 				AA00000000000000000011 /* Sources */,
 				AA0000000000000000000C /* Frameworks */,
 				AA00000000000000000012 /* Resources */,
+				3C1B95BF2FD181C000E5108E /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -135,24 +220,6 @@
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
-
-/* Begin PBXContainerItemProxy section */
-		AA00000000000000000058 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = AA00000000000000000013 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = AA0000000000000000000F;
-			remoteInfo = Demo;
-		};
-/* End PBXContainerItemProxy section */
-
-/* Begin PBXTargetDependency section */
-		AA00000000000000000059 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = AA0000000000000000000F /* Demo */;
-			targetProxy = AA00000000000000000058 /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
 
 /* Begin PBXProject section */
 		AA00000000000000000013 /* Project object */ = {
@@ -213,6 +280,23 @@
 				AA0000000000000000002B /* DemoViewController+Layout.swift in Sources */,
 				AA0000000000000000002D /* DemoViewController+Delegate.swift in Sources */,
 				AA0000000000000000004C /* MockURLProtocol.swift in Sources */,
+				AA000000000000000000A0 /* BugBaseViewController.swift in Sources */,
+				AA000000000000000000A1 /* EventLogView.swift in Sources */,
+				AA000000000000000000A2 /* FieldScripting.swift in Sources */,
+				AA000000000000000000A3 /* MockScenarios.swift in Sources */,
+				AA000000000000000000A4 /* SecureFieldsDelegateDefaults.swift in Sources */,
+				AA000000000000000000A5 /* BugCatalog.swift in Sources */,
+				AA000000000000000000A6 /* BugListViewController.swift in Sources */,
+				AA000000000000000000A7 /* Bug01ExpiryCalendarViewController.swift in Sources */,
+				AA000000000000000000A8 /* Bug02OneyLengthViewController.swift in Sources */,
+				AA000000000000000000A9 /* Bug03BirthDateLocaleViewController.swift in Sources */,
+				AA000000000000000000AA /* Bug04BirthDatePrefillViewController.swift in Sources */,
+				AA000000000000000000AB /* Bug05NetworkFallbackViewController.swift in Sources */,
+				AA000000000000000000AC /* Bug06CursorJumpViewController.swift in Sources */,
+				AA000000000000000000AD /* Bug07MissingInvalidationViewController.swift in Sources */,
+				AA000000000000000000AE /* Bug08BrandOverrideViewController.swift in Sources */,
+				AA000000000000000000AF /* Bug09StaleStateViewController.swift in Sources */,
+				AA000000000000000000B0 /* Bug10DuplicateEventsViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -225,6 +309,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AA00000000000000000059 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA0000000000000000000F /* Demo */;
+			targetProxy = AA00000000000000000058 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		AA00000000000000000016 /* Debug */ = {
@@ -373,7 +465,7 @@
 /* Begin XCLocalSwiftPackageReference section */
 		3C1B95BB2FD181C000E5108E /* XCLocalSwiftPackageReference ".." */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "..";
+			relativePath = ..;
 		};
 /* End XCLocalSwiftPackageReference section */
 
