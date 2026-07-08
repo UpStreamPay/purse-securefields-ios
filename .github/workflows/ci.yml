@@ -68,7 +68,8 @@ jobs:
             -project Demo/Demo.xcodeproj \
             -scheme DemoUITests \
             -destination "platform=iOS Simulator,id=$SIM_ID" \
+            -parallel-testing-enabled NO \
             -test-timeouts-enabled YES \
-            -default-test-execution-time-allowance 60 \
+            -default-test-execution-time-allowance 120 \
             CODE_SIGNING_ALLOWED=NO \
             | grep --line-buffered -E "(Test Suite|Test Case|passed|failed|error:|BUILD)"

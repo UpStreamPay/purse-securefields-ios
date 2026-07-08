@@ -18,6 +18,14 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- Demo app config — set via env vars when launching Xcode/xcodebuild, or a gitignored
+	     .env file loaded with `source scripts/load-env.sh` (never commit real values). Resolve
+	     to an empty string when unset; DemoViewController falls back to a shared sandbox
+	     tenant for TENANT_ID and leaves remote log monitoring disabled for MONITORING_API_KEY. -->
+	<key>TENANT_ID</key>
+	<string>$(TENANT_ID)</string>
+	<key>MONITORING_API_KEY</key>
+	<string>$(MONITORING_API_KEY)</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

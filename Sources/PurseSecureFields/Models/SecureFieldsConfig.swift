@@ -45,16 +45,21 @@ public struct SecureFieldsPlaceholders {
 
 public struct SecureFieldsConfig {
     public let tenantId: String
-    public let baseURL: String
+
+    /// `SANDBOX`/`PRODUCTION` (or the internal-only `TEST` in Debug builds). The SDK resolves
+    /// both the tokenization gateway and the remote monitoring endpoint internally — no raw URL
+    /// configuration is required in the host app. See `VaultEnvironment`.
+    public let environment: VaultEnvironment
+
     public let brands: [CardBrand]
     public let style: SecureFieldsStyle
     public let placeholders: SecureFieldsPlaceholders
 
     /// SHA-256 hashes (Base64-encoded) of the vault server's SubjectPublicKeyInfo (SPKI).
     ///
-    /// When non-empty, every request to `baseURL` is rejected unless the server presents a
-    /// certificate whose public key matches at least one hash — preventing MITM attacks even
-    /// when a rogue root CA is installed on the device (MDM/BYOD profiles, malware).
+    /// When non-empty, every request to the tokenization gateway is rejected unless the server
+    /// presents a certificate whose public key matches at least one hash — preventing MITM
+    /// attacks even when a rogue root CA is installed on the device (MDM/BYOD profiles, malware).
     ///
     /// Supported key types: RSA-2048, RSA-4096, EC-256 (P-256), EC-384 (P-384).
     ///
@@ -71,25 +76,37 @@ public struct SecureFieldsConfig {
     /// ```
     public let pinnedPublicKeyHashes: [String]
 
+    /// Api key used to authenticate remote log monitoring (Datadog, via the widget log worker).
+    /// Monitoring silently disables itself when omitted.
+    public let apiKey: String?
+
+    /// Opt-out for remote log monitoring. Defaults to enabled. Events are sent as they happen —
+    /// safety comes from every payload being structural metadata only, never card data — see
+    /// `RemoteLogger`.
+    public let monitoringEnabled: Bool
+
     #if DEBUG
     public var testURLSession: URLSession? = nil
     #endif
 
     public init(
         tenantId: String,
-        baseURL: String,
+        environment: VaultEnvironment = .sandbox,
         brands: [CardBrand] = CardBrand.allCases,
         style: SecureFieldsStyle = .default,
         placeholders: SecureFieldsPlaceholders = .init(),
-        pinnedPublicKeyHashes: [String] = []
+        pinnedPublicKeyHashes: [String] = [],
+        apiKey: String? = nil,
+        monitoringEnabled: Bool = true
     ) {
-        precondition(baseURL.hasPrefix("https://"), "SecureFields: baseURL must use HTTPS")
         precondition(!tenantId.trimmingCharacters(in: .whitespaces).isEmpty, "SecureFields: tenantId must not be empty")
         self.tenantId = tenantId
-        self.baseURL = baseURL
+        self.environment = environment
         self.brands = brands
         self.style = style
         self.placeholders = placeholders
         self.pinnedPublicKeyHashes = pinnedPublicKeyHashes
+        self.apiKey = apiKey
+        self.monitoringEnabled = monitoringEnabled
     }
 }

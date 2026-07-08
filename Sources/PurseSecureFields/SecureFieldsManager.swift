@@ -67,6 +67,7 @@ public final class SecureFieldsManager {
         cvvField.setInputMode(.cvv)
         brandSelectorView.update(brands: [])
         delegate?.secureFieldsBrandsDetected([])
+        monitoring.recordBrandsDetected([])
         notifyFormValidity()
     }
 
@@ -80,25 +81,44 @@ public final class SecureFieldsManager {
 
     private let config: SecureFieldsConfig
     private let apiClient: VaultAPIClient
+    // Remote log monitoring — observes submit start/result via explicit hooks (below) rather
+    // than tracking submit counters inline here. See MonitoringCoordinator for everything this
+    // manager doesn't need to know about monitoring.
+    private let monitoring: MonitoringCoordinator
     private var detectedBrands: [CardBrand] = []
     private var lastBinResult: BinLookupResult?
     private var binLookupWorkItem: DispatchWorkItem?
     private var lastBinPrefix: String?
     private var isSubmitting = false
     private var privacyObservers: [NSObjectProtocol] = []
+    private var monitoringObservers: [NSObjectProtocol] = []
 
     // MARK: - Init
 
     public init(config: SecureFieldsConfig) {
+        // Constructed and started first, using the local `config` parameter — Swift requires
+        // every stored property be assigned before `self` is used, so `monitoring` (a `let`)
+        // is built here and assigned to `self.monitoring` below.
+        let monitoring = MonitoringCoordinator(
+            tenantId: config.tenantId,
+            version: VaultAPIClient.sdkVersion,
+            env: config.environment.rawValue,
+            monitoringApiRoot: config.environment.monitoringApiRoot,
+            apiKey: config.apiKey,
+            monitoringEnabled: config.monitoringEnabled
+        )
+        monitoring.start(config: config)
+        self.monitoring = monitoring
+
         self.config = config
         #if DEBUG
         if let testSession = config.testURLSession {
-            self.apiClient = VaultAPIClient(baseURL: config.baseURL, session: testSession)
+            self.apiClient = VaultAPIClient(baseURL: config.environment.apiRoot, session: testSession)
         } else {
-            self.apiClient = VaultAPIClient(baseURL: config.baseURL, pinnedPublicKeyHashes: config.pinnedPublicKeyHashes)
+            self.apiClient = VaultAPIClient(baseURL: config.environment.apiRoot, pinnedPublicKeyHashes: config.pinnedPublicKeyHashes)
         }
         #else
-        self.apiClient = VaultAPIClient(baseURL: config.baseURL, pinnedPublicKeyHashes: config.pinnedPublicKeyHashes)
+        self.apiClient = VaultAPIClient(baseURL: config.environment.apiRoot, pinnedPublicKeyHashes: config.pinnedPublicKeyHashes)
         #endif
         let pan = SecurePANField()
         let cvv = SecureCVVField()
@@ -113,6 +133,12 @@ public final class SecureFieldsManager {
         setupBrandSelector()
         applyConfig(config)
         setupPrivacyObservers()
+        setupMonitoringObservers()
+    }
+
+    deinit {
+        monitoringObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        monitoring.unmount()
     }
 
     // MARK: - Config
@@ -137,19 +163,24 @@ public final class SecureFieldsManager {
             self?.delegate?.secureFieldsContentChanged()
         }
         panField.onValidityChanged = { [weak self] _ in self?.notifyFormValidity() }
-        panField.onFocusChanged    = { [weak self] f in self?.delegate?.secureFieldsFocusChanged(field: .pan, isFocused: f) }
+        panField.onFocusChanged    = { [weak self] f in self?.focusChanged(.pan, f) }
 
         cvvField.onContentChanged  = { [weak self] in self?.delegate?.secureFieldsContentChanged() }
         cvvField.onValidityChanged = { [weak self] _ in self?.notifyFormValidity() }
-        cvvField.onFocusChanged    = { [weak self] f in self?.delegate?.secureFieldsFocusChanged(field: .cvv, isFocused: f) }
+        cvvField.onFocusChanged    = { [weak self] f in self?.focusChanged(.cvv, f) }
 
         expDateField.onContentChanged  = { [weak self] in self?.delegate?.secureFieldsContentChanged() }
         expDateField.onValidityChanged = { [weak self] _ in self?.notifyFormValidity() }
-        expDateField.onFocusChanged    = { [weak self] f in self?.delegate?.secureFieldsFocusChanged(field: .expDate, isFocused: f) }
+        expDateField.onFocusChanged    = { [weak self] f in self?.focusChanged(.expDate, f) }
 
         holderNameField.onContentChanged  = { [weak self] in self?.delegate?.secureFieldsContentChanged() }
         holderNameField.onValidityChanged = { [weak self] _ in self?.notifyFormValidity() }
-        holderNameField.onFocusChanged    = { [weak self] f in self?.delegate?.secureFieldsFocusChanged(field: .holderName, isFocused: f) }
+        holderNameField.onFocusChanged    = { [weak self] f in self?.focusChanged(.holderName, f) }
+    }
+
+    private func focusChanged(_ field: SecureField, _ isFocused: Bool) {
+        delegate?.secureFieldsFocusChanged(field: field, isFocused: isFocused)
+        monitoring.recordFocusChanged(field: field, isFocused: isFocused)
     }
 
     private func setupBrandSelector() {
@@ -157,6 +188,7 @@ public final class SecureFieldsManager {
             self?.applySelectedBrand(brand)
             self?.applyLengthsForBrand(brand)
             self?.delegate?.secureFieldsBrandSelected(brand)
+            self?.monitoring.recordBrandSelected(brand)
         }
     }
 
@@ -174,6 +206,7 @@ public final class SecureFieldsManager {
                 cvvField.setInputMode(.cvv)
                 brandSelectorView.update(brands: [])
                 delegate?.secureFieldsBrandsDetected([])
+                monitoring.recordBrandsDetected([])
                 notifyFormValidity()
             }
             return
@@ -198,6 +231,7 @@ public final class SecureFieldsManager {
                     self.brandSelectorView.update(brands: allowed)
                     self.applySelectedBrand(self.brandSelectorView.selectedBrand)
                     self.delegate?.secureFieldsBrandsDetected(allowed)
+                    self.monitoring.recordBrandsDetected(allowed)
                     self.notifyFormValidity()
                 }
             }
@@ -238,6 +272,19 @@ public final class SecureFieldsManager {
                            object: nil, queue: .main) { [weak self] _ in
                 self?.delegate?.secureFieldsScreenshotDetected()
             },
+        ]
+    }
+
+    /// Unlike `setupPrivacyObservers()`, these run regardless of `obscuresOnBackground` and are
+    /// only ever registered once, at init — flushing buffered logs must not depend on a privacy
+    /// setting the host app may turn off.
+    private func setupMonitoringObservers() {
+        let nc = NotificationCenter.default
+        monitoringObservers = [
+            nc.addObserver(forName: UIApplication.didEnterBackgroundNotification,
+                           object: nil, queue: .main) { [weak self] _ in self?.monitoring.flush() },
+            nc.addObserver(forName: UIApplication.willTerminateNotification,
+                           object: nil, queue: .main) { [weak self] _ in self?.monitoring.flush() },
         ]
     }
 
@@ -298,12 +345,14 @@ public final class SecureFieldsManager {
         holderNameField.clearSensitiveData()
         notifyFormValidity()
 
+        monitoring.recordSubmitStart()
         apiClient.tokenize(tenantId: config.tenantId, payload: payload) { [weak self] result in
             guard let self else { return }
             DispatchQueue.main.async {
                 self.isSubmitting = false
                 switch result {
                 case .success(let response):
+                    self.monitoring.recordSubmitSuccess()
                     let tokenResult = TokenizationResult(
                         vaultFormToken: response.formToken,
                         bin: response.card.bin,
@@ -312,6 +361,7 @@ public final class SecureFieldsManager {
                     )
                     self.delegate?.secureFieldsDidTokenize(tokenResult)
                 case .failure(let error):
+                    self.monitoring.recordSubmitFailure(error)
                     self.delegate?.secureFieldsDidFail(error)
                 }
             }

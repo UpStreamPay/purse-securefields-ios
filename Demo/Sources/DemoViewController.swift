@@ -10,9 +10,11 @@ final class DemoViewController: UIViewController {
     private func makeManager() -> SecureFieldsManager {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--uitesting") {
+            // The URL itself is irrelevant here — MockURLProtocol intercepts by path suffix,
+            // not host, so requests never actually leave the device regardless of environment.
             var config = SecureFieldsConfig(
                 tenantId: "test",
-                baseURL: "https://api.test.example.com",
+                environment: .test,
                 placeholders: SecureFieldsPlaceholders(
                     pan: "1234 5678 9012 3456",
                     cvv: "123",
@@ -25,15 +27,31 @@ final class DemoViewController: UIViewController {
         }
         #endif
         return SecureFieldsManager(config: SecureFieldsConfig(
-            tenantId: "61ff8a6a-edd5-4f40-aa32-8410a73e79ac",
-            baseURL: "https://api.vault.purse-test.com",
+            tenantId: Self.tenantId,
+            environment: .test,
             placeholders: SecureFieldsPlaceholders(
                 pan: "1234 5678 9012 3456",
                 cvv: "123",
                 expDate: "MM/YY",
                 holderName: "Name Surname"
-            )
+            ),
+            apiKey: Self.monitoringApiKey
         ))
+    }
+
+    // Set via env vars when launching Xcode/xcodebuild, or a gitignored .env file loaded with
+    // `source scripts/load-env.sh` (see Demo/Resources/Info.plist) — never commit real values
+    // here. Falls back to a shared sandbox tenant when unset, so the demo still runs out of
+    // the box.
+    private static var tenantId: String {
+        let value = Bundle.main.object(forInfoDictionaryKey: "TENANT_ID") as? String
+        return value?.isEmpty == false ? value! : "61ff8a6a-edd5-4f40-aa32-8410a73e79ac"
+    }
+
+    // Blank when unset, which leaves remote log monitoring disabled.
+    private static var monitoringApiKey: String? {
+        let value = Bundle.main.object(forInfoDictionaryKey: "MONITORING_API_KEY") as? String
+        return value?.isEmpty == false ? value : nil
     }
 
     // MARK: - UI

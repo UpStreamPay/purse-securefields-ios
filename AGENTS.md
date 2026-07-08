@@ -14,8 +14,9 @@ Always run a clean build after changes. BUILD SUCCEEDED is the acceptance bar.
 
 ```
 Sources/PurseSecureFields/
-  Models/           — CardBrand, SecureFieldsConfig (+ Style + Placeholders), SecureFieldsError, TokenizationResult
+  Models/           — CardBrand, SecureFieldsConfig (+ Style + Placeholders), SecureFieldsError, TokenizationResult, VaultEnvironment
   Networking/       — VaultAPIClient, NetworkModels (BIN lookup + tokenization payloads)
+  Monitoring/       — RemoteLogger, RemoteLogClient, LogQueue, SecureFieldsLog (remote log monitoring, separate from VaultAPIClient)
   Internal/         — CardFormatter (PAN display grouping), CardValidator (Luhn, expiry)
   Views/            — SecureBaseField, SecurePAN/CVV/ExpDate/HolderNameField, SecurePANContainer, SecureBrandSelectorView
   SecureFieldsManager.swift   — public API entry point
@@ -55,12 +56,20 @@ Tests/              — SecureFieldsTests
 - `submit()` calls `clearSensitiveData()` on all four fields immediately after building the tokenization payload (before the network call), per PCI compliance requirements. This only zeroes text/validity — it does NOT reset BIN lookup state, detected brands, or the brand selector. Host app still calls `manager.clearFields()` for a full reset (e.g. to start a new form).
 
 ## Networking
-- All requests require HTTPS (enforced via `precondition` in `SecureFieldsConfig`).
+- All requests are HTTPS by construction — `VaultEnvironment.apiRoot` is a fixed `https://` literal per case, so there's no raw URL for a host app to get wrong. `SecureFieldsConfig` no longer takes a `baseURL` parameter at all.
 - `X-Purse-SDK-Version` header on every request. Version string is in `VaultAPIClient.sdkVersion`.
 - `X-Request-ID` (UUID) on tokenization only.
 - No card data in logs. Body logging is fully removed. `#if DEBUG` guards on status codes only.
 - **SPKI certificate pinning**: `SecureFieldsConfig.pinnedPublicKeyHashes` accepts Base64-encoded SHA-256 SPKI hashes. When set, `VaultAPIClient` enforces pinning via `PinningDelegate` (a private `URLSessionDelegate`). Supported key types: RSA-2048, RSA-4096, EC-256, EC-384. Provide ≥ 2 hashes (primary + rotation backup). A `#if DEBUG` warning is printed when hashes are empty. **Production integrations must set this field.**
 - `VaultAPIClient` has two inits: `init(baseURL:pinnedPublicKeyHashes:)` for production (creates pinned session), and `init(baseURL:session:)` for test injection only (pinning skipped). Never call the test init in production code.
+
+## Remote log monitoring
+- `SecureFieldsManager` carries **no monitoring state** — no counters, no payload-building. It owns one `MonitoringCoordinator` (in `Monitoring/`) and only ever calls `start(config:)`/`unmount()` (construction/`deinit`) and `recordFocusChanged`/`recordBrandsDetected`/`recordBrandSelected`/`recordSubmitStart`/`recordSubmitSuccess`/`recordSubmitFailure` at the same points it already calls its own `delegate`. If you're about to add a counter or `JSONValue` payload directly to `SecureFieldsManager`, stop — that logic belongs in `MonitoringCoordinator`.
+- `MonitoringCoordinator` owns a `RemoteLogger` — a separate, opt-out logger from `VaultAPIClient`'s local `#if DEBUG` prints — which forwards `info`/`warn`/`error` events to the `cf-widget-logger` worker for Datadog. Configured via `SecureFieldsConfig.apiKey`/`monitoringEnabled`/`environment`; disables itself silently when `apiKey` is missing.
+- **No suppression window.** Events are sent continuously, as they happen — including while the secure fields are on screen. This matches the web vault SDK's `WithMonitoringProxy` exactly. PCI safety comes from every payload being structural metadata only (field names, brand lists, outcome codes) — `MonitoringCoordinator` never has access to raw field values in the first place, so there's nothing to accidentally log. If you're adding a new event, the question is never "should this wait until `deinit`" — it's "does this payload contain anything other than a field name, brand, count, or non-sensitive code."
+- Log payloads carry only structural metadata (brand list, submit outcome counts, non-sensitive error codes like `"NETWORK_ERROR"` or an HTTP status string) — never the error `message`, which could echo back arbitrary server text.
+- Kept as a separate class/network stack from `VaultAPIClient` on purpose, so a telemetry failure can never affect PCI flows.
+- `VaultEnvironment.test` is wrapped in `#if DEBUG` — never remove that guard or add a similar always-compiled "internal/test" option. The distributed XCFramework is always built in `Release` configuration (`xcodebuild archive` in release.yml), so `#if DEBUG` is the only mechanism that actually keeps something out of what merchants integrate — a runtime check (like Android's `FLAG_DEBUGGABLE` guard) would NOT work here, since this framework isn't recompiled per host app.
 
 ## Style / placeholder config
 - Applied once at init via `applyConfig(_:)` in the manager.
@@ -85,6 +94,7 @@ Standard Luhn in `CardValidator.luhn(_:)`. Double every second digit from the ri
 
 ## What NOT to do
 - Do not add logging of card data anywhere, including in debug builds.
+- Do not add a `RemoteLogger.info/warn/error` call anywhere between `SecureFieldsManager.init` setting `mounted = true` and `deinit` setting it back to `false` — that entire window must stay silent by design (PCI). If you need new telemetry, add it to the `INIT_SDK` or `DESTROY` payloads instead.
 - Do not add `public` to `SecureBaseField`, `SecurePANField`, `SecureCVVField`, `SecureExpDateField`, or `SecureHolderNameField`.
 - Do not re-add `setPlaceholders` to the manager — use `SecureFieldsConfig`.
 - Do not truncate PAN input — `maxLength` was replaced by `validLengths` for a reason (pasting a 19-char Oney PAN before BIN lookup would be truncated).
@@ -99,3 +109,4 @@ Standard Luhn in `CardValidator.luhn(_:)`. Double every second digit from the ri
 
 ## Demo app
 The Demo target is for manual testing only. It is not shipped. `DemoViewController` is split into three files: main state/lifecycle, `+Layout` (UI construction + border logic), `+Delegate` (delegate conformance).
+`TENANT_ID`/`MONITORING_API_KEY` come from `Demo/Resources/Info.plist`'s `$(VAR)` build-setting substitution, sourced from a gitignored `.env` at the repo root (see `.env.example`) via `source scripts/load-env.sh` — never hardcode real values in `DemoViewController.swift`. That script sets values with both `export` (for `xcodebuild` in the same shell) and `launchctl setenv` (so Xcode.app opened via Finder/Dock, which does not inherit shell env, still resolves them). Both vars fall back gracefully when unset — `TENANT_ID` to a shared sandbox tenant, `MONITORING_API_KEY` to `nil` (monitoring disabled) — so the demo still builds and runs without any `.env` file at all.

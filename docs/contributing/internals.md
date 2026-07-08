@@ -19,6 +19,7 @@ How the native field layer works and how `SecureFieldsManager` coordinates it.
 - [Expiry formatting](#expiry-formatting)
 - [CVV and Oney date-of-birth mode](#cvv-and-oney-date-of-birth-mode)
 - [Tokenization](#tokenization)
+- [Remote log monitoring](#remote-log-monitoring)
 - [Privacy and background blur](#privacy-and-background-blur)
 - [Event dispatch](#event-dispatch)
 
@@ -225,6 +226,68 @@ For Oney flows, `birthDate` replaces `cvv`:
 `VaultAPIClient` uses `URLSession(configuration: .ephemeral)` — no URL cache, no cookie
 storage. 5xx responses are retried up to three times. Transport errors and 4xx responses are
 not retried to avoid creating duplicate vault tokens.
+
+---
+
+## Remote log monitoring
+
+`Monitoring/` forwards health telemetry to Datadog via the `cf-widget-logger` Cloudflare worker,
+matching the web vault SDK's monitoring module wire format:
+
+```
+MonitoringCoordinator  ← SecureFieldsManager's ONLY awareness of monitoring
+└── RemoteLogger       ← info()/warn()/error()
+    ├── LogQueue       ← buffers events, flushes at 16 events / 2s idle / 64KB, mirrors web SimpleQueue
+    └── RemoteLogClient ← POST {monitoringApiRoot}/widget/secure_fields?api-key=…
+```
+
+- **`SecureFieldsManager` carries no monitoring state** — no counters, no payload-building, no
+  `RemoteLogger` reference. It constructs one `MonitoringCoordinator` and calls
+  `start(config:)`/`unmount()` at construction/`deinit`, plus `recordFocusChanged`/
+  `recordBrandsDetected`/`recordBrandSelected`/`recordSubmitStart`/`recordSubmitSuccess`/
+  `recordSubmitFailure` at the exact points inside field callbacks / BIN lookup / `submit()`
+  where it already calls into its own `delegate`. Everything else — deriving the submit-outcome
+  summary, building log payloads — lives in `MonitoringCoordinator`. Unlike Android's
+  `MonitoringCoordinator` (which registers itself as a `SecureFieldsListener` and observes events
+  generically, since `SecureFieldsAndroid` supports multiple listeners), `SecureFieldsManager` has
+  only a single `delegate` slot, so these are explicit one-line hook calls at the same call sites
+  rather than a listener registration — same end result (zero monitoring state on the manager),
+  different wiring mechanism because of that platform difference. This still mirrors the intent
+  of the web vault SDK's `WithMonitoringProxy`: telemetry is derived from events the manager
+  already reports, not threaded through its business logic as ad hoc state.
+- `RemoteLogger` is deliberately kept **separate from `VaultAPIClient`** so remote sending can be
+  opted out independently, and so a telemetry failure can never affect PCI flows (tokenization,
+  BIN lookup). It has no dependency on `VaultAPIClient` or vice versa.
+- **No suppression window.** Events are sent continuously, as they happen — including while the
+  secure fields are on screen. This matches the web vault SDK's monitoring proxy exactly. PCI
+  safety comes from every payload being structural metadata only (field names, brand lists,
+  outcome codes) — `MonitoringCoordinator` never has access to raw field values in the first
+  place, so there's nothing for it to accidentally log.
+- **Enable/disable**: `RemoteLogger` resolves a `RemoteLogClient?` at construction — `nil` when
+  `apiKey` is missing/empty or `monitoringEnabled` is `false`. `enabled = (client != nil)` gates
+  every log call.
+- **Wire format**: each event is a flat `SecureFieldsLog` — `tenantId`, `instanceId` (random UUID
+  per manager instance), `version`, `date` (ISO 8601), `env`, `level`
+  (`OK`/`DEBUG`/`VERBOSE`/`NOTICE`/`WARNING`/`ERROR`), `code`, `payload` (a small `JSONValue` enum
+  standing in for arbitrary JSON — structural metadata only). A batch is a JSON array of these,
+  POSTed as the request body. This is the same shape the web vault SDK's `SecureFieldsLog` type
+  produces (`vault/packages/securefields-js-sdk/src/monitoring/types.ts`).
+- **Emitted events** (`LogCode` in `SecureFieldsLog.swift`): `INIT_SDK` (brand list, from
+  `start(config:)`), `FIELD_FOCUS`/`FIELD_BLUR` (from `recordFocusChanged`), `BRAND_DETECTED`/
+  `BRAND_NOT_DETECTED` (from `recordBrandsDetected`), `BRAND_SELECTION_CHANGED` (from
+  `recordBrandSelected`), `SUBMIT`/`SUBMIT_SUCCESS`/`ERROR` (from `recordSubmitStart`/
+  `recordSubmitSuccess`/`recordSubmitFailure`), and `DESTROY` (submit attempt/success counts,
+  non-sensitive error codes only — never the error message — from `unmount()`). Mirrors the web
+  vault SDK's `LOG_CODES`; there is no `RENDER`/`FORM_READY` pair like Android's, since iOS has
+  no separate render step — fields exist as soon as the manager is constructed.
+- `LogQueue` is a small serial-`DispatchQueue`-backed buffer (no Combine, no async/await, matching
+  the rest of the codebase) rather than a coroutine-based queue. `RemoteLogClient` follows the
+  same DI pattern as `VaultAPIClient`: a production init building an ephemeral `URLSession`, and a
+  test-only `init(session:)` for injecting a mock. Sends are fire-and-forget — no retry, no error
+  propagation to the caller.
+- A `didEnterBackgroundNotification`/`willTerminateNotification` observer pair (registered once,
+  independent of `obscuresOnBackground`) flushes any buffered logs so app backgrounding doesn't
+  silently drop them.
 
 ---
 

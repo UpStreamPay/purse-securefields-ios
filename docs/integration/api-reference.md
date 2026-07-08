@@ -8,6 +8,8 @@ Module: `PurseSecureFields`
 
 - [SecureFieldsManager](#securefieldsmanager)
 - [SecureFieldsConfig](#securefieldsconfig)
+- [Remote log monitoring](#remote-log-monitoring)
+- [VaultEnvironment](#vaultenvironment)
 - [SecureFieldsStyle](#securefieldsstyle)
 - [SecureFieldsPlaceholders](#securefieldsplaceholders)
 - [SecureFieldsDelegate](#securefieldsdelegate)
@@ -101,11 +103,13 @@ Passed to `SecureFieldsManager.init()`. All configuration is immutable after ini
 public struct SecureFieldsConfig {
     public init(
         tenantId: String,
-        baseURL: String,
+        environment: VaultEnvironment = .sandbox,
         brands: [CardBrand] = CardBrand.allCases,
         style: SecureFieldsStyle = .default,
         placeholders: SecureFieldsPlaceholders = .init(),
-        pinnedPublicKeyHashes: [String] = []
+        pinnedPublicKeyHashes: [String] = [],
+        apiKey: String? = nil,
+        monitoringEnabled: Bool = true
     )
 }
 ```
@@ -113,15 +117,61 @@ public struct SecureFieldsConfig {
 | Parameter | Required | Description |
 |---|---|---|
 | `tenantId` | Yes | Your merchant/tenant identifier |
-| `baseURL` | Yes | Vault API base URL — must use `https://` |
+| `environment` | No | `.sandbox` or `.production` (default `.sandbox`). The SDK resolves both the tokenization gateway and the remote monitoring endpoint internally — see [VaultEnvironment](#vaultenvironment) |
 | `brands` | No | Accepted card networks. Defaults to all supported brands. |
 | `style` | No | Visual style applied to all fields |
 | `placeholders` | No | Placeholder text for each field |
 | `pinnedPublicKeyHashes` | No | SHA-256 SPKI hashes (Base64) for certificate pinning |
+| `apiKey` | No | Api key for remote log monitoring (Datadog). Monitoring silently disables itself when omitted — see [Remote log monitoring](#remote-log-monitoring) |
+| `monitoringEnabled` | No | Opt-out for remote log monitoring (default `true`) |
 
 **Preconditions** (crash at init time if violated):
-- `baseURL` must start with `https://`
 - `tenantId` must not be blank
+
+There is no `baseURL` parameter — all requests are HTTPS by construction, since
+`VaultEnvironment.apiRoot` is a fixed `https://` literal per case rather than a
+host-app-supplied string.
+
+---
+
+## Remote log monitoring
+
+The SDK forwards health logs (SDK init, field focus/blur, brand detection, submit attempts and
+results, teardown — never card data) to Datadog via Purse's log ingestion worker
+(`cf-widget-logger`), so we can monitor SDK health in production, in real time. The wire format
+matches the web vault SDK's monitoring module.
+
+- **Enable/disable**: on by default whenever `apiKey` is provided to `SecureFieldsConfig`.
+  Omitting `apiKey`, or passing `monitoringEnabled: false`, disables it — nothing is sent, and no
+  network calls are made.
+- **PCI**: events are sent continuously, as they happen — including for `SecureFieldsManager`'s
+  entire lifetime, while the secure fields are on screen. Safety comes from what's in a payload,
+  not from when it's sent: every event is structural metadata only (field names, brand lists,
+  outcome codes) — no card data is ever placed in a log payload, by construction.
+- This is unrelated to the SDK's local `#if DEBUG` status-code prints, which never leave the
+  device.
+- See [Security](../security/security.md) for the full PCI rationale.
+
+---
+
+## `VaultEnvironment`
+
+Selects which Purse environment the SDK talks to. Resolves **both** the vault
+tokenization/BIN-lookup gateway and the `cf-widget-logger` remote monitoring endpoint internally
+— no URL configuration is required in the host app.
+
+```swift
+public enum VaultEnvironment: String {
+    case test          // Debug builds only — see below
+    case sandbox
+    case production
+}
+```
+
+`.test` only exists in `Debug` builds. The distributed XCFramework is always built in `Release`
+configuration, so `#if DEBUG` code — including this case entirely — is compiled out of what every
+merchant integrates, in both their own Debug and Release builds. `.test` is only reachable when
+building this package from source in a Debug configuration (local development).
 
 ---
 

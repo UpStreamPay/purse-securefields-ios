@@ -11,3 +11,6 @@ DerivedData/
 
 # macOS
 .DS_Store
+
+# Local demo app secrets (monitoring API key) — see .env.example
+.env
