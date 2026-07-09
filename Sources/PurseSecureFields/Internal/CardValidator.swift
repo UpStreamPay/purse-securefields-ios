@@ -18,7 +18,10 @@ enum CardValidator {
 
     static func isExpiryValid(month: Int, year: Int) -> Bool {
         let now = Date()
-        let cal = Calendar.current
+        // `parsedExpiry` always produces Gregorian years, so the "current" year/month must be read
+        // from a Gregorian calendar too. Using `Calendar.current` would read e.g. 2569 on a Thai
+        // Buddhist-calendar device and reject every valid card.
+        let cal = Calendar(identifier: .gregorian)
         let currentYear = cal.component(.year, from: now)
         let currentMonth = cal.component(.month, from: now)
         if year > currentYear { return true }

@@ -169,10 +169,11 @@ struct SecureCVVFieldTests {
         #expect(field.hasContent)
     }
 
-    @Test func birthdateModeIsValidAfterSwitch() {
+    @Test func birthdateModeInvalidUntilUserPicks() {
         let field = SecureCVVField()
         field.setInputMode(.birthdate)
-        #expect(field.isValid)
+        // The birth date must NOT auto-populate/auto-validate — the user has to pick a date first.
+        #expect(!field.isValid)
     }
 
     @Test func birthdateModeClearsOldCVV() {
@@ -181,7 +182,7 @@ struct SecureCVVFieldTests {
         field.textDidChange()
 
         field.setInputMode(.birthdate)
-        // picker immediately populates a date — old CVV digits must be gone
+        // Old CVV digits must be gone; the field is left empty until the user picks a date.
         #expect(field.storedText != "123")
     }
 
@@ -196,7 +197,6 @@ struct SecureCVVFieldTests {
     @Test func switchBackToCVVClearsAndInvalidates() {
         let field = SecureCVVField()
         field.setInputMode(.birthdate)
-        #expect(field.isValid)
 
         field.setInputMode(.cvv)
         #expect(!field.isValid)
