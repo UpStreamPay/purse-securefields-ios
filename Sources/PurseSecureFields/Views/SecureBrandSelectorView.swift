@@ -45,7 +45,14 @@ public final class SecureBrandSelectorView: UIView {
 
     private func rebuildChips(showBorder: Bool) {
         stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        selectedBrand = brands.first
+        // Preserve the user's manual selection if it survives into the new brand set; only fall
+        // back to the first brand when there is no valid prior selection. Unconditionally resetting
+        // to `brands.first` wiped the manual pick on every BIN lookup cycle.
+        if let current = selectedBrand, brands.contains(current) {
+            selectedBrand = current
+        } else {
+            selectedBrand = brands.first
+        }
 
         for (index, brand) in brands.enumerated() {
             let chip = BrandChip(brand: brand, showBorder: showBorder)
