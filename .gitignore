@@ -4,7 +4,6 @@
 
 # Xcode
 xcuserdata/
-*.xcodeproj/project.xcworkspace/xcuserdata/
 DerivedData/
 *.xcscmblueprint
 *.xccheckout
@@ -14,3 +13,8 @@ DerivedData/
 
 # Local demo app secrets (monitoring API key) — see .env.example
 .env
+
+# IntelliJ Idea
+.idea
+.run
+*.iml
