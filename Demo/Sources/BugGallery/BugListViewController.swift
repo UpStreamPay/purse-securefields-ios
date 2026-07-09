@@ -32,7 +32,7 @@ final class BugListViewController: UITableViewController {
     }
 
     override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        "10 cas de reproduction confirmés — voir chaque écran pour les étapes détaillées et le comportement attendu vs observé."
+        "13 cas de reproduction confirmés — voir chaque écran pour les étapes détaillées et le comportement attendu vs observé."
     }
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {

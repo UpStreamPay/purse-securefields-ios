@@ -51,6 +51,18 @@ enum BugCatalog {
                 title: "formValidityChanged émis en boucle",
                 subtitle: "Le contrat « seulement au changement » n'est pas respecté",
                 makeViewController: { Bug10DuplicateEventsViewController() }),
+        BugInfo(number: 11,
+                title: "Observateurs NotificationCenter jamais retirés",
+                subtitle: "setupPrivacyObservers n'a pas de deinit — fuite à chaque manager",
+                makeViewController: { Bug11ObserverLeakViewController() }),
+        BugInfo(number: 12,
+                title: "Lookup BIN relancé à chaque frappe",
+                subtitle: "Garde de déduplication inopérante quand aucune marque n'est retenue",
+                makeViewController: { Bug12RepeatedBinLookupViewController() }),
+        BugInfo(number: 13,
+                title: "JSON BIN malformé → faux succès [16]/[3]",
+                subtitle: "Un échec de décodage est présenté comme un succès, sans erreur",
+                makeViewController: { Bug13FakeSuccessViewController() }),
     ]
 }
 #endif

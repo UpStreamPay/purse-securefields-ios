@@ -32,6 +32,9 @@
 		AA000000000000000000AE /* Bug08BrandOverrideViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000006E /* Bug08BrandOverrideViewController.swift */; };
 		AA000000000000000000AF /* Bug09StaleStateViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000006F /* Bug09StaleStateViewController.swift */; };
 		AA000000000000000000B0 /* Bug10DuplicateEventsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000070 /* Bug10DuplicateEventsViewController.swift */; };
+		AA00000000000000000201 /* Bug11ObserverLeakViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000101 /* Bug11ObserverLeakViewController.swift */; };
+		AA00000000000000000202 /* Bug12RepeatedBinLookupViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000102 /* Bug12RepeatedBinLookupViewController.swift */; };
+		AA00000000000000000203 /* Bug13FakeSuccessViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000103 /* Bug13FakeSuccessViewController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -85,6 +88,9 @@
 		AA0000000000000000006E /* Bug08BrandOverrideViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bug08BrandOverrideViewController.swift; sourceTree = "<group>"; };
 		AA0000000000000000006F /* Bug09StaleStateViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bug09StaleStateViewController.swift; sourceTree = "<group>"; };
 		AA00000000000000000070 /* Bug10DuplicateEventsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bug10DuplicateEventsViewController.swift; sourceTree = "<group>"; };
+		AA00000000000000000101 /* Bug11ObserverLeakViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bug11ObserverLeakViewController.swift; sourceTree = "<group>"; };
+		AA00000000000000000102 /* Bug12RepeatedBinLookupViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bug12RepeatedBinLookupViewController.swift; sourceTree = "<group>"; };
+		AA00000000000000000103 /* Bug13FakeSuccessViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bug13FakeSuccessViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -174,6 +180,9 @@
 				AA0000000000000000006E /* Bug08BrandOverrideViewController.swift */,
 				AA0000000000000000006F /* Bug09StaleStateViewController.swift */,
 				AA00000000000000000070 /* Bug10DuplicateEventsViewController.swift */,
+				AA00000000000000000101 /* Bug11ObserverLeakViewController.swift */,
+				AA00000000000000000102 /* Bug12RepeatedBinLookupViewController.swift */,
+				AA00000000000000000103 /* Bug13FakeSuccessViewController.swift */,
 			);
 			path = BugGallery;
 			sourceTree = "<group>";
@@ -297,6 +306,9 @@
 				AA000000000000000000AE /* Bug08BrandOverrideViewController.swift in Sources */,
 				AA000000000000000000AF /* Bug09StaleStateViewController.swift in Sources */,
 				AA000000000000000000B0 /* Bug10DuplicateEventsViewController.swift in Sources */,
+				AA00000000000000000201 /* Bug11ObserverLeakViewController.swift in Sources */,
+				AA00000000000000000202 /* Bug12RepeatedBinLookupViewController.swift in Sources */,
+				AA00000000000000000203 /* Bug13FakeSuccessViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
