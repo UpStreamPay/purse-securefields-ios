@@ -340,9 +340,14 @@ public final class SecureFieldsManager {
             delegate?.secureFieldsDidFail(.fieldsIncomplete)
             return
         }
+        // Require a real brand — either the user's manual pick or an auto-detected one. Defaulting
+        // to `.visa` silently tokenized non-Visa cards under the wrong network.
+        guard let selectedBrand = brandSelectorView.selectedBrand ?? detectedBrands.first else {
+            delegate?.secureFieldsDidFail(.fieldsIncomplete)
+            return
+        }
         isSubmitting = true
 
-        let selectedBrand = brandSelectorView.selectedBrand ?? detectedBrands.first ?? .visa
         let isOney = selectedBrand == .oney
         let (month, year) = expDateField.parsedExpiry
         let holderName = holderNameField.rawValue.trimmingCharacters(in: .whitespaces)
