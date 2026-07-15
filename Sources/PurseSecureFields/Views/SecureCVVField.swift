@@ -39,6 +39,9 @@ final class SecureCVVField: SecureBaseField {
             inputAccessoryView = nil
             isSecureTextEntry = true
             reloadInputViews()
+            // The field was just cleared switching out of birthdate mode — recompute validity so a
+            // stale `isValid == true` from the previous mode does not leak into the form state.
+            textDidChange()
 
         case .birthdate:
             let picker = UIDatePicker()
@@ -52,7 +55,10 @@ final class SecureCVVField: SecureBaseField {
             inputAccessoryView = makeDoneToolbar()
             isSecureTextEntry = false
             reloadInputViews()
-            applyBirthdate(from: picker)
+            // Do NOT pre-fill the birth date. Leaving it empty + invalid forces an explicit user
+            // pick before the form can submit — auto-populating "yesterday" let a wrong birth date
+            // be submitted with no user interaction.
+            setValidity(false)
         }
     }
 
@@ -62,6 +68,11 @@ final class SecureCVVField: SecureBaseField {
 
     private func applyBirthdate(from picker: UIDatePicker) {
         let fmt = DateFormatter()
+        // Pin locale + calendar so the output is always Gregorian ISO `yyyy-MM-dd`, regardless of
+        // device settings. Without this, a Buddhist-calendar device emits e.g. `2569-…`, which the
+        // backend rejects.
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.calendar = Calendar(identifier: .gregorian)
         fmt.dateFormat = "yyyy-MM-dd"
         text = fmt.string(from: picker.date)
         onContentChanged?()

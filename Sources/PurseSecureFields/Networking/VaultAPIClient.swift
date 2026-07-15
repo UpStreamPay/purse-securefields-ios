@@ -86,9 +86,17 @@ final class VaultAPIClient {
                 completion(.failure(.invalidResponse))
                 return
             }
-            let result = (try? JSONDecoder().decode(BinLookupResponse.self, from: data))?.toBinLookupResult()
-                ?? BinLookupResult(brands: [], panLengths: [16], cvvLengths: [3], perBrandLengths: [:])
-            completion(.success(result))
+            // A malformed 2xx body must fail explicitly — never fall back to a default result and
+            // report `.success`, or downstream code silently proceeds on corrupt data.
+            // Mirrors the decode handling in `perform(request:retries:completion:)`.
+            guard let response = try? JSONDecoder().decode(BinLookupResponse.self, from: data) else {
+                #if DEBUG
+                print("[SecureFields] BIN lookup decode error")
+                #endif
+                completion(.failure(.invalidResponse))
+                return
+            }
+            completion(.success(response.toBinLookupResult()))
         }.resume()
     }
 

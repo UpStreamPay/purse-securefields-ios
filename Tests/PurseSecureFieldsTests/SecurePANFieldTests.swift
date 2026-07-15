@@ -175,4 +175,37 @@ struct SecurePANFieldTests {
         field.textDidChange()
         #expect(field.storedText == "3782 822463 10005")
     }
+
+    // MARK: Caret preservation (no teleport to end on mid-string edit)
+
+    @Test func caretStaysAfterMidStringEdit() {
+        let field = SecurePANField()
+        // Existing formatted value "4111 1111" with the caret placed after the 3rd digit.
+        field.text = "41111111"
+        field.textDidChange()
+        let caretAfterThirdDigit = field.position(from: field.beginningOfDocument, offset: 3)!
+        field.selectedTextRange = field.textRange(from: caretAfterThirdDigit, to: caretAfterThirdDigit)
+
+        // A subsequent reformat pass must not shove the caret to the end of the field.
+        field.textDidChange()
+
+        let caretOffset = field.offset(from: field.beginningOfDocument, to: field.selectedTextRange!.end)
+        let endOffset = field.offset(from: field.beginningOfDocument, to: field.endOfDocument)
+        #expect(caretOffset == 3)
+        #expect(caretOffset != endOffset)
+    }
+
+    @Test func caretStaysAtEndWhenAlreadyAtEnd() {
+        let field = SecurePANField()
+        field.text = "41111111"
+        field.textDidChange() // "4111 1111"
+        // Caret explicitly at the end → must remain at the end after a reformat pass.
+        field.selectedTextRange = field.textRange(from: field.endOfDocument, to: field.endOfDocument)
+
+        field.textDidChange()
+
+        let caretOffset = field.offset(from: field.beginningOfDocument, to: field.selectedTextRange!.end)
+        let endOffset = field.offset(from: field.beginningOfDocument, to: field.endOfDocument)
+        #expect(caretOffset == endOffset)
+    }
 }

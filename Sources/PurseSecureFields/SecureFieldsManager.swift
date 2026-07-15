@@ -68,6 +68,9 @@ public final class SecureFieldsManager {
         brandSelectorView.update(brands: [])
         delegate?.secureFieldsBrandsDetected([])
         monitoring.recordBrandsDetected([])
+        // Force the next validity notification through — the host should always hear the definitive
+        // (invalid) state after a clear, even if it already believed the form invalid.
+        lastNotifiedValidity = nil
         notifyFormValidity()
     }
 
@@ -137,6 +140,7 @@ public final class SecureFieldsManager {
     }
 
     deinit {
+        privacyObservers.forEach { NotificationCenter.default.removeObserver($0) }
         monitoringObservers.forEach { NotificationCenter.default.removeObserver($0) }
         monitoring.unmount()
     }
@@ -189,6 +193,9 @@ public final class SecureFieldsManager {
             self?.applyLengthsForBrand(brand)
             self?.delegate?.secureFieldsBrandSelected(brand)
             self?.monitoring.recordBrandSelected(brand)
+            // Switching brand can change the CVV input mode / valid lengths (e.g. Oney birthdate),
+            // which changes form validity. Recompute so the host isn't left with a stale value.
+            self?.notifyFormValidity()
         }
     }
 
@@ -213,7 +220,10 @@ public final class SecureFieldsManager {
         }
 
         let prefix = String(digits.prefix(8))
-        if prefix == lastBinPrefix && !detectedBrands.isEmpty { return }
+        // Skip re-querying a prefix already looked up — even when it yielded no authorized brands.
+        // Gating on `!detectedBrands.isEmpty` fired a network request on every keystroke for any
+        // prefix with no matching brand.
+        if prefix == lastBinPrefix { return }
 
         let workItem = DispatchWorkItem { [weak self] in
             guard let self else { return }
@@ -230,6 +240,13 @@ public final class SecureFieldsManager {
                     self.cvvField.validLengths = binResult.cvvLengths.isEmpty ? [3] : binResult.cvvLengths
                     self.brandSelectorView.update(brands: allowed)
                     self.applySelectedBrand(self.brandSelectorView.selectedBrand)
+                    // Apply the auto-selected brand's own PAN/CVV lengths. Without this the field
+                    // keeps the `is_main` brand's lengths (e.g. VISA [16]) and an auto-selected
+                    // Oney card's 19-digit PAN could never validate — brand lengths were only
+                    // applied on a manual chip tap.
+                    if let selected = self.brandSelectorView.selectedBrand {
+                        self.applyLengthsForBrand(selected)
+                    }
                     self.delegate?.secureFieldsBrandsDetected(allowed)
                     self.monitoring.recordBrandsDetected(allowed)
                     self.notifyFormValidity()
@@ -304,8 +321,14 @@ public final class SecureFieldsManager {
         }
     }
 
+    private var lastNotifiedValidity: Bool?
+
     private func notifyFormValidity() {
         let valid = panField.isValid && cvvField.isValid && expDateField.isValid
+        // Emit only on a genuine state transition. Firing on every field callback produced spurious
+        // `secureFieldsFormValidityChanged` events and needless host-side UI churn.
+        guard valid != lastNotifiedValidity else { return }
+        lastNotifiedValidity = valid
         delegate?.secureFieldsFormValidityChanged(valid)
     }
 
@@ -317,9 +340,14 @@ public final class SecureFieldsManager {
             delegate?.secureFieldsDidFail(.fieldsIncomplete)
             return
         }
+        // Require a real brand — either the user's manual pick or an auto-detected one. Defaulting
+        // to `.visa` silently tokenized non-Visa cards under the wrong network.
+        guard let selectedBrand = brandSelectorView.selectedBrand ?? detectedBrands.first else {
+            delegate?.secureFieldsDidFail(.fieldsIncomplete)
+            return
+        }
         isSubmitting = true
 
-        let selectedBrand = brandSelectorView.selectedBrand ?? detectedBrands.first ?? .visa
         let isOney = selectedBrand == .oney
         let (month, year) = expDateField.parsedExpiry
         let holderName = holderNameField.rawValue.trimmingCharacters(in: .whitespaces)
@@ -359,6 +387,11 @@ public final class SecureFieldsManager {
                         lastFourDigits: response.card.lastFourDigits,
                         detectedBrands: self.detectedBrands
                     )
+                    // Reset brand/BIN state after a successful tokenization (fields were already
+                    // zeroed at submit). Otherwise stale `detectedBrands`/`selectedBrand`/lengths
+                    // bleed into the next transaction. Built `tokenResult` first so it still
+                    // carries the brands from this transaction.
+                    self.clearFields()
                     self.delegate?.secureFieldsDidTokenize(tokenResult)
                 case .failure(let error):
                     self.monitoring.recordSubmitFailure(error)
