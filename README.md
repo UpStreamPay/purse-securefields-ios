@@ -272,4 +272,4 @@ until logout/reboot otherwise). Without any `.env` file, the demo still builds a
 
 ## License
 
-Copyright © Purse. All rights reserved.
+Released under the [MIT License](LICENSE). Copyright © 2026 Purse.
