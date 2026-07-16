@@ -2,9 +2,11 @@
 .build/
 .swiftpm/
 
-# Xcode
+# Xcode (keep shared schemes under xcshareddata/)
 xcuserdata/
 DerivedData/
+build/
+*.xcuserstate
 *.xcscmblueprint
 *.xccheckout
 
