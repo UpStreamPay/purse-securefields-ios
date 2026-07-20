@@ -24,7 +24,7 @@ from scratch for SDK contributors.
 ## Project structure
 
 ```
-vault-ios/
+purse-securefields-ios/
 ├── Package.swift              ← Source package (main branch). Rewritten to binary target on release.
 ├── Sources/
 │   └── PurseSecureFields/     ← SDK source
@@ -54,7 +54,7 @@ vault-ios/
 ## Step 1 — Create the Swift package
 
 ```bash
-mkdir vault-ios && cd vault-ios
+mkdir purse-securefields-ios && cd purse-securefields-ios
 swift package init --name PurseSecureFields --type library
 ```
 
@@ -130,7 +130,7 @@ local package. It is not published — it serves as a manual test harness and th
 automated UI tests.
 
 Create `Demo/Demo.xcodeproj` in Xcode (**File → New → Project → App**) and add the local package
-as a dependency (**File → Add Package Dependencies → Add Local → select the vault-ios root**).
+as a dependency (**File → Add Package Dependencies → Add Local → select the purse-securefields-ios root**).
 
 The demo app structure:
 

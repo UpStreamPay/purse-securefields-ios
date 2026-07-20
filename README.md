@@ -1,7 +1,7 @@
 # PurseSecureFields — iOS SDK
 
-![CI](https://github.com/UpStreamPay/vault-ios/actions/workflows/ci.yml/badge.svg)
-![Release](https://img.shields.io/github/v/release/UpStreamPay/vault-ios)
+![CI](https://github.com/UpStreamPay/purse-securefields-ios/actions/workflows/ci.yml/badge.svg)
+![Release](https://img.shields.io/github/v/release/UpStreamPay/purse-securefields-ios)
 
 Native iOS SDK for secure card data collection. Fields are fully isolated from the host application: card numbers, CVV, and cardholder data never pass through host app code.
 
@@ -20,7 +20,7 @@ The SDK is distributed as a pre-built XCFramework via Swift Package Manager. Tag
 **File → Add Package Dependencies** → enter the URL:
 
 ```
-https://github.com/UpStreamPay/vault-ios.git
+https://github.com/UpStreamPay/purse-securefields-ios.git
 ```
 
 Select **Up to Next Major Version** from `1.0.0`.
@@ -29,13 +29,13 @@ Select **Up to Next Major Version** from `1.0.0`.
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/UpStreamPay/vault-ios.git", from: "1.0.0")
+    .package(url: "https://github.com/UpStreamPay/purse-securefields-ios.git", from: "1.0.0")
 ],
 targets: [
     .target(
         name: "YourTarget",
         dependencies: [
-            .product(name: "PurseSecureFields", package: "vault-ios")
+            .product(name: "PurseSecureFields", package: "purse-securefields-ios")
         ]
     )
 ]
