@@ -24,12 +24,12 @@ Integrate the Vault iOS SDK into your project in three steps.
 1. In Xcode: **File → Add Package Dependencies…**
 2. Paste the repository URL in the search bar:
    ```
-   https://github.com/UpStreamPay/vault-ios
+   https://github.com/UpStreamPay/purse-securefields-ios
    ```
 3. Select the latest version tag and click **Add Package**.
 4. When prompted, add **PurseSecureFields** to your app target.
 
-> Check the [releases page](https://github.com/UpStreamPay/vault-ios/releases) for the
+> Check the [releases page](https://github.com/UpStreamPay/purse-securefields-ios/releases) for the
 > latest version. Each tagged release distributes a signed XCFramework.
 
 ---

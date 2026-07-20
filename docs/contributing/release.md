@@ -151,7 +151,7 @@ After a release, verify the XCFramework is properly signed:
 
 ```bash
 # Download the zip from the GitHub Release
-curl -L https://github.com/UpStreamPay/vault-ios/releases/download/v1.x.x/PurseSecureFields.xcframework.zip -o PurseSecureFields.xcframework.zip
+curl -L https://github.com/UpStreamPay/purse-securefields-ios/releases/download/v1.x.x/PurseSecureFields.xcframework.zip -o PurseSecureFields.xcframework.zip
 unzip PurseSecureFields.xcframework.zip
 
 # Verify the device slice signature
