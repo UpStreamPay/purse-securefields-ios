@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		3C1B95BD2FD181C000E5108E /* PurseSecureFields in Frameworks */ = {isa = PBXBuildFile; productRef = 3C1B95BC2FD181C000E5108E /* PurseSecureFields */; };
+		3C1B95BE2FD181C000E5108E /* PurseSecureFields.framework in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 3C1B95BC2FD181C000E5108E /* PurseSecureFields */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		AA00000000000000000061 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000060 /* Assets.xcassets */; };
 		AA00000000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000002 /* AppDelegate.swift */; };
 		AA00000000000000000003 /* DemoViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000004 /* DemoViewController.swift */; };
 		AA0000000000000000002B /* DemoViewController+Layout.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000002A /* DemoViewController+Layout.swift */; };
@@ -26,6 +28,7 @@
 		AA0000000000000000004E /* DemoUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DemoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000000000000000004F /* DemoUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoUITests.swift; sourceTree = "<group>"; };
 		AA00000000000000000050 /* MockURLProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockURLProtocol.swift; sourceTree = "<group>"; };
+		AA00000000000000000060 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,6 +48,20 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		3C1B95BF2FD181C000E5108E /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				3C1B95BE2FD181C000E5108E /* PurseSecureFields.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXGroup section */
 		AA0000000000000000000D /* Products */ = {
@@ -82,6 +99,7 @@
 			isa = PBXGroup;
 			children = (
 				AA0000000000000000000B /* Info.plist */,
+				AA00000000000000000060 /* Assets.xcassets */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -104,6 +122,7 @@
 				AA00000000000000000011 /* Sources */,
 				AA0000000000000000000C /* Frameworks */,
 				AA00000000000000000012 /* Resources */,
+				3C1B95BF2FD181C000E5108E /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -164,9 +183,11 @@
 				TargetAttributes = {
 					AA0000000000000000000F = {
 						CreatedOnToolsVersion = 16.0;
+						DevelopmentTeam = SQ8SDC637D;
 					};
 					AA00000000000000000052 = {
 						CreatedOnToolsVersion = 16.0;
+						DevelopmentTeam = SQ8SDC637D;
 						TestTargetID = AA0000000000000000000F;
 					};
 				};
@@ -198,6 +219,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA00000000000000000061 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -265,8 +287,10 @@
 		AA00000000000000000018 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SQ8SDC637D;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -285,8 +309,10 @@
 		AA00000000000000000019 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SQ8SDC637D;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -307,6 +333,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SQ8SDC637D;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MARKETING_VERSION = 1.0;
@@ -325,6 +352,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SQ8SDC637D;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MARKETING_VERSION = 1.0;
