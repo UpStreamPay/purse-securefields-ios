@@ -82,6 +82,44 @@ struct SecureCVVFieldTests {
         #expect(field.storedText == "1234")
     }
 
+    // MARK: Expected-length change (brand detection / chip tap)
+
+    @Test func lengthShrinkKeepsValueAndInvalidates() {
+        let field = SecureCVVField()
+        field.validLengths = [4]
+        field.text = "1234"
+        field.textDidChange()
+        #expect(field.isValid)
+
+        // AMEX → VISA: the typed value must survive and turn invalid — silently truncating it
+        // made an amputated CVV look valid (web keeps the value and sets aria-invalid).
+        field.validLengths = [3]
+        #expect(field.storedText == "1234")
+        #expect(!field.isValid)
+    }
+
+    @Test func lengthGrowKeepsValueAndInvalidates() {
+        let field = SecureCVVField()
+        field.text = "123"
+        field.textDidChange()
+        #expect(field.isValid)
+
+        field.validLengths = [4]
+        #expect(field.storedText == "123")
+        #expect(!field.isValid)
+    }
+
+    @Test func lengthChangeFiresValidityCallback() {
+        let field = SecureCVVField()
+        field.text = "123"
+        field.textDidChange()
+
+        var changes: [Bool] = []
+        field.onValidityChanged = { changes.append($0) }
+        field.validLengths = [4]
+        #expect(changes == [false])
+    }
+
     @Test func nonDigitsFiltered() {
         let field = SecureCVVField()
         field.text = "1a2b3"
@@ -163,9 +201,18 @@ struct SecureCVVFieldTests {
 
     // MARK: Birthdate mode
 
-    @Test func birthdateModeHasContentAlwaysTrue() {
+    @Test func birthdateModeHasContentFalseWhenEmpty() {
         let field = SecureCVVField()
         field.setInputMode(.birthdate)
+        // The mode switch just cleared the field and no date has been picked — `hasContent`
+        // must say so instead of hardcoding true (the field is empty AND invalid here).
+        #expect(!field.hasContent)
+    }
+
+    @Test func birthdateModeHasContentTrueOncePicked() {
+        let field = SecureCVVField()
+        field.setInputMode(.birthdate)
+        field.text = "2000-01-01"
         #expect(field.hasContent)
     }
 

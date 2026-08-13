@@ -92,12 +92,12 @@ struct BinLookupResponse: Decodable {
 
     func toBinLookupResult() -> BinLookupResult {
         let parsed = brands ?? []
-        let cardBrands = parsed.compactMap { CardBrand(rawValue: Self.normaliseScheme($0.brand)) }
+        let cardBrands = parsed.compactMap { CardBrand(apiValue: $0.brand) }
         let main = parsed.first { $0.isMain }
 
         var perBrand: [CardBrand: BinLookupResult.BrandLengths] = [:]
         for b in parsed {
-            if let brand = CardBrand(rawValue: Self.normaliseScheme(b.brand)) {
+            if let brand = CardBrand(apiValue: b.brand) {
                 perBrand[brand] = BinLookupResult.BrandLengths(
                     panLengths: b.panLengths ?? [],
                     cvvLengths: b.cvvLengths ?? []
@@ -113,15 +113,6 @@ struct BinLookupResponse: Decodable {
         )
     }
 
-    // API returns "AMERICAN_EXPRESS" and "DINERS_CLUB"; map to our enum raw values
-    private static func normaliseScheme(_ scheme: String) -> String {
-        switch scheme {
-        case "AMERICAN_EXPRESS": return "AMEX"
-        case "DINERS_CLUB":      return "DINERS"
-        case "CARTE_BANCAIRE":   return "CARTE_BANCAIRE" // already matches
-        default:                 return scheme
-        }
-    }
 }
 
 struct BinLookupPayload: Encodable {

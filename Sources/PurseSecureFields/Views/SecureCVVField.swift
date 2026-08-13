@@ -10,11 +10,11 @@ final class SecureCVVField: SecureBaseField {
     private(set) var inputMode: CVVInputMode = .cvv
 
     var rawValue: String { storedText ?? "" }
-    var hasContent: Bool { inputMode == .birthdate || !rawValue.isEmpty }
+    var hasContent: Bool { !rawValue.isEmpty }
 
     var validLengths: [Int] = [3] {
         didSet {
-            if oldValue != validLengths && inputMode == .cvv { textDidChange() }
+            if oldValue != validLengths && inputMode == .cvv { revalidate() }
         }
     }
 
@@ -77,6 +77,15 @@ final class SecureCVVField: SecureBaseField {
         text = fmt.string(from: picker.date)
         onContentChanged?()
         setValidity(true)
+    }
+
+    /// Re-checks validity against the current `validLengths` without touching the stored text.
+    /// When the expected lengths change under an already-typed value (brand detection or a chip
+    /// tap), the value must be kept and marked invalid — truncating it here made an amputated
+    /// CVV look valid, and the user would submit digits they never re-read.
+    private func revalidate() {
+        let digits = (storedText ?? "").filter { $0.isNumber }
+        setValidity(validLengths.contains(digits.count))
     }
 
     @objc override func textDidChange() {

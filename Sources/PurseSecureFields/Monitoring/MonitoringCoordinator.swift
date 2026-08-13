@@ -78,6 +78,13 @@ final class MonitoringCoordinator {
         logger.info(LogCode.brandSelectionChanged, payload: ["brand": .string(brand.rawValue)])
     }
 
+    func recordBinLookupFailed(_ error: SecureFieldsError) {
+        logger.error(LogCode.error, payload: [
+            "code": .string(Self.errorCode(for: error)),
+            "source": .string("BIN_LOOKUP"),
+        ])
+    }
+
     func recordSubmitStart() {
         submitAttempts += 1
         logger.info(LogCode.submit)

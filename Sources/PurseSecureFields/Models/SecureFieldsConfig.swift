@@ -55,6 +55,12 @@ public struct SecureFieldsConfig {
     public let style: SecureFieldsStyle
     public let placeholders: SecureFieldsPlaceholders
 
+    /// When true, the cardholder name counts toward `secureFieldsFormValidityChanged` and the
+    /// `submit()` completeness check. Defaults to false: the field is optional at tokenization,
+    /// and a host that never mounts `holderNameView` must not end up with a form that can never
+    /// become valid. Mirrors the Android rule "a configured field counts".
+    public let requiresHolderName: Bool
+
     /// SHA-256 hashes (Base64-encoded) of the vault server's SubjectPublicKeyInfo (SPKI).
     ///
     /// When non-empty, every request to the tokenization gateway is rejected unless the server
@@ -95,6 +101,7 @@ public struct SecureFieldsConfig {
         brands: [CardBrand] = CardBrand.allCases,
         style: SecureFieldsStyle = .default,
         placeholders: SecureFieldsPlaceholders = .init(),
+        requiresHolderName: Bool = false,
         pinnedPublicKeyHashes: [String] = [],
         apiKey: String? = nil,
         monitoringEnabled: Bool = true
@@ -105,6 +112,7 @@ public struct SecureFieldsConfig {
         self.brands = brands
         self.style = style
         self.placeholders = placeholders
+        self.requiresHolderName = requiresHolderName
         self.pinnedPublicKeyHashes = pinnedPublicKeyHashes
         self.apiKey = apiKey
         self.monitoringEnabled = monitoringEnabled
