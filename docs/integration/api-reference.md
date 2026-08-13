@@ -65,7 +65,15 @@ public func hasFieldContent(_ field: SecureField) -> Bool
 
 // Number of PAN digits typed. Never exposes the digits themselves.
 public var panDigitCount: Int { get }
+
+// PAN/CVV lengths currently accepted, as driven by BIN lookup and brand selection.
+// .expDate and .holderName carry no length constraint and return [].
+public func expectedLengths(for field: SecureField) -> [Int]
 ```
+
+Form validity (`secureFieldsFormValidityChanged` and the `submit()` completeness check) covers
+PAN, CVV and expiry date. The cardholder name is optional at tokenization and is **excluded by
+default** — opt in with `requiresHolderName: true` in the config to make it count.
 
 ### Submission
 
@@ -83,6 +91,11 @@ Calling `submit()` while any required field is invalid is safe — it fires
 ```swift
 // Zeroes all field buffers, cancels pending BIN lookup, resets brand state.
 public func clearFields()
+
+// Clears a single field through the same reformat/validate path as user typing,
+// leaving the other fields untouched. Clearing .pan also resets brand detection
+// once the digit count drops below the BIN threshold.
+public func clearField(_ field: SecureField)
 ```
 
 ### Privacy
@@ -107,6 +120,7 @@ public struct SecureFieldsConfig {
         brands: [CardBrand] = CardBrand.allCases,
         style: SecureFieldsStyle = .default,
         placeholders: SecureFieldsPlaceholders = .init(),
+        requiresHolderName: Bool = false,
         pinnedPublicKeyHashes: [String] = [],
         apiKey: String? = nil,
         monitoringEnabled: Bool = true
@@ -118,9 +132,10 @@ public struct SecureFieldsConfig {
 |---|---|---|
 | `tenantId` | Yes | Your merchant/tenant identifier |
 | `environment` | No | `.sandbox` or `.production` (default `.sandbox`). The SDK resolves both the tokenization gateway and the remote monitoring endpoint internally — see [VaultEnvironment](#vaultenvironment) |
-| `brands` | No | Accepted card networks. Defaults to all supported brands. |
+| `brands` | No | Accepted card networks, **in your preference order** — for a co-badged card, the first configured brand that matches is pre-selected. Defaults to all supported brands. |
 | `style` | No | Visual style applied to all fields |
 | `placeholders` | No | Placeholder text for each field |
+| `requiresHolderName` | No | When `true`, the cardholder name counts toward form validity and the `submit()` completeness check (default `false` — the field is optional at tokenization, and a host that never mounts `holderNameView` must not end up with a form that can never become valid) |
 | `pinnedPublicKeyHashes` | No | SHA-256 SPKI hashes (Base64) for certificate pinning |
 | `apiKey` | No | Api key for remote log monitoring (Datadog). Monitoring silently disables itself when omitted — see [Remote log monitoring](#remote-log-monitoring) |
 | `monitoringEnabled` | No | Opt-out for remote log monitoring (default `true`) |

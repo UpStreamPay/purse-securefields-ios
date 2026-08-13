@@ -28,6 +28,7 @@ public final class SecureBrandSelectorView: UIView {
 
     private func setup() {
         isHidden = true
+        accessibilityIdentifier = "brand_selector"
         addSubview(stackView)
         NSLayoutConstraint.activate([
             stackView.topAnchor.constraint(equalTo: topAnchor),
@@ -79,7 +80,10 @@ public final class SecureBrandSelectorView: UIView {
 private final class BrandChip: UIControl {
 
     override var isSelected: Bool {
-        didSet { updateAppearance() }
+        didSet {
+            accessibilityTraits = isSelected ? [.button, .selected] : .button
+            updateAppearance()
+        }
     }
 
     private let imageView: UIImageView = {
@@ -112,6 +116,15 @@ private final class BrandChip: UIControl {
         addSubview(imageView)
         addSubview(fallbackLabel)
 
+        // The chip subtree contains no accessible element on its own (the image view is not
+        // accessible, the fallback label is usually hidden) — without these, chips are invisible
+        // to VoiceOver and unaddressable by XCUITest/Appium. The identifier derives from the
+        // brand, not the index, so it stays stable across the rebuild on every BIN lookup.
+        isAccessibilityElement = true
+        accessibilityTraits = .button
+        accessibilityLabel = brand.shortName
+        accessibilityIdentifier = "brand_chip_\(brand.rawValue.lowercased())"
+
         NSLayoutConstraint.activate([
             widthAnchor.constraint(equalToConstant: 36),
             heightAnchor.constraint(equalToConstant: 24),
@@ -125,6 +138,13 @@ private final class BrandChip: UIControl {
         ])
 
         let image = UIImage(named: brand.badgeAssetName, in: .module, compatibleWith: nil)
+        if image == nil {
+            // A missing badge is always a packaging defect (resource bundle not embedded in the
+            // framework), never a use case — fail loudly in Debug, leave a console trace in
+            // Release, then degrade to the text label.
+            assertionFailure("PurseSecureFields: missing badge asset '\(brand.badgeAssetName)' — is the resource bundle embedded?")
+            NSLog("PurseSecureFields: missing badge asset '%@', falling back to text label", brand.badgeAssetName)
+        }
         imageView.image = image
         fallbackLabel.isHidden = image != nil
         updateAppearance()

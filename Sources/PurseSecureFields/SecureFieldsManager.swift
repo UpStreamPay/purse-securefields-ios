@@ -52,6 +52,43 @@ public final class SecureFieldsManager {
         }
     }
 
+    /// The PAN/CVV lengths currently accepted, as driven by BIN lookup and brand selection.
+    /// `.expDate` and `.holderName` carry no length constraint and return an empty array.
+    public func expectedLengths(for field: SecureField) -> [Int] {
+        switch field {
+        case .pan:                  return panField.validLengths
+        case .cvv:                  return cvvField.validLengths
+        case .expDate, .holderName: return []
+        }
+    }
+
+    /// Clears a single field through the same reformat/validate path as user typing, leaving the
+    /// other fields untouched. `clearFields()` resets the whole form; a host offering a per-field
+    /// erase button (or a test asserting what happens to the *other* fields) needs this instead.
+    public func clearField(_ field: SecureField) {
+        switch field {
+        case .pan:
+            panField.text = ""
+            panField.textDidChange()
+        case .cvv:
+            if cvvField.inputMode == .birthdate {
+                // textDidChange is a no-op in birthdate mode — clear storage and validity directly.
+                cvvField.clearSensitiveData()
+                delegate?.secureFieldsContentChanged()
+            } else {
+                cvvField.text = ""
+                cvvField.textDidChange()
+            }
+        case .expDate:
+            expDateField.text = ""
+            expDateField.textDidChange()
+        case .holderName:
+            holderNameField.text = ""
+            holderNameField.textDidChange()
+        }
+        notifyFormValidity()
+    }
+
     public func clearFields() {
         binLookupWorkItem?.cancel()
         binLookupWorkItem = nil
@@ -229,9 +266,18 @@ public final class SecureFieldsManager {
             guard let self else { return }
             self.apiClient.binLookup(tenantId: self.config.tenantId, firstDigits: prefix) { result in
                 DispatchQueue.main.async {
-                    guard case .success(let binResult) = result else { return }
+                    guard case .success(let binResult) = result else {
+                        // Surface the failure — silently dropping it made an outage
+                        // indistinguishable from "this card has no authorized brand". The prefix
+                        // is deliberately not cached, so the lookup retries on the next PAN change.
+                        if case .failure(let error) = result {
+                            self.delegate?.secureFieldsBinLookupFailed(error)
+                            self.monitoring.recordBinLookupFailed(error)
+                        }
+                        return
+                    }
                     guard prefix == String(self.panField.rawValue.prefix(8)) else { return }
-                    let allowed = binResult.brands.filter { self.config.brands.contains($0) }
+                    let allowed = Self.allowedBrands(api: binResult.brands, config: self.config.brands)
                     self.lastBinPrefix = prefix
                     self.lastBinResult = binResult
                     self.detectedBrands = allowed
@@ -255,6 +301,13 @@ public final class SecureFieldsManager {
         }
         binLookupWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
+    }
+
+    /// Brands allowed for this card, in `config.brands` order. The integrator's order expresses
+    /// a commercial preference (it drives the default selection), so it must win over the API
+    /// response order — matching the web SDK, where `config.brands[0]` is the default brand.
+    static func allowedBrands(api: [CardBrand], config: [CardBrand]) -> [CardBrand] {
+        config.filter { api.contains($0) }
     }
 
     private func applySelectedBrand(_ brand: CardBrand?) {
@@ -325,6 +378,7 @@ public final class SecureFieldsManager {
 
     private func notifyFormValidity() {
         let valid = panField.isValid && cvvField.isValid && expDateField.isValid
+            && (!config.requiresHolderName || holderNameField.isValid)
         // Emit only on a genuine state transition. Firing on every field callback produced spurious
         // `secureFieldsFormValidityChanged` events and needless host-side UI churn.
         guard valid != lastNotifiedValidity else { return }
@@ -336,7 +390,8 @@ public final class SecureFieldsManager {
 
     public func submit(saveToken: Bool = false) {
         guard !isSubmitting else { return }
-        guard panField.isValid, cvvField.isValid, expDateField.isValid else {
+        guard panField.isValid, cvvField.isValid, expDateField.isValid,
+              !config.requiresHolderName || holderNameField.isValid else {
             delegate?.secureFieldsDidFail(.fieldsIncomplete)
             return
         }
