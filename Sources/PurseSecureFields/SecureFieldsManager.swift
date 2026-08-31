@@ -234,6 +234,7 @@ public final class SecureFieldsManager {
     }
 
     private func setupBrandSelector() {
+        brandSelectorView.isSelectorEnabled = config.brandSelector
         brandSelectorView.onBrandSelected = { [weak self] brand in
             self?.applySelectedBrand(brand)
             self?.applyLengthsForBrand(brand)
@@ -332,6 +333,29 @@ public final class SecureFieldsManager {
         config.filter { api.contains($0) }
     }
 
+    /// The network to submit, arbitrating between the merchant's `submit(selectedNetwork:)` and
+    /// the SDK's own resolution. The cardholder's choice outranks the merchant's (Android does
+    /// the same), and a network this card doesn't carry is refused rather than tokenized under a
+    /// brand the BIN never announced.
+    static func effectiveNetwork(
+        requested: CardBrand?,
+        resolved: CardBrand,
+        detected: [CardBrand],
+        brandSelectorEnabled: Bool
+    ) -> CardBrand {
+        guard let requested else { return resolved }
+        if brandSelectorEnabled {
+            NSLog("PurseSecureFields: selectedNetwork ignored — brandSelector is enabled, the cardholder's selection wins")
+            return resolved
+        }
+        guard detected.contains(requested) else {
+            NSLog("PurseSecureFields: selectedNetwork '%@' was not detected on this card — submitting '%@'",
+                  requested.rawValue, resolved.rawValue)
+            return resolved
+        }
+        return requested
+    }
+
     private func applySelectedBrand(_ brand: CardBrand?) {
         cvvField.setInputMode(brand == .oney ? .birthdate : .cvv)
     }
@@ -410,7 +434,16 @@ public final class SecureFieldsManager {
 
     // MARK: - Submit
 
-    public func submit(saveToken: Bool = false) {
+    /// Tokenizes the form.
+    ///
+    /// - Parameters:
+    ///   - selectedNetwork: the network to submit for a co-badged card, overriding the SDK's own
+    ///     resolution. Ignored — with a warning — when `SecureFieldsConfig.brandSelector` is
+    ///     enabled, since the cardholder's pick then wins; and ignored when the brand was not
+    ///     detected on this card, rather than tokenizing under a network the BIN doesn't carry.
+    ///     Mirrors `SubmitOptions.selectedNetwork` on Android.
+    ///   - saveToken: asks the vault to retain the card for later reuse.
+    public func submit(selectedNetwork: CardBrand? = nil, saveToken: Bool = false) {
         guard !isSubmitting else { return }
         guard panField.isValid, cvvField.isValid, expDateField.isValid,
               !config.requiresHolderName || holderNameField.isValid else {
@@ -419,10 +452,16 @@ public final class SecureFieldsManager {
         }
         // Require a real brand — either the user's manual pick or an auto-detected one. Defaulting
         // to `.visa` silently tokenized non-Visa cards under the wrong network.
-        guard let selectedBrand = brandSelectorView.selectedBrand ?? detectedBrands.first else {
+        guard let resolvedBrand = brandSelectorView.selectedBrand ?? detectedBrands.first else {
             delegate?.secureFieldsDidFail(.fieldsIncomplete)
             return
         }
+        let selectedBrand = Self.effectiveNetwork(
+            requested: selectedNetwork,
+            resolved: resolvedBrand,
+            detected: detectedBrands,
+            brandSelectorEnabled: config.brandSelector
+        )
         isSubmitting = true
 
         // Gate on the field's actual mode, not on the brand: `selectedBrand` can resolve to Oney

@@ -52,6 +52,15 @@ public struct SecureFieldsConfig {
     public let environment: VaultEnvironment
 
     public let brands: [CardBrand]
+
+    /// Whether the cardholder may arbitrate the network of a co-badged card through the built-in
+    /// brand selector. Defaults to `false`, matching the web and Android SDKs: the selector stays
+    /// hidden and the SDK submits the brand its own resolution picked (the merchant's
+    /// `brands` order expresses that preference). Set it to `true` to show the chips.
+    ///
+    /// When enabled, the cardholder's pick wins over any `selectedNetwork` passed to `submit`.
+    public let brandSelector: Bool
+
     public let style: SecureFieldsStyle
     public let placeholders: SecureFieldsPlaceholders
 
@@ -99,6 +108,7 @@ public struct SecureFieldsConfig {
         tenantId: String,
         environment: VaultEnvironment = .sandbox,
         brands: [CardBrand] = CardBrand.allCases,
+        brandSelector: Bool = false,
         style: SecureFieldsStyle = .default,
         placeholders: SecureFieldsPlaceholders = .init(),
         requiresHolderName: Bool = false,
@@ -110,6 +120,7 @@ public struct SecureFieldsConfig {
         self.tenantId = tenantId
         self.environment = environment
         self.brands = brands
+        self.brandSelector = brandSelector
         self.style = style
         self.placeholders = placeholders
         self.requiresHolderName = requiresHolderName

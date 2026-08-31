@@ -146,9 +146,12 @@ struct CheckoutView: View {
 `panContainer` is a `SecurePANContainer` — it wraps the PAN field and optionally shows a brand
 selector for co-branded cards (e.g. Visa + CB).
 
-The brand selector appears automatically when two or more brands are detected from the BIN lookup.
-The user taps to choose the network. When the selector is active, `secureFieldsBrandSelected(_:)`
-fires on your delegate.
+The selector is **opt-in**: set `brandSelector: true` in `SecureFieldsConfig` to let the
+cardholder arbitrate the network of a co-badged card. It then appears once two or more brands are
+detected from the BIN lookup, and `secureFieldsBrandSelected(_:)` fires on your delegate when the
+user taps. Left at its default (`false`, matching web and Android), the chips stay hidden and the
+SDK submits the first brand in your `brands` order that the card carries — you can still override
+that per transaction with `submit(selectedNetwork:)`.
 
 Pass `brands` in `SecureFieldsConfig` to restrict which card networks are accepted:
 
@@ -156,7 +159,8 @@ Pass `brands` in `SecureFieldsConfig` to restrict which card networks are accept
 SecureFieldsConfig(
     tenantId: "...",
     environment: .sandbox,
-    brands: [.visa, .mastercard, .carteBancaire, .oney]
+    brands: [.visa, .mastercard, .carteBancaire, .oney],
+    brandSelector: true
 )
 ```
 

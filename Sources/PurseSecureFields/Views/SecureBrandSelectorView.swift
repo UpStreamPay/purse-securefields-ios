@@ -5,6 +5,12 @@ public final class SecureBrandSelectorView: UIView {
     public var onBrandSelected: ((CardBrand) -> Void)?
     public private(set) var selectedBrand: CardBrand?
 
+    /// When false (`SecureFieldsConfig.brandSelector` default), the chips are never shown and the
+    /// cardholder cannot arbitrate the network. Brand resolution still runs — `selectedBrand`
+    /// keeps driving the CVV mode, the accepted lengths and the submitted `selected_network` —
+    /// only the UI is suppressed.
+    var isSelectorEnabled = true
+
     private var brands: [CardBrand] = []
 
     private let stackView: UIStackView = {
@@ -41,7 +47,7 @@ public final class SecureBrandSelectorView: UIView {
     func update(brands: [CardBrand]) {
         self.brands = brands
         rebuildChips(showBorder: brands.count > 1)
-        isHidden = brands.isEmpty
+        isHidden = brands.isEmpty || !isSelectorEnabled
     }
 
     private func rebuildChips(showBorder: Bool) {

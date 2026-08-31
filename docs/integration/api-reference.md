@@ -80,11 +80,16 @@ default** — opt in with `requiresHolderName: true` in the config to make it co
 ```swift
 // Validates all fields and initiates tokenization.
 // Fires secureFieldsDidTokenize or secureFieldsDidFail on the delegate.
-public func submit(saveToken: Bool = false)
+public func submit(selectedNetwork: CardBrand? = nil, saveToken: Bool = false)
 ```
 
 Calling `submit()` while any required field is invalid is safe — it fires
 `secureFieldsDidFail(.fieldsIncomplete)` without making a network request.
+
+`selectedNetwork` names the network to submit for a co-badged card, overriding the SDK's own
+resolution. It is ignored — with a console warning — when `brandSelector` is enabled, since the
+cardholder's pick then wins, and when the requested network was not detected on the card. Mirrors
+`SubmitOptions.selectedNetwork` on Android.
 
 ### Clear
 
@@ -118,6 +123,7 @@ public struct SecureFieldsConfig {
         tenantId: String,
         environment: VaultEnvironment = .sandbox,
         brands: [CardBrand] = CardBrand.allCases,
+        brandSelector: Bool = false,
         style: SecureFieldsStyle = .default,
         placeholders: SecureFieldsPlaceholders = .init(),
         requiresHolderName: Bool = false,
@@ -133,6 +139,7 @@ public struct SecureFieldsConfig {
 | `tenantId` | Yes | Your merchant/tenant identifier |
 | `environment` | No | `.sandbox` or `.production` (default `.sandbox`). The SDK resolves both the tokenization gateway and the remote monitoring endpoint internally — see [VaultEnvironment](#vaultenvironment) |
 | `brands` | No | Accepted card networks, **in your preference order** — for a co-badged card, the first configured brand that matches is pre-selected. Defaults to all supported brands. |
+| `brandSelector` | No | Whether the cardholder may arbitrate the network of a co-badged card through the built-in selector. Defaults to `false` (selector hidden), matching web and Android; the SDK then submits the brand its own resolution picked. |
 | `style` | No | Visual style applied to all fields |
 | `placeholders` | No | Placeholder text for each field |
 | `requiresHolderName` | No | When `true`, the cardholder name counts toward form validity and the `submit()` completeness check (default `false` — the field is optional at tokenization, and a host that never mounts `holderNameView` must not end up with a form that can never become valid) |

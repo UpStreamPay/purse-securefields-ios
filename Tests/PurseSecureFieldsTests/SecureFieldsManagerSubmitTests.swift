@@ -118,4 +118,39 @@ struct SecureFieldsManagerSubmitTests {
         #expect(json["cvv"] as? String == "123")
         #expect(json["birth_date"] == nil)
     }
+
+    /// With the selector disabled (the default), the merchant names the network of a co-badged
+    /// card through `submit(selectedNetwork:)` — SDK-12108, gap 11.
+    @Test func submitOverridesTheSelectedNetworkOnACobadgedCard() async throws {
+        let tenantId = "cobadge-\(UUID().uuidString)"
+        StubGatewayURLProtocol.register(tenantId: tenantId) { request, _ in
+            request.url!.path.hasSuffix("/bin-lookup")
+                ? .init(statusCode: 200, body: #"""
+                    {"brands":[{"brand":"CARTE_BANCAIRE","is_main":true,"pan_lengths":[16],"cvv_lengths":[3]},
+                               {"brand":"VISA","is_main":false,"pan_lengths":[16],"cvv_lengths":[3]}]}
+                    """#)
+                : .init(statusCode: 200, body: #"{"form_token":"tok_cb","card":{"bin":"41111111","last_four_digits":"1111"}}"#)
+        }
+        let manager = makeManager(tenantId: tenantId, brands: [.carteBancaire, .visa])
+        let delegate = SpyDelegate()
+        manager.delegate = delegate
+
+        type("4111111111111111", into: panField(manager))
+        try await Task.sleep(nanoseconds: 1_200_000_000)
+        type("123", into: cvvField(manager))
+        type("1230", into: expField(manager))
+
+        // Config order makes Cartes Bancaires the resolved default; the merchant asks for Visa.
+        manager.submit(selectedNetwork: .visa)
+        try await Task.sleep(nanoseconds: 1_000_000_000)
+
+        let tokenizeCall = StubGatewayURLProtocol.requests(tenantId: tenantId)
+            .first { $0.request.url!.path.hasSuffix("/forms/secure-fields") }
+        let body = try #require(tokenizeCall?.body)
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let card = try #require(json["card"] as? [String: Any])
+
+        #expect(card["selected_network"] as? String == "VISA")
+        #expect(delegate.tokenized?.selectedNetwork == .visa)
+    }
 }
