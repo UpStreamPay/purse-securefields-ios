@@ -422,6 +422,11 @@ public final class SecureFieldsManager {
             )
         )
 
+        // Captured before the fields are zeroed just below: the birth date is deliberately not
+        // sent to the gateway and not echoed by the response, so this local is the only way it
+        // can still reach the host on the result.
+        let submittedBirthDate = isBirthdate ? cvvField.rawValue : nil
+
         // PCI compliance: raw values are copied into `payload` above — zero the field
         // buffers immediately, before the network round-trip, not on completion.
         panField.clearSensitiveData()
@@ -442,7 +447,9 @@ public final class SecureFieldsManager {
                         vaultFormToken: response.formToken,
                         bin: response.card.bin,
                         lastFourDigits: response.card.lastFourDigits,
-                        detectedBrands: self.detectedBrands
+                        detectedBrands: self.detectedBrands,
+                        birthDate: submittedBirthDate,
+                        selectedNetwork: selectedBrand
                     )
                     // Reset brand/BIN state after a successful tokenization (fields were already
                     // zeroed at submit). Otherwise stale `detectedBrands`/`selectedBrand`/lengths

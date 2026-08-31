@@ -334,11 +334,18 @@ public struct TokenizationResult {
     public let bin: String               // first 8 digits — never the full PAN
     public let lastFourDigits: String    // last 4 digits
     public let detectedBrands: [CardBrand]
+    public let birthDate: String?        // Oney only — "yyyy-MM-dd"
+    public let selectedNetwork: CardBrand?  // the network submitted as `selected_network`
 }
 ```
 
 > `bin` and `lastFourDigits` are safe to display in a payment confirmation UI. `vaultFormToken`
 > is sent to your backend to complete the transaction — it never contains card data.
+
+`birthDate` and `selectedNetwork` are reflected from the SDK's own state, not from the response:
+the birth date never reaches the gateway, and the submitted network is not echoed back, so this
+result is the only place either can be read. Matches `SubmitResult.Success` on Android and
+`birth_date` on web.
 
 ---
 

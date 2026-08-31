@@ -69,6 +69,9 @@ struct SecureFieldsManagerSubmitTests {
 
         #expect(delegate.failure == nil)
         #expect(delegate.tokenized?.vaultFormToken == "tok_oney")
+        // The date is never sent nor echoed — the result is the only place it can be read back.
+        #expect(delegate.tokenized?.birthDate == "1990-01-01")
+        #expect(delegate.tokenized?.selectedNetwork == .oney)
 
         let tokenizeCall = StubGatewayURLProtocol.requests(tenantId: tenantId)
             .first { $0.request.url!.path.hasSuffix("/forms/secure-fields") }
@@ -104,6 +107,8 @@ struct SecureFieldsManagerSubmitTests {
         try await Task.sleep(nanoseconds: 1_000_000_000)
 
         #expect(delegate.tokenized?.vaultFormToken == "tok_visa")
+        #expect(delegate.tokenized?.birthDate == nil)
+        #expect(delegate.tokenized?.selectedNetwork == .visa)
 
         let tokenizeCall = StubGatewayURLProtocol.requests(tenantId: tenantId)
             .first { $0.request.url!.path.hasSuffix("/forms/secure-fields") }
