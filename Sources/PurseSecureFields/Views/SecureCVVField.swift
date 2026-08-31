@@ -91,12 +91,21 @@ final class SecureCVVField: SecureBaseField {
     @objc override func textDidChange() {
         guard inputMode == .cvv else { return }
         let digits = (storedText ?? "").filter { $0.isNumber }
-        let maxLen = validLengths.max() ?? 4
-        let truncated = String(digits.prefix(maxLen))
-        if storedText != truncated { text = truncated }
+        // Keep what the cardholder typed and only judge its validity — the rule `revalidate()`
+        // already applies when the expected lengths change under an existing value, applied here
+        // to the typing path too (web-aligned). Truncating to `validLengths.max()` made a
+        // 4-digit CVV typed before brand detection silently become a "valid" 3-digit one, so the
+        // later switch to a 3-digit brand had nothing left to invalidate. The cap below is a
+        // safety bound against unbounded growth, not a format rule.
+        let kept = String(digits.prefix(Self.maxStoredLength))
+        if storedText != kept { text = kept }
         onContentChanged?()
-        setValidity(validLengths.contains(truncated.count))
+        setValidity(validLengths.contains(kept.count))
     }
+
+    /// Well past every real CVV length (and past the 10 characters of a `yyyy-MM-dd` birth date):
+    /// the field must not grow without bound, but it must never trim a plausible entry either.
+    private static let maxStoredLength = 12
 
     override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
         if inputMode == .cvv && action == #selector(paste(_:)) { return false }
