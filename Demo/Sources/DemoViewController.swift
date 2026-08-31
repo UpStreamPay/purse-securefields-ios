@@ -24,7 +24,7 @@ final class DemoViewController: UIViewController {
                     holderName: "Name Surname"
                 )
             )
-            config.testURLSession = MockURLProtocol.makeSession()
+            config.urlSessionOverride = MockURLProtocol.makeSession()
             return SecureFieldsManager(config: config)
         }
         #endif

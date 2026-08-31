@@ -37,7 +37,7 @@ struct SecureFieldsManagerTests {
         )
         let sessionConfig = URLSessionConfiguration.ephemeral
         sessionConfig.protocolClasses = [FailingURLProtocol.self]
-        config.testURLSession = URLSession(configuration: sessionConfig)
+        config.urlSessionOverride = URLSession(configuration: sessionConfig)
         return SecureFieldsManager(config: config)
     }
 

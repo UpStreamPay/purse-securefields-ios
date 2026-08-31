@@ -15,7 +15,8 @@ struct SecureFieldsManagerSubmitTests {
         var failure: SecureFieldsError?
         func secureFieldsDidTokenize(_ result: TokenizationResult) { tokenized = result }
         func secureFieldsDidFail(_ error: SecureFieldsError) { failure = error }
-        func secureFieldsBrandsDetected(_ brands: [CardBrand]) {}
+        var brands: [CardBrand] = []
+        func secureFieldsBrandsDetected(_ brands: [CardBrand]) { self.brands = brands }
         func secureFieldsFormValidityChanged(_ isValid: Bool) {}
     }
 
@@ -26,7 +27,7 @@ struct SecureFieldsManagerSubmitTests {
 
     private func makeManager(tenantId: String, brands: [CardBrand]) -> SecureFieldsManager {
         var config = SecureFieldsConfig(tenantId: tenantId, brands: brands, monitoringEnabled: false)
-        config.testURLSession = StubGatewayURLProtocol.makeSession()
+        config.urlSessionOverride = StubGatewayURLProtocol.makeSession()
         return SecureFieldsManager(config: config)
     }
 
@@ -41,6 +42,21 @@ struct SecureFieldsManagerSubmitTests {
     private func cvvField(_ m: SecureFieldsManager) -> SecureCVVField { m.cvvView as! SecureCVVField }
     private func expField(_ m: SecureFieldsManager) -> SecureExpDateField { m.expDateView as! SecureExpDateField }
 
+    /// Polls until `condition` holds, instead of sleeping a fixed amount: BIN lookup and submit
+    /// hop main → URLSession → main, and a fixed wait turns into a flake as soon as the machine
+    /// is loaded (swift-testing runs these suites in parallel).
+    private func waitUntil(
+        _ description: String,
+        timeout: TimeInterval = 10,
+        _ condition: () -> Bool
+    ) async throws {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition() && Date() < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        #expect(condition(), "timed out waiting for \(description)")
+    }
+
     @Test func oneySubmitSendsNoCvvAndNoBirthdate() async throws {
         let tenantId = "oney-\(UUID().uuidString)"
         StubGatewayURLProtocol.register(tenantId: tenantId) { request, _ in
@@ -54,7 +70,7 @@ struct SecureFieldsManagerSubmitTests {
 
         type("5032026098999722327", into: panField(manager))
         // 300 ms BIN-lookup debounce, then the stubbed response lands on the main queue.
-        try await Task.sleep(nanoseconds: 1_200_000_000)
+        try await waitUntil("the Oney brand to be applied") { cvvField(manager).inputMode == .birthdate }
 
         #expect(cvvField(manager).inputMode == .birthdate)
         #expect(manager.isFieldValid(.pan), "19-digit Oney PAN must validate")
@@ -65,7 +81,7 @@ struct SecureFieldsManagerSubmitTests {
         type("1230", into: expField(manager))
 
         manager.submit()
-        try await Task.sleep(nanoseconds: 1_000_000_000)
+        try await waitUntil("tokenization to complete") { delegate.tokenized != nil || delegate.failure != nil }
 
         #expect(delegate.failure == nil)
         #expect(delegate.tokenized?.vaultFormToken == "tok_oney")
@@ -97,14 +113,14 @@ struct SecureFieldsManagerSubmitTests {
         manager.delegate = delegate
 
         type("4111111111111111", into: panField(manager))
-        try await Task.sleep(nanoseconds: 1_200_000_000)
+        try await waitUntil("the VISA brand to be detected") { !delegate.brands.isEmpty }
 
         #expect(cvvField(manager).inputMode == .cvv)
         type("123", into: cvvField(manager))
         type("1230", into: expField(manager))
 
         manager.submit()
-        try await Task.sleep(nanoseconds: 1_000_000_000)
+        try await waitUntil("tokenization to complete") { delegate.tokenized != nil || delegate.failure != nil }
 
         #expect(delegate.tokenized?.vaultFormToken == "tok_visa")
         #expect(delegate.tokenized?.birthDate == nil)
@@ -136,13 +152,13 @@ struct SecureFieldsManagerSubmitTests {
         manager.delegate = delegate
 
         type("4111111111111111", into: panField(manager))
-        try await Task.sleep(nanoseconds: 1_200_000_000)
+        try await waitUntil("both brands to be detected") { delegate.brands.count == 2 }
         type("123", into: cvvField(manager))
         type("1230", into: expField(manager))
 
         // Config order makes Cartes Bancaires the resolved default; the merchant asks for Visa.
         manager.submit(selectedNetwork: .visa)
-        try await Task.sleep(nanoseconds: 1_000_000_000)
+        try await waitUntil("tokenization to complete") { delegate.tokenized != nil || delegate.failure != nil }
 
         let tokenizeCall = StubGatewayURLProtocol.requests(tenantId: tenantId)
             .first { $0.request.url!.path.hasSuffix("/forms/secure-fields") }

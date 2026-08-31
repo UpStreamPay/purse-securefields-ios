@@ -100,9 +100,16 @@ public struct SecureFieldsConfig {
     /// `RemoteLogger`.
     public let monitoringEnabled: Bool
 
-    #if DEBUG
-    public var testURLSession: URLSession? = nil
-    #endif
+    /// Substitutes the `URLSession` used for BIN lookup and tokenization.
+    ///
+    /// **Tests only.** A session set here bypasses certificate pinning entirely, so it must never
+    /// be set in a shipping app. It exists outside `#if DEBUG` because the distributed
+    /// XCFramework is built in Release: gated, no consumer of the binary — including our own E2E
+    /// suite — could stub the gateway at all.
+    ///
+    /// Remote log monitoring builds its own session and is not affected; disable it with
+    /// `monitoringEnabled: false` when running against a stub.
+    public var urlSessionOverride: URLSession? = nil
 
     public init(
         tenantId: String,

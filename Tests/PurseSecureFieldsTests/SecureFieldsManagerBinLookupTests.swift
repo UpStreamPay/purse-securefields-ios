@@ -41,7 +41,7 @@ struct SecureFieldsManagerBinLookupTests {
             brands: [.mastercard, .visa],
             monitoringEnabled: false
         )
-        config.testURLSession = StubGatewayURLProtocol.makeSession()
+        config.urlSessionOverride = StubGatewayURLProtocol.makeSession()
         return SecureFieldsManager(config: config)
     }
 
@@ -49,11 +49,22 @@ struct SecureFieldsManagerBinLookupTests {
         m.panContainer.subviews.compactMap { $0 as? SecurePANField }.first!
     }
 
-    /// Types one digit and lets the 300 ms debounce plus the stubbed round-trip settle.
-    private func typeDigit(_ c: Character, into field: SecurePANField) async throws {
+    /// Types one digit, then waits for whatever lookup it triggered to land. A digit whose
+    /// prefix was already queried fires nothing, so the wait for a new request is bounded and
+    /// its expiry is not a failure.
+    private func typeDigit(_ c: Character, into field: SecurePANField, tenantId: String) async throws {
+        let before = Self.sentPrefixes(tenantId: tenantId).count
         field.text = (field.storedText ?? "") + String(c)
         field.textDidChange()
-        try await Task.sleep(nanoseconds: 500_000_000)
+
+        // 300 ms debounce, plus room for the request to be recorded on a loaded machine.
+        let deadline = Date().addingTimeInterval(2)
+        while Self.sentPrefixes(tenantId: tenantId).count == before, Date() < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        // The stub answers synchronously; one more turn lets the response reach the main queue
+        // and apply its brand state.
+        try await Task.sleep(nanoseconds: 100_000_000)
     }
 
     @Test func brandIsDetectedWhenTheBinOnlyResolvesPastEightDigits() async throws {
@@ -70,10 +81,10 @@ struct SecureFieldsManagerBinLookupTests {
         manager.delegate = delegate
         let pan = panField(manager)
 
-        for c in "23037700" { try await typeDigit(c, into: pan) }
+        for c in "23037700" { try await typeDigit(c, into: pan, tenantId: tenantId) }
         #expect(delegate.brandEvents.last ?? [] == [], "8 digits: the API knows nothing yet")
 
-        for c in "003" { try await typeDigit(c, into: pan) }   // 9th, 10th, 11th digit
+        for c in "003" { try await typeDigit(c, into: pan, tenantId: tenantId) }   // 9th, 10th, 11th digit
 
         #expect(delegate.brandEvents.last == [.mastercard], "11 digits must resolve the brand")
         #expect(Self.sentPrefixes(tenantId: tenantId).contains("23037700003"))
@@ -87,7 +98,7 @@ struct SecureFieldsManagerBinLookupTests {
         let manager = makeManager(tenantId: tenantId)
         let pan = panField(manager)
 
-        for c in "4111111111111111" { try await typeDigit(c, into: pan) }   // 16 digits
+        for c in "4111111111111111" { try await typeDigit(c, into: pan, tenantId: tenantId) }   // 16 digits
 
         let prefixes = Self.sentPrefixes(tenantId: tenantId)
         // One request per distinct prefix: 8 through 11 digits, then nothing — digits 12-16
@@ -106,7 +117,7 @@ struct SecureFieldsManagerBinLookupTests {
         manager.delegate = delegate
         let pan = panField(manager)
 
-        for c in "41111111" { try await typeDigit(c, into: pan) }
+        for c in "41111111" { try await typeDigit(c, into: pan, tenantId: tenantId) }
         #expect(delegate.brandEvents.last == [.visa])
 
         pan.text = "4111"

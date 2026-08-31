@@ -142,7 +142,7 @@ if deviceIsJailbroken() {
 | **HTTPS by construction** | `SecureFieldsConfig` takes a `VaultEnvironment`, not a raw URL — `apiRoot` is a fixed `https://` literal per case, so there's no host-app-supplied string that could be `http://` |
 | **No card data logging** | Debug prints are guarded by `#if DEBUG` — they produce no output in production builds |
 | **Remote monitoring never carries card data** | `RemoteLogger` (separate from local debug prints, opt-out via `monitoringEnabled`/omitting `apiKey`) sends events continuously as they happen — safety comes from every payload being structural metadata only (field names, brand lists, outcome codes), not from a time window. No caller has raw field values (PAN, CVV, expiry, cardholder name) to log in the first place |
-| **`VaultEnvironment.test` cannot ship to merchants** | Wrapped in `#if DEBUG`; the distributed XCFramework is always built in `Release` configuration, so the case is compiled out of every merchant integration entirely |
+| **`VaultEnvironment.test` cannot reach a merchant's users** | Guarded at runtime: honoured only on a development build (simulator, or `get-task-allow` in the provisioning profile), downgraded to `.production` with a warning in a release-signed app. The case ships in the binary so our own E2E suite can target TEST — the same trade-off, and the same guard, as the Android SDK |
 
 ---
 

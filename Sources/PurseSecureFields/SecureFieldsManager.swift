@@ -145,14 +145,19 @@ public final class SecureFieldsManager {
     // MARK: - Init
 
     public init(config: SecureFieldsConfig) {
+        // `.test` is internal-only and is refused in a release-signed host app, whatever the
+        // merchant passed — the SDK ships as one binary for every build type, so the check can
+        // only be a runtime one (mirrors Android's resolveEnvironment).
+        let environment = VaultEnvironment.resolve(config.environment, isDebugHost: VaultEnvironment.isDebugHost)
+
         // Constructed and started first, using the local `config` parameter — Swift requires
         // every stored property be assigned before `self` is used, so `monitoring` (a `let`)
         // is built here and assigned to `self.monitoring` below.
         let monitoring = MonitoringCoordinator(
             tenantId: config.tenantId,
             version: VaultAPIClient.sdkVersion,
-            env: config.environment.rawValue,
-            monitoringApiRoot: config.environment.monitoringApiRoot,
+            env: environment.rawValue,
+            monitoringApiRoot: environment.monitoringApiRoot,
             apiKey: config.apiKey,
             monitoringEnabled: config.monitoringEnabled
         )
@@ -160,15 +165,11 @@ public final class SecureFieldsManager {
         self.monitoring = monitoring
 
         self.config = config
-        #if DEBUG
-        if let testSession = config.testURLSession {
-            self.apiClient = VaultAPIClient(baseURL: config.environment.apiRoot, session: testSession)
+        if let overrideSession = config.urlSessionOverride {
+            self.apiClient = VaultAPIClient(baseURL: environment.apiRoot, session: overrideSession)
         } else {
-            self.apiClient = VaultAPIClient(baseURL: config.environment.apiRoot, pinnedPublicKeyHashes: config.pinnedPublicKeyHashes)
+            self.apiClient = VaultAPIClient(baseURL: environment.apiRoot, pinnedPublicKeyHashes: config.pinnedPublicKeyHashes)
         }
-        #else
-        self.apiClient = VaultAPIClient(baseURL: config.environment.apiRoot, pinnedPublicKeyHashes: config.pinnedPublicKeyHashes)
-        #endif
         let pan = SecurePANField()
         let cvv = SecureCVVField()
         let exp = SecureExpDateField()

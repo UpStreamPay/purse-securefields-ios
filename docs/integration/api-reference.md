@@ -184,16 +184,32 @@ tokenization/BIN-lookup gateway and the `cf-widget-logger` remote monitoring end
 
 ```swift
 public enum VaultEnvironment: String {
-    case test          // Debug builds only — see below
+    case test          // internal only — refused in a release-signed app, see below
     case sandbox
     case production
 }
 ```
 
-`.test` only exists in `Debug` builds. The distributed XCFramework is always built in `Release`
-configuration, so `#if DEBUG` code — including this case entirely — is compiled out of what every
-merchant integrates, in both their own Debug and Release builds. `.test` is only reachable when
-building this package from source in a Debug configuration (local development).
+`.test` is internal-only and guarded **at runtime**: it is honoured on a development build (the
+simulator, or a binary whose provisioning profile carries `get-task-allow` — Xcode-run,
+development and ad-hoc builds) and silently downgraded to `.production`, with a console warning,
+anywhere else. The SDK ships as a single Release-built XCFramework used by every merchant
+whatever their own build type, so the check cannot be a compile-time one. Same rule as the
+Android SDK, which checks the host app's `FLAG_DEBUGGABLE`.
+
+### `urlSessionOverride` (tests only)
+
+```swift
+public var urlSessionOverride: URLSession?   // on SecureFieldsConfig
+```
+
+Substitutes the `URLSession` used for BIN lookup and tokenization, so an automated suite can stub
+the gateway. **It bypasses certificate pinning entirely and must never be set in a shipping app.**
+It is available in the distributed binary because that binary is built in Release — gated behind
+`#if DEBUG`, no consumer of the XCFramework could stub anything.
+
+Remote log monitoring builds its own session and is *not* substituted; pass
+`monitoringEnabled: false` when running against a stub.
 
 ---
 
