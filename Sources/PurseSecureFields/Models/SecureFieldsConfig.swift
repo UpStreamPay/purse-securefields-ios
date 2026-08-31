@@ -1,11 +1,47 @@
 import UIKit
 
 public struct SecureFieldsStyle {
+    /// Appearance overrides for one field state. Every property is optional: `nil` inherits the
+    /// base style, so a theme only states what actually changes in that state.
+    public struct StateStyle {
+        public let textColor: UIColor?
+        public let backgroundColor: UIColor?
+        public let borderColor: UIColor?
+        public let borderWidth: CGFloat?
+
+        public init(
+            textColor: UIColor? = nil,
+            backgroundColor: UIColor? = nil,
+            borderColor: UIColor? = nil,
+            borderWidth: CGFloat? = nil
+        ) {
+            self.textColor = textColor
+            self.backgroundColor = backgroundColor
+            self.borderColor = borderColor
+            self.borderWidth = borderWidth
+        }
+    }
+
     public let font: UIFont
     public let textColor: UIColor
     public let placeholderColor: UIColor
     public let tintColor: UIColor
     public let keyboardAppearance: UIKeyboardAppearance
+
+    public let backgroundColor: UIColor?
+    public let borderColor: UIColor?
+    public let borderWidth: CGFloat
+    public let cornerRadius: CGFloat
+
+    /// State-dependent overrides, resolved in this order for a field: `focus` while it is the
+    /// first responder, then `valid` or `invalid` once it has content, and `empty` while it has
+    /// none. The first match wins; anything a state leaves `nil` falls back to the base style.
+    /// Mirrors the `focus` / `valid` / `invalid` / `empty` pseudo-classes of `VaultStyles` on
+    /// Android and of the web SDK's CSS.
+    public let focus: StateStyle?
+    public let valid: StateStyle?
+    public let invalid: StateStyle?
+    public let empty: StateStyle?
 
     public static let `default` = SecureFieldsStyle()
 
@@ -14,13 +50,36 @@ public struct SecureFieldsStyle {
         textColor: UIColor = .label,
         placeholderColor: UIColor = .placeholderText,
         tintColor: UIColor = .systemBlue,
-        keyboardAppearance: UIKeyboardAppearance = .default
+        keyboardAppearance: UIKeyboardAppearance = .default,
+        backgroundColor: UIColor? = nil,
+        borderColor: UIColor? = nil,
+        borderWidth: CGFloat = 0,
+        cornerRadius: CGFloat = 0,
+        focus: StateStyle? = nil,
+        valid: StateStyle? = nil,
+        invalid: StateStyle? = nil,
+        empty: StateStyle? = nil
     ) {
         self.font = font
         self.textColor = textColor
         self.placeholderColor = placeholderColor
         self.tintColor = tintColor
         self.keyboardAppearance = keyboardAppearance
+        self.backgroundColor = backgroundColor
+        self.borderColor = borderColor
+        self.borderWidth = borderWidth
+        self.cornerRadius = cornerRadius
+        self.focus = focus
+        self.valid = valid
+        self.invalid = invalid
+        self.empty = empty
+    }
+
+    /// The overrides that apply to a field in the given state, or nil when none is configured.
+    func stateStyle(isFocused: Bool, isValid: Bool, hasContent: Bool) -> StateStyle? {
+        if isFocused, let focus { return focus }
+        if hasContent { return isValid ? valid : invalid }
+        return empty
     }
 }
 

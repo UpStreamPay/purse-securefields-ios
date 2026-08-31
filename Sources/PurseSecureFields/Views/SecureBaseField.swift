@@ -52,18 +52,25 @@ class SecureBaseField: UITextField {
         addTarget(self, action: #selector(textDidChange), for: .editingChanged)
         addTarget(self, action: #selector(didBeginEditing), for: .editingDidBegin)
         addTarget(self, action: #selector(didEndEditing), for: .editingDidEnd)
+        // Registered after textDidChange so the restyle sees the validity that keystroke produced.
+        addTarget(self, action: #selector(applyStateStyle), for: .editingChanged)
     }
 
     @objc func textDidChange() {}
 
     @objc private func didBeginEditing() {
+        applyStateStyle()
         onFocusChanged?(true)
     }
-    @objc private func didEndEditing()   { onFocusChanged?(false) }
+    @objc private func didEndEditing() {
+        applyStateStyle()
+        onFocusChanged?(false)
+    }
 
     func setValidity(_ newValid: Bool) {
         if newValid != isValid {
             isValid = newValid
+            applyStateStyle()
             onValidityChanged?(isValid)
         }
     }
@@ -71,13 +78,37 @@ class SecureBaseField: UITextField {
     func clearSensitiveData() {
         text = ""
         isValid = false
+        applyStateStyle()
     }
 
+    // MARK: - Styling
+
+    private var style: SecureFieldsStyle?
+
     func applyStyle(_ style: SecureFieldsStyle) {
+        self.style = style
         font = style.font
-        textColor = style.textColor
         tintColor = style.tintColor
         keyboardAppearance = style.keyboardAppearance
+        layer.cornerRadius = style.cornerRadius
+        applyStateStyle()
+    }
+
+    /// Repaints the state-dependent properties for the field's current focus/validity/content.
+    /// Everything a state leaves unset falls back to the base style, so a field always ends up
+    /// fully painted rather than keeping a colour from the state it just left.
+    @objc func applyStateStyle() {
+        guard let style else { return }
+        let state = style.stateStyle(
+            isFocused: isFirstResponder,
+            isValid: isValid,
+            hasContent: !(storedText?.isEmpty ?? true)
+        )
+        textColor = state?.textColor ?? style.textColor
+        backgroundColor = state?.backgroundColor ?? style.backgroundColor
+        layer.borderWidth = state?.borderWidth ?? style.borderWidth
+        let border = state?.borderColor ?? style.borderColor
+        layer.borderColor = border?.cgColor
     }
 
     func applyPlaceholder(_ text: String, color: UIColor) {

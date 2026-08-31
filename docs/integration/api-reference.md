@@ -219,12 +219,29 @@ Visual configuration applied to all card input fields.
 
 ```swift
 public struct SecureFieldsStyle {
+    public struct StateStyle {
+        public init(
+            textColor: UIColor? = nil,
+            backgroundColor: UIColor? = nil,
+            borderColor: UIColor? = nil,
+            borderWidth: CGFloat? = nil
+        )
+    }
+
     public init(
         font: UIFont = .systemFont(ofSize: 16),
         textColor: UIColor = .label,
         placeholderColor: UIColor = .placeholderText,
         tintColor: UIColor = .systemBlue,
-        keyboardAppearance: UIKeyboardAppearance = .default
+        keyboardAppearance: UIKeyboardAppearance = .default,
+        backgroundColor: UIColor? = nil,
+        borderColor: UIColor? = nil,
+        borderWidth: CGFloat = 0,
+        cornerRadius: CGFloat = 0,
+        focus: StateStyle? = nil,
+        valid: StateStyle? = nil,
+        invalid: StateStyle? = nil,
+        empty: StateStyle? = nil
     )
 
     public static let `default`: SecureFieldsStyle
@@ -238,6 +255,34 @@ public struct SecureFieldsStyle {
 | `placeholderColor` | `UIColor` | `.placeholderText` | Placeholder text color |
 | `tintColor` | `UIColor` | `.systemBlue` | Cursor and selection highlight color |
 | `keyboardAppearance` | `UIKeyboardAppearance` | `.default` | Light or dark keyboard |
+| `backgroundColor` | `UIColor?` | `nil` | Field background |
+| `borderColor` | `UIColor?` | `nil` | Border colour (needs a non-zero `borderWidth`) |
+| `borderWidth` | `CGFloat` | `0` | Border width |
+| `cornerRadius` | `CGFloat` | `0` | Corner radius |
+| `focus` / `valid` / `invalid` / `empty` | `StateStyle?` | `nil` | Per-state overrides — see below |
+
+### State-dependent styling
+
+The SDK repaints each field as its state changes, so you no longer have to drive borders yourself
+from `secureFieldsFocusChanged` / `secureFieldsContentChanged`. States resolve in this order:
+`focus` while the field is first responder, then `valid` or `invalid` once it has content, and
+`empty` while it has none. Anything a `StateStyle` leaves `nil` falls back to the base style.
+
+```swift
+SecureFieldsStyle(
+    backgroundColor: .secondarySystemBackground,
+    borderColor: .separator,
+    borderWidth: 1,
+    cornerRadius: 10,
+    focus:   .init(borderColor: .systemBlue, borderWidth: 2),
+    valid:   .init(borderColor: .systemGreen),
+    invalid: .init(borderColor: .systemRed)
+)
+```
+
+The names mirror the `focus` / `valid` / `invalid` / `empty` pseudo-classes of `VaultStyles` on
+Android and of the web SDK's CSS. Styles are still applied to every field at once, and are fixed
+at initialisation.
 
 ---
 

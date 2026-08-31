@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import UIKit
 @testable import PurseSecureFields
@@ -160,7 +161,12 @@ struct SecureFieldsManagerTests {
 
         type("41111111", into: panField(manager))
         // 300 ms debounce before the request fires, then the stubbed session fails immediately.
-        try await Task.sleep(nanoseconds: 1_200_000_000)
+        // Polled rather than slept: these suites run in parallel, and a fixed wait flakes as
+        // soon as the machine is loaded.
+        let deadline = Date().addingTimeInterval(10)
+        while spy.binLookupFailures.isEmpty, Date() < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
 
         #expect(!spy.binLookupFailures.isEmpty)
         #expect(spy.brandsDetected.isEmpty) // failure must not masquerade as "no brands"

@@ -197,6 +197,30 @@ SecureFieldsConfig(
 | `placeholderColor` | `UIColor` | `.placeholderText` | Placeholder text color |
 | `tintColor` | `UIColor` | `.systemBlue` | Cursor and selection color |
 | `keyboardAppearance` | `UIKeyboardAppearance` | `.default` | Light or dark keyboard |
+| `backgroundColor` | `UIColor?` | `nil` | Field background |
+| `borderColor` / `borderWidth` / `cornerRadius` | — | none | Field border and rounding |
+| `focus` / `valid` / `invalid` / `empty` | `StateStyle?` | `nil` | Per-state overrides — see below |
+
+### State-dependent styling
+
+The SDK repaints each field as it gains focus, becomes valid or invalid, or empties out — you no
+longer have to drive that yourself from the delegate callbacks:
+
+```swift
+style: SecureFieldsStyle(
+    backgroundColor: .secondarySystemBackground,
+    borderColor: .separator,
+    borderWidth: 1,
+    cornerRadius: 10,
+    focus:   .init(borderColor: .systemBlue, borderWidth: 2),
+    valid:   .init(borderColor: .systemGreen),
+    invalid: .init(borderColor: .systemRed)
+)
+```
+
+States resolve in order: `focus` while the field is first responder, then `valid` or `invalid`
+once it has content, and `empty` while it has none. Whatever a state leaves unset falls back to
+the base style. The names match `VaultStyles` on Android and the web SDK's CSS pseudo-classes.
 
 ---
 
