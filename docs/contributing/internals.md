@@ -111,13 +111,20 @@ reads, and VoiceOver/accessibility service reads.
 
 ## BIN detection
 
-`SecureFieldsManager.scheduleBinLookup(digits:)` debounces lookups by 300 ms and sends the first
-8 digits once the PAN has at least 6 digits:
+`SecureFieldsManager.scheduleBinLookup(digits:)` debounces lookups by 300 ms and starts once the
+PAN has at least 8 digits:
 
 ```
 POST /v1/tenants/{tenantId}/bin-lookup
 { "first_digits": "12345678" }
 ```
+
+The prefix grows with the PAN up to the 11 digits the gateway accepts, so the lookup is repeated
+at 8, 9, 10 and 11 digits — a BIN that only becomes discriminant past 8 digits would otherwise
+never resolve. Beyond 11 digits the request body would be identical, so the prefix cache
+(`lastBinPrefix`) stops re-querying. A failed lookup is not cached and retries on the next PAN
+change. Responses carry the generation of the lookup that asked for them and are dropped when a
+newer lookup has since been launched, so an out-of-order answer cannot undo a fresher detection.
 
 The response carries:
 - `brands`: array of network strings (e.g. `["VISA", "CARTE_BANCAIRE"]`)

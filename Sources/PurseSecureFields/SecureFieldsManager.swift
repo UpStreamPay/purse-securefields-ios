@@ -96,6 +96,7 @@ public final class SecureFieldsManager {
         cvvField.clearSensitiveData()
         expDateField.clearSensitiveData()
         holderNameField.clearSensitiveData()
+        lookupGeneration &+= 1
         lastBinPrefix = nil
         lastBinResult = nil
         detectedBrands = []
@@ -129,6 +130,14 @@ public final class SecureFieldsManager {
     private var lastBinResult: BinLookupResult?
     private var binLookupWorkItem: DispatchWorkItem?
     private var lastBinPrefix: String?
+    /// Identifies the most recently launched BIN lookup, so a response that arrives after a newer
+    /// one was launched can be dropped instead of overwriting fresher brand state.
+    private var lookupGeneration: UInt64 = 0
+
+    /// Digits typed before the first BIN lookup fires.
+    private static let binSize = 8
+    /// Longest prefix the gateway accepts — a longer PAN produces a byte-identical request.
+    private static let lookupPrefixSize = 11
     private var isSubmitting = false
     private var privacyObservers: [NSObjectProtocol] = []
     private var monitoringObservers: [NSObjectProtocol] = []
@@ -241,9 +250,12 @@ public final class SecureFieldsManager {
     private func scheduleBinLookup(digits: String) {
         binLookupWorkItem?.cancel()
 
-        guard digits.count >= 6 else {
+        guard digits.count >= Self.binSize else {
+            // Invalidate any in-flight lookup: it was requested for digits that no longer exist
+            // and must not resurrect the brand state cleared just below.
+            lookupGeneration &+= 1
+            lastBinPrefix = nil
             if !detectedBrands.isEmpty {
-                lastBinPrefix = nil
                 detectedBrands = []
                 panField.validLengths = [16]
                 cvvField.validLengths = [3]
@@ -256,16 +268,27 @@ public final class SecureFieldsManager {
             return
         }
 
-        let prefix = String(digits.prefix(8))
+        // The gateway accepts up to 11 digits and answers on exactly what it is given, so the
+        // prefix must grow with the PAN: a BIN that only becomes discriminant past 8 digits was
+        // otherwise undetectable, since the 8-digit prefix never changed again and the dedupe
+        // below turned every later keystroke into a no-op. Past 11 digits the request body is
+        // identical, so the same dedupe correctly stops re-querying (mirrors web and Android).
+        let prefix = String(digits.prefix(Self.lookupPrefixSize))
         // Skip re-querying a prefix already looked up — even when it yielded no authorized brands.
         // Gating on `!detectedBrands.isEmpty` fired a network request on every keystroke for any
         // prefix with no matching brand.
         if prefix == lastBinPrefix { return }
 
+        lookupGeneration &+= 1
+        let generation = lookupGeneration
         let workItem = DispatchWorkItem { [weak self] in
             guard let self else { return }
             self.apiClient.binLookup(tenantId: self.config.tenantId, firstDigits: prefix) { result in
                 DispatchQueue.main.async {
+                    // A lookup fires per keystroke without cancelling the one in flight, so
+                    // responses can arrive out of order. Applying an older one would undo a
+                    // fresher detection — clearing brands and re-narrowing the PAN length.
+                    guard generation == self.lookupGeneration else { return }
                     guard case .success(let binResult) = result else {
                         // Surface the failure — silently dropping it made an outage
                         // indistinguishable from "this card has no authorized brand". The prefix
@@ -276,7 +299,6 @@ public final class SecureFieldsManager {
                         }
                         return
                     }
-                    guard prefix == String(self.panField.rawValue.prefix(8)) else { return }
                     let allowed = Self.allowedBrands(api: binResult.brands, config: self.config.brands)
                     self.lastBinPrefix = prefix
                     self.lastBinResult = binResult

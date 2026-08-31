@@ -15,10 +15,12 @@ final class StubGatewayURLProtocol: URLProtocol {
     }
 
     private static let lock = NSLock()
-    private static var handlers: [String: (URLRequest) -> Stub] = [:]
+    private static var handlers: [String: (URLRequest, Data?) -> Stub] = [:]
     private static var captured: [String: [(request: URLRequest, body: Data?)]] = [:]
 
-    static func register(tenantId: String, handler: @escaping (URLRequest) -> Stub) {
+    /// The handler receives the request together with its body — already drained from the
+    /// stream, since `URLRequest.httpBody` is always nil by the time a protocol sees it.
+    static func register(tenantId: String, handler: @escaping (URLRequest, Data?) -> Stub) {
         lock.lock(); handlers[tenantId] = handler; lock.unlock()
     }
 
@@ -52,7 +54,7 @@ final class StubGatewayURLProtocol: URLProtocol {
             client?.urlProtocol(self, didFailWithError: URLError(.unsupportedURL))
             return
         }
-        let stub = handler(request)
+        let stub = handler(request, body)
         let response = HTTPURLResponse(
             url: request.url!,
             statusCode: stub.statusCode,

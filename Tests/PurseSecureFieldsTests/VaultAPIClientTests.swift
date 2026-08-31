@@ -34,7 +34,7 @@ struct VaultAPIClientTests {
 
     @Test func documentedErrorShapeIsDecoded() async throws {
         let tenantId = "t-\(UUID().uuidString)"
-        StubGatewayURLProtocol.register(tenantId: tenantId) { _ in
+        StubGatewayURLProtocol.register(tenantId: tenantId) { _, _ in
             .init(statusCode: 400, body: #"{"error":"pan is invalid"}"#)
         }
 
@@ -51,7 +51,7 @@ struct VaultAPIClientTests {
     @Test func undocumentedErrorBodyIsRelayedRaw() async throws {
         let tenantId = "t-\(UUID().uuidString)"
         let body = #"{"message":"birth_date is not an accepted field"}"#
-        StubGatewayURLProtocol.register(tenantId: tenantId) { _ in
+        StubGatewayURLProtocol.register(tenantId: tenantId) { _, _ in
             .init(statusCode: 400, body: body)
         }
 
@@ -66,7 +66,7 @@ struct VaultAPIClientTests {
 
     @Test func emptyErrorBodyFallsBackToUnknownError() async throws {
         let tenantId = "t-\(UUID().uuidString)"
-        StubGatewayURLProtocol.register(tenantId: tenantId) { _ in
+        StubGatewayURLProtocol.register(tenantId: tenantId) { _, _ in
             .init(statusCode: 400, body: "")
         }
 
@@ -81,7 +81,7 @@ struct VaultAPIClientTests {
 
     @Test func binLookupErrorRelaysBody() async throws {
         let tenantId = "t-\(UUID().uuidString)"
-        StubGatewayURLProtocol.register(tenantId: tenantId) { _ in
+        StubGatewayURLProtocol.register(tenantId: tenantId) { _, _ in
             .init(statusCode: 403, body: #"{"detail":"tenant not allowed"}"#)
         }
 

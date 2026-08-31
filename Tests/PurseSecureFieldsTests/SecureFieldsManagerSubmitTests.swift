@@ -43,7 +43,7 @@ struct SecureFieldsManagerSubmitTests {
 
     @Test func oneySubmitSendsNoCvvAndNoBirthdate() async throws {
         let tenantId = "oney-\(UUID().uuidString)"
-        StubGatewayURLProtocol.register(tenantId: tenantId) { request in
+        StubGatewayURLProtocol.register(tenantId: tenantId) { request, _ in
             request.url!.path.hasSuffix("/bin-lookup")
                 ? .init(statusCode: 200, body: Self.oneyBinBody)
                 : .init(statusCode: 200, body: Self.tokenizeSuccessBody)
@@ -87,7 +87,7 @@ struct SecureFieldsManagerSubmitTests {
 
     @Test func regularSubmitSendsCvv() async throws {
         let tenantId = "visa-\(UUID().uuidString)"
-        StubGatewayURLProtocol.register(tenantId: tenantId) { request in
+        StubGatewayURLProtocol.register(tenantId: tenantId) { request, _ in
             request.url!.path.hasSuffix("/bin-lookup")
                 ? .init(statusCode: 200, body: #"{"brands":[{"brand":"VISA","is_main":true,"pan_lengths":[16],"cvv_lengths":[3]}]}"#)
                 : .init(statusCode: 200, body: #"{"form_token":"tok_visa","card":{"bin":"41111111","last_four_digits":"1111"}}"#)

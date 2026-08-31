@@ -89,7 +89,9 @@ func secureFieldsContentChanged() {
 ### Handle brand detection
 
 `secureFieldsBrandsDetected(_:)` fires when the BIN lookup returns results (≥ 8 digits typed)
-or when the card number drops below 8 digits (empty array).
+or when the card number drops below 8 digits (empty array). The lookup is repeated as the PAN
+grows, up to the 11 digits the gateway reads, so a brand may be reported after the 8th digit
+returned nothing — expect more than one event per card.
 
 ```swift
 func secureFieldsBrandsDetected(_ brands: [CardBrand]) {
