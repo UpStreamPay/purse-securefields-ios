@@ -319,8 +319,8 @@ The `rawValue` matches the network string returned by the BIN lookup API. `CardB
 is the default accepted brand list if none is specified in `SecureFieldsConfig`.
 
 **Oney special behaviour:** when `oney` is the selected brand, the CVV field switches to
-date-of-birth input mode (date picker, stored as `YYYY-MM-DD`). The tokenization request sends
-`birthDate` instead of `cvv`.
+date-of-birth input mode (date picker, stored as `YYYY-MM-DD`). The tokenization request then
+carries no `cvv` at all, and the birth date is never sent to the gateway.
 
 ---
 

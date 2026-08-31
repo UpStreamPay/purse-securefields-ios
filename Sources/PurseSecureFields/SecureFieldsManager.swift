@@ -403,13 +403,15 @@ public final class SecureFieldsManager {
         }
         isSubmitting = true
 
-        let isOney = selectedBrand == .oney
+        // Gate on the field's actual mode, not on the brand: `selectedBrand` can resolve to Oney
+        // through the `detectedBrands.first` fallback while the CVV field never switched to
+        // birthdate mode — and the value it holds is then a real CVV, not a date.
+        let isBirthdate = cvvField.inputMode == .birthdate
         let (month, year) = expDateField.parsedExpiry
         let holderName = holderNameField.rawValue.trimmingCharacters(in: .whitespaces)
 
         let payload = TokenizationPayload(
-            cvv: isOney ? nil : cvvField.rawValue,
-            birthDate: isOney ? cvvField.rawValue : nil,
+            cvv: isBirthdate ? nil : cvvField.rawValue,
             card: .init(
                 pan: panField.rawValue,
                 expiryMonth: month,

@@ -78,7 +78,9 @@ final class VaultAPIClient {
             #endif
 
             guard (200..<300).contains(statusCode) else {
-                completion(.failure(.apiError(message: "BIN lookup failed", statusCode: statusCode)))
+                let message = data.map { Self.errorMessage(from: $0, fallback: "BIN lookup failed") }
+                    ?? "BIN lookup failed"
+                completion(.failure(.apiError(message: message, statusCode: statusCode)))
                 return
             }
 
@@ -128,6 +130,18 @@ final class VaultAPIClient {
         perform(request: request, retries: maxRetries, completion: completion)
     }
 
+    /// Error text for a non-2xx response. The gateway's documented shape is `{"error": "..."}`;
+    /// anything else is relayed raw (truncated) rather than collapsed into an opaque fallback —
+    /// a 400 whose message says nothing costs a support round-trip to diagnose.
+    private static func errorMessage(from data: Data, fallback: String) -> String {
+        if let decoded = try? JSONDecoder().decode(APIErrorResponse.self, from: data) {
+            return decoded.error
+        }
+        let body = String(data: data, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return body.isEmpty ? fallback : String(body.prefix(500))
+    }
+
     private func perform(
         request: URLRequest,
         retries: Int,
@@ -159,7 +173,7 @@ final class VaultAPIClient {
             }
 
             guard (200..<300).contains(statusCode) else {
-                let message = (try? JSONDecoder().decode(APIErrorResponse.self, from: data))?.error ?? "Unknown error"
+                let message = Self.errorMessage(from: data, fallback: "Unknown error")
                 completion(.failure(.apiError(message: message, statusCode: statusCode)))
                 return
             }

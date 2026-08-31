@@ -205,11 +205,12 @@ POST /v1/tenants/{tenantId}/forms/secure-fields
 }
 ```
 
-For Oney flows, `birthDate` replaces `cvv`:
+For Oney flows the CVV field holds a birth date rather than a PIN, and the request carries
+**neither** key — the gateway accepts no birth-date field and rejects a request containing one
+with a 400. The date never leaves the device. Same contract as the web and Android SDKs:
 
 ```json
 {
-  "birth_date": "1990-06-15",
   "card": { ... }
 }
 ```
@@ -218,7 +219,7 @@ For Oney flows, `birthDate` replaces `cvv`:
 
 ```json
 {
-  "vault_form_token": "tok_xxx",
+  "form_token": "tok_xxx",
   "card": { "bin": "41111111", "last_four_digits": "1111" }
 }
 ```

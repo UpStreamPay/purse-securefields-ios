@@ -1,18 +1,20 @@
 struct TokenizationPayload: Encodable {
+    // Oney: when the CVV field is in birthdate mode its value is a "yyyy-MM-dd" date, not a
+    // 3-4 digit PIN — the gateway's `cvv` field only accepts a PIN, and it accepts no birthdate
+    // key at all (sending one is rejected with a 400). The date therefore never goes on the
+    // wire — web and Android do the same — and the SDK reflects it back to the integrator
+    // locally via `TokenizationResult.birthDate`. `cvv` is simply omitted in that mode.
     let cvv: String?
-    let birthDate: String?
     let card: CardPayload
 
     enum CodingKeys: String, CodingKey {
         case cvv
-        case birthDate = "birth_date"
         case card
     }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encodeIfPresent(cvv, forKey: .cvv)
-        try container.encodeIfPresent(birthDate, forKey: .birthDate)
         try container.encode(card, forKey: .card)
     }
 
