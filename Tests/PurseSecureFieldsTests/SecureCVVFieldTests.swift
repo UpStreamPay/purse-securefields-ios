@@ -65,21 +65,49 @@ struct SecureCVVFieldTests {
         #expect(field.isValid)
     }
 
-    // MARK: Truncation
+    // MARK: Over-length typing (kept, not truncated)
 
-    @Test func truncatesToMaxValidLength() {
+    @Test func typingBeyondMaxValidLengthKeepsValueAndInvalidates() {
         let field = SecureCVVField()
         field.text = "12345" // 5 digits, max valid = 3
         field.textDidChange()
-        #expect(field.storedText == "123")
+        #expect(field.storedText == "12345")
+        #expect(!field.isValid)
     }
 
-    @Test func truncatesToMaxWhenMultipleLengths() {
+    @Test func typingBeyondMaxKeepsValueWhenMultipleLengths() {
         let field = SecureCVVField()
         field.validLengths = [3, 4]
         field.text = "12345" // 5 digits, max valid = 4
         field.textDidChange()
+        #expect(field.storedText == "12345")
+        #expect(!field.isValid)
+    }
+
+    /// The reported scenario: a 4-digit CVV typed on a fresh form, before any brand is known.
+    /// Truncating it to "123" made it valid on the spot, so the later switch to a 3-digit brand
+    /// had nothing left to invalidate — the value the cardholder saw and the value submitted
+    /// diverged silently.
+    @Test func fourDigitsTypedBeforeBrandDetectionSurviveAndInvalidate() {
+        let field = SecureCVVField()   // default validLengths == [3]
+        field.text = "1234"
+        field.textDidChange()
+
         #expect(field.storedText == "1234")
+        #expect(!field.isValid)
+
+        // AMEX detected → the same four digits are now valid, untouched.
+        field.validLengths = [4]
+        #expect(field.storedText == "1234")
+        #expect(field.isValid)
+    }
+
+    @Test func typingIsCappedAtASafetyBound() {
+        let field = SecureCVVField()
+        field.text = String(repeating: "1", count: 40)
+        field.textDidChange()
+        #expect(field.storedText?.count == 12)
+        #expect(!field.isValid)
     }
 
     // MARK: Expected-length change (brand detection / chip tap)

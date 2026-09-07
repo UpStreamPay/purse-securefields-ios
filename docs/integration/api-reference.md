@@ -80,11 +80,16 @@ default** — opt in with `requiresHolderName: true` in the config to make it co
 ```swift
 // Validates all fields and initiates tokenization.
 // Fires secureFieldsDidTokenize or secureFieldsDidFail on the delegate.
-public func submit(saveToken: Bool = false)
+public func submit(selectedNetwork: CardBrand? = nil, saveToken: Bool = false)
 ```
 
 Calling `submit()` while any required field is invalid is safe — it fires
 `secureFieldsDidFail(.fieldsIncomplete)` without making a network request.
+
+`selectedNetwork` names the network to submit for a co-badged card, overriding the SDK's own
+resolution. It is ignored — with a console warning — when `brandSelector` is enabled, since the
+cardholder's pick then wins, and when the requested network was not detected on the card. Mirrors
+`SubmitOptions.selectedNetwork` on Android.
 
 ### Clear
 
@@ -118,6 +123,7 @@ public struct SecureFieldsConfig {
         tenantId: String,
         environment: VaultEnvironment = .sandbox,
         brands: [CardBrand] = CardBrand.allCases,
+        brandSelector: Bool = false,
         style: SecureFieldsStyle = .default,
         placeholders: SecureFieldsPlaceholders = .init(),
         requiresHolderName: Bool = false,
@@ -133,6 +139,7 @@ public struct SecureFieldsConfig {
 | `tenantId` | Yes | Your merchant/tenant identifier |
 | `environment` | No | `.sandbox` or `.production` (default `.sandbox`). The SDK resolves both the tokenization gateway and the remote monitoring endpoint internally — see [VaultEnvironment](#vaultenvironment) |
 | `brands` | No | Accepted card networks, **in your preference order** — for a co-badged card, the first configured brand that matches is pre-selected. Defaults to all supported brands. |
+| `brandSelector` | No | Whether the cardholder may arbitrate the network of a co-badged card through the built-in selector. Defaults to `false` (selector hidden), matching web and Android; the SDK then submits the brand its own resolution picked. |
 | `style` | No | Visual style applied to all fields |
 | `placeholders` | No | Placeholder text for each field |
 | `requiresHolderName` | No | When `true`, the cardholder name counts toward form validity and the `submit()` completeness check (default `false` — the field is optional at tokenization, and a host that never mounts `holderNameView` must not end up with a form that can never become valid) |
@@ -177,16 +184,32 @@ tokenization/BIN-lookup gateway and the `cf-widget-logger` remote monitoring end
 
 ```swift
 public enum VaultEnvironment: String {
-    case test          // Debug builds only — see below
+    case test          // internal only — refused in a release-signed app, see below
     case sandbox
     case production
 }
 ```
 
-`.test` only exists in `Debug` builds. The distributed XCFramework is always built in `Release`
-configuration, so `#if DEBUG` code — including this case entirely — is compiled out of what every
-merchant integrates, in both their own Debug and Release builds. `.test` is only reachable when
-building this package from source in a Debug configuration (local development).
+`.test` is internal-only and guarded **at runtime**: it is honoured on a development build (the
+simulator, or a binary whose provisioning profile carries `get-task-allow` — Xcode-run,
+development and ad-hoc builds) and silently downgraded to `.production`, with a console warning,
+anywhere else. The SDK ships as a single Release-built XCFramework used by every merchant
+whatever their own build type, so the check cannot be a compile-time one. Same rule as the
+Android SDK, which checks the host app's `FLAG_DEBUGGABLE`.
+
+### `urlSessionOverride` (tests only)
+
+```swift
+public var urlSessionOverride: URLSession?   // on SecureFieldsConfig
+```
+
+Substitutes the `URLSession` used for BIN lookup and tokenization, so an automated suite can stub
+the gateway. **It bypasses certificate pinning entirely and must never be set in a shipping app.**
+It is available in the distributed binary because that binary is built in Release — gated behind
+`#if DEBUG`, no consumer of the XCFramework could stub anything.
+
+Remote log monitoring builds its own session and is *not* substituted; pass
+`monitoringEnabled: false` when running against a stub.
 
 ---
 
@@ -196,12 +219,29 @@ Visual configuration applied to all card input fields.
 
 ```swift
 public struct SecureFieldsStyle {
+    public struct StateStyle {
+        public init(
+            textColor: UIColor? = nil,
+            backgroundColor: UIColor? = nil,
+            borderColor: UIColor? = nil,
+            borderWidth: CGFloat? = nil
+        )
+    }
+
     public init(
         font: UIFont = .systemFont(ofSize: 16),
         textColor: UIColor = .label,
         placeholderColor: UIColor = .placeholderText,
         tintColor: UIColor = .systemBlue,
-        keyboardAppearance: UIKeyboardAppearance = .default
+        keyboardAppearance: UIKeyboardAppearance = .default,
+        backgroundColor: UIColor? = nil,
+        borderColor: UIColor? = nil,
+        borderWidth: CGFloat = 0,
+        cornerRadius: CGFloat = 0,
+        focus: StateStyle? = nil,
+        valid: StateStyle? = nil,
+        invalid: StateStyle? = nil,
+        empty: StateStyle? = nil
     )
 
     public static let `default`: SecureFieldsStyle
@@ -215,6 +255,34 @@ public struct SecureFieldsStyle {
 | `placeholderColor` | `UIColor` | `.placeholderText` | Placeholder text color |
 | `tintColor` | `UIColor` | `.systemBlue` | Cursor and selection highlight color |
 | `keyboardAppearance` | `UIKeyboardAppearance` | `.default` | Light or dark keyboard |
+| `backgroundColor` | `UIColor?` | `nil` | Field background |
+| `borderColor` | `UIColor?` | `nil` | Border colour (needs a non-zero `borderWidth`) |
+| `borderWidth` | `CGFloat` | `0` | Border width |
+| `cornerRadius` | `CGFloat` | `0` | Corner radius |
+| `focus` / `valid` / `invalid` / `empty` | `StateStyle?` | `nil` | Per-state overrides — see below |
+
+### State-dependent styling
+
+The SDK repaints each field as its state changes, so you no longer have to drive borders yourself
+from `secureFieldsFocusChanged` / `secureFieldsContentChanged`. States resolve in this order:
+`focus` while the field is first responder, then `valid` or `invalid` once it has content, and
+`empty` while it has none. Anything a `StateStyle` leaves `nil` falls back to the base style.
+
+```swift
+SecureFieldsStyle(
+    backgroundColor: .secondarySystemBackground,
+    borderColor: .separator,
+    borderWidth: 1,
+    cornerRadius: 10,
+    focus:   .init(borderColor: .systemBlue, borderWidth: 2),
+    valid:   .init(borderColor: .systemGreen),
+    invalid: .init(borderColor: .systemRed)
+)
+```
+
+The names mirror the `focus` / `valid` / `invalid` / `empty` pseudo-classes of `VaultStyles` on
+Android and of the web SDK's CSS. Styles are still applied to every field at once, and are fixed
+at initialisation.
 
 ---
 
@@ -319,8 +387,8 @@ The `rawValue` matches the network string returned by the BIN lookup API. `CardB
 is the default accepted brand list if none is specified in `SecureFieldsConfig`.
 
 **Oney special behaviour:** when `oney` is the selected brand, the CVV field switches to
-date-of-birth input mode (date picker, stored as `YYYY-MM-DD`). The tokenization request sends
-`birthDate` instead of `cvv`.
+date-of-birth input mode (date picker, stored as `YYYY-MM-DD`). The tokenization request then
+carries no `cvv` at all, and the birth date is never sent to the gateway.
 
 ---
 
@@ -334,11 +402,18 @@ public struct TokenizationResult {
     public let bin: String               // first 8 digits — never the full PAN
     public let lastFourDigits: String    // last 4 digits
     public let detectedBrands: [CardBrand]
+    public let birthDate: String?        // Oney only — "yyyy-MM-dd"
+    public let selectedNetwork: CardBrand?  // the network submitted as `selected_network`
 }
 ```
 
 > `bin` and `lastFourDigits` are safe to display in a payment confirmation UI. `vaultFormToken`
 > is sent to your backend to complete the transaction — it never contains card data.
+
+`birthDate` and `selectedNetwork` are reflected from the SDK's own state, not from the response:
+the birth date never reaches the gateway, and the submitted network is not echoed back, so this
+result is the only place either can be read. Matches `SubmitResult.Success` on Android and
+`birth_date` on web.
 
 ---
 

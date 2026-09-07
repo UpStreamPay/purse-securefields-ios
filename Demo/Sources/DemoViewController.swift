@@ -15,6 +15,8 @@ final class DemoViewController: UIViewController {
             var config = SecureFieldsConfig(
                 tenantId: "test",
                 environment: .test,
+                // Opt in: the selector is hidden by default, and the demo exists to show it.
+                brandSelector: true,
                 placeholders: SecureFieldsPlaceholders(
                     pan: "1234 5678 9012 3456",
                     cvv: "123",
@@ -22,13 +24,14 @@ final class DemoViewController: UIViewController {
                     holderName: "Name Surname"
                 )
             )
-            config.testURLSession = MockURLProtocol.makeSession()
+            config.urlSessionOverride = MockURLProtocol.makeSession()
             return SecureFieldsManager(config: config)
         }
         #endif
         return SecureFieldsManager(config: SecureFieldsConfig(
             tenantId: Self.tenantId,
             environment: .test,
+            brandSelector: true,
             placeholders: SecureFieldsPlaceholders(
                 pan: "1234 5678 9012 3456",
                 cvv: "123",

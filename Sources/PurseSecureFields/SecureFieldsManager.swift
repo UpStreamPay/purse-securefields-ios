@@ -96,6 +96,7 @@ public final class SecureFieldsManager {
         cvvField.clearSensitiveData()
         expDateField.clearSensitiveData()
         holderNameField.clearSensitiveData()
+        lookupGeneration &+= 1
         lastBinPrefix = nil
         lastBinResult = nil
         detectedBrands = []
@@ -129,6 +130,14 @@ public final class SecureFieldsManager {
     private var lastBinResult: BinLookupResult?
     private var binLookupWorkItem: DispatchWorkItem?
     private var lastBinPrefix: String?
+    /// Identifies the most recently launched BIN lookup, so a response that arrives after a newer
+    /// one was launched can be dropped instead of overwriting fresher brand state.
+    private var lookupGeneration: UInt64 = 0
+
+    /// Digits typed before the first BIN lookup fires.
+    private static let binSize = 8
+    /// Longest prefix the gateway accepts — a longer PAN produces a byte-identical request.
+    private static let lookupPrefixSize = 11
     private var isSubmitting = false
     private var privacyObservers: [NSObjectProtocol] = []
     private var monitoringObservers: [NSObjectProtocol] = []
@@ -136,14 +145,19 @@ public final class SecureFieldsManager {
     // MARK: - Init
 
     public init(config: SecureFieldsConfig) {
+        // `.test` is internal-only and is refused in a release-signed host app, whatever the
+        // merchant passed — the SDK ships as one binary for every build type, so the check can
+        // only be a runtime one (mirrors Android's resolveEnvironment).
+        let environment = VaultEnvironment.resolve(config.environment, isDebugHost: VaultEnvironment.isDebugHost)
+
         // Constructed and started first, using the local `config` parameter — Swift requires
         // every stored property be assigned before `self` is used, so `monitoring` (a `let`)
         // is built here and assigned to `self.monitoring` below.
         let monitoring = MonitoringCoordinator(
             tenantId: config.tenantId,
             version: VaultAPIClient.sdkVersion,
-            env: config.environment.rawValue,
-            monitoringApiRoot: config.environment.monitoringApiRoot,
+            env: environment.rawValue,
+            monitoringApiRoot: environment.monitoringApiRoot,
             apiKey: config.apiKey,
             monitoringEnabled: config.monitoringEnabled
         )
@@ -151,15 +165,11 @@ public final class SecureFieldsManager {
         self.monitoring = monitoring
 
         self.config = config
-        #if DEBUG
-        if let testSession = config.testURLSession {
-            self.apiClient = VaultAPIClient(baseURL: config.environment.apiRoot, session: testSession)
+        if let overrideSession = config.urlSessionOverride {
+            self.apiClient = VaultAPIClient(baseURL: environment.apiRoot, session: overrideSession)
         } else {
-            self.apiClient = VaultAPIClient(baseURL: config.environment.apiRoot, pinnedPublicKeyHashes: config.pinnedPublicKeyHashes)
+            self.apiClient = VaultAPIClient(baseURL: environment.apiRoot, pinnedPublicKeyHashes: config.pinnedPublicKeyHashes)
         }
-        #else
-        self.apiClient = VaultAPIClient(baseURL: config.environment.apiRoot, pinnedPublicKeyHashes: config.pinnedPublicKeyHashes)
-        #endif
         let pan = SecurePANField()
         let cvv = SecureCVVField()
         let exp = SecureExpDateField()
@@ -225,6 +235,7 @@ public final class SecureFieldsManager {
     }
 
     private func setupBrandSelector() {
+        brandSelectorView.isSelectorEnabled = config.brandSelector
         brandSelectorView.onBrandSelected = { [weak self] brand in
             self?.applySelectedBrand(brand)
             self?.applyLengthsForBrand(brand)
@@ -241,9 +252,12 @@ public final class SecureFieldsManager {
     private func scheduleBinLookup(digits: String) {
         binLookupWorkItem?.cancel()
 
-        guard digits.count >= 6 else {
+        guard digits.count >= Self.binSize else {
+            // Invalidate any in-flight lookup: it was requested for digits that no longer exist
+            // and must not resurrect the brand state cleared just below.
+            lookupGeneration &+= 1
+            lastBinPrefix = nil
             if !detectedBrands.isEmpty {
-                lastBinPrefix = nil
                 detectedBrands = []
                 panField.validLengths = [16]
                 cvvField.validLengths = [3]
@@ -256,16 +270,27 @@ public final class SecureFieldsManager {
             return
         }
 
-        let prefix = String(digits.prefix(8))
+        // The gateway accepts up to 11 digits and answers on exactly what it is given, so the
+        // prefix must grow with the PAN: a BIN that only becomes discriminant past 8 digits was
+        // otherwise undetectable, since the 8-digit prefix never changed again and the dedupe
+        // below turned every later keystroke into a no-op. Past 11 digits the request body is
+        // identical, so the same dedupe correctly stops re-querying (mirrors web and Android).
+        let prefix = String(digits.prefix(Self.lookupPrefixSize))
         // Skip re-querying a prefix already looked up — even when it yielded no authorized brands.
         // Gating on `!detectedBrands.isEmpty` fired a network request on every keystroke for any
         // prefix with no matching brand.
         if prefix == lastBinPrefix { return }
 
+        lookupGeneration &+= 1
+        let generation = lookupGeneration
         let workItem = DispatchWorkItem { [weak self] in
             guard let self else { return }
             self.apiClient.binLookup(tenantId: self.config.tenantId, firstDigits: prefix) { result in
                 DispatchQueue.main.async {
+                    // A lookup fires per keystroke without cancelling the one in flight, so
+                    // responses can arrive out of order. Applying an older one would undo a
+                    // fresher detection — clearing brands and re-narrowing the PAN length.
+                    guard generation == self.lookupGeneration else { return }
                     guard case .success(let binResult) = result else {
                         // Surface the failure — silently dropping it made an outage
                         // indistinguishable from "this card has no authorized brand". The prefix
@@ -276,7 +301,6 @@ public final class SecureFieldsManager {
                         }
                         return
                     }
-                    guard prefix == String(self.panField.rawValue.prefix(8)) else { return }
                     let allowed = Self.allowedBrands(api: binResult.brands, config: self.config.brands)
                     self.lastBinPrefix = prefix
                     self.lastBinResult = binResult
@@ -308,6 +332,29 @@ public final class SecureFieldsManager {
     /// response order — matching the web SDK, where `config.brands[0]` is the default brand.
     static func allowedBrands(api: [CardBrand], config: [CardBrand]) -> [CardBrand] {
         config.filter { api.contains($0) }
+    }
+
+    /// The network to submit, arbitrating between the merchant's `submit(selectedNetwork:)` and
+    /// the SDK's own resolution. The cardholder's choice outranks the merchant's (Android does
+    /// the same), and a network this card doesn't carry is refused rather than tokenized under a
+    /// brand the BIN never announced.
+    static func effectiveNetwork(
+        requested: CardBrand?,
+        resolved: CardBrand,
+        detected: [CardBrand],
+        brandSelectorEnabled: Bool
+    ) -> CardBrand {
+        guard let requested else { return resolved }
+        if brandSelectorEnabled {
+            NSLog("PurseSecureFields: selectedNetwork ignored — brandSelector is enabled, the cardholder's selection wins")
+            return resolved
+        }
+        guard detected.contains(requested) else {
+            NSLog("PurseSecureFields: selectedNetwork '%@' was not detected on this card — submitting '%@'",
+                  requested.rawValue, resolved.rawValue)
+            return resolved
+        }
+        return requested
     }
 
     private func applySelectedBrand(_ brand: CardBrand?) {
@@ -388,7 +435,16 @@ public final class SecureFieldsManager {
 
     // MARK: - Submit
 
-    public func submit(saveToken: Bool = false) {
+    /// Tokenizes the form.
+    ///
+    /// - Parameters:
+    ///   - selectedNetwork: the network to submit for a co-badged card, overriding the SDK's own
+    ///     resolution. Ignored — with a warning — when `SecureFieldsConfig.brandSelector` is
+    ///     enabled, since the cardholder's pick then wins; and ignored when the brand was not
+    ///     detected on this card, rather than tokenizing under a network the BIN doesn't carry.
+    ///     Mirrors `SubmitOptions.selectedNetwork` on Android.
+    ///   - saveToken: asks the vault to retain the card for later reuse.
+    public func submit(selectedNetwork: CardBrand? = nil, saveToken: Bool = false) {
         guard !isSubmitting else { return }
         guard panField.isValid, cvvField.isValid, expDateField.isValid,
               !config.requiresHolderName || holderNameField.isValid else {
@@ -397,19 +453,27 @@ public final class SecureFieldsManager {
         }
         // Require a real brand — either the user's manual pick or an auto-detected one. Defaulting
         // to `.visa` silently tokenized non-Visa cards under the wrong network.
-        guard let selectedBrand = brandSelectorView.selectedBrand ?? detectedBrands.first else {
+        guard let resolvedBrand = brandSelectorView.selectedBrand ?? detectedBrands.first else {
             delegate?.secureFieldsDidFail(.fieldsIncomplete)
             return
         }
+        let selectedBrand = Self.effectiveNetwork(
+            requested: selectedNetwork,
+            resolved: resolvedBrand,
+            detected: detectedBrands,
+            brandSelectorEnabled: config.brandSelector
+        )
         isSubmitting = true
 
-        let isOney = selectedBrand == .oney
+        // Gate on the field's actual mode, not on the brand: `selectedBrand` can resolve to Oney
+        // through the `detectedBrands.first` fallback while the CVV field never switched to
+        // birthdate mode — and the value it holds is then a real CVV, not a date.
+        let isBirthdate = cvvField.inputMode == .birthdate
         let (month, year) = expDateField.parsedExpiry
         let holderName = holderNameField.rawValue.trimmingCharacters(in: .whitespaces)
 
         let payload = TokenizationPayload(
-            cvv: isOney ? nil : cvvField.rawValue,
-            birthDate: isOney ? cvvField.rawValue : nil,
+            cvv: isBirthdate ? nil : cvvField.rawValue,
             card: .init(
                 pan: panField.rawValue,
                 expiryMonth: month,
@@ -419,6 +483,11 @@ public final class SecureFieldsManager {
                 selectedNetwork: selectedBrand.rawValue
             )
         )
+
+        // Captured before the fields are zeroed just below: the birth date is deliberately not
+        // sent to the gateway and not echoed by the response, so this local is the only way it
+        // can still reach the host on the result.
+        let submittedBirthDate = isBirthdate ? cvvField.rawValue : nil
 
         // PCI compliance: raw values are copied into `payload` above — zero the field
         // buffers immediately, before the network round-trip, not on completion.
@@ -440,7 +509,9 @@ public final class SecureFieldsManager {
                         vaultFormToken: response.formToken,
                         bin: response.card.bin,
                         lastFourDigits: response.card.lastFourDigits,
-                        detectedBrands: self.detectedBrands
+                        detectedBrands: self.detectedBrands,
+                        birthDate: submittedBirthDate,
+                        selectedNetwork: selectedBrand
                     )
                     // Reset brand/BIN state after a successful tokenization (fields were already
                     // zeroed at submit). Otherwise stale `detectedBrands`/`selectedBrand`/lengths

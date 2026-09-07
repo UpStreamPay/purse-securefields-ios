@@ -1,11 +1,47 @@
 import UIKit
 
 public struct SecureFieldsStyle {
+    /// Appearance overrides for one field state. Every property is optional: `nil` inherits the
+    /// base style, so a theme only states what actually changes in that state.
+    public struct StateStyle {
+        public let textColor: UIColor?
+        public let backgroundColor: UIColor?
+        public let borderColor: UIColor?
+        public let borderWidth: CGFloat?
+
+        public init(
+            textColor: UIColor? = nil,
+            backgroundColor: UIColor? = nil,
+            borderColor: UIColor? = nil,
+            borderWidth: CGFloat? = nil
+        ) {
+            self.textColor = textColor
+            self.backgroundColor = backgroundColor
+            self.borderColor = borderColor
+            self.borderWidth = borderWidth
+        }
+    }
+
     public let font: UIFont
     public let textColor: UIColor
     public let placeholderColor: UIColor
     public let tintColor: UIColor
     public let keyboardAppearance: UIKeyboardAppearance
+
+    public let backgroundColor: UIColor?
+    public let borderColor: UIColor?
+    public let borderWidth: CGFloat
+    public let cornerRadius: CGFloat
+
+    /// State-dependent overrides, resolved in this order for a field: `focus` while it is the
+    /// first responder, then `valid` or `invalid` once it has content, and `empty` while it has
+    /// none. The first match wins; anything a state leaves `nil` falls back to the base style.
+    /// Mirrors the `focus` / `valid` / `invalid` / `empty` pseudo-classes of `VaultStyles` on
+    /// Android and of the web SDK's CSS.
+    public let focus: StateStyle?
+    public let valid: StateStyle?
+    public let invalid: StateStyle?
+    public let empty: StateStyle?
 
     public static let `default` = SecureFieldsStyle()
 
@@ -14,13 +50,36 @@ public struct SecureFieldsStyle {
         textColor: UIColor = .label,
         placeholderColor: UIColor = .placeholderText,
         tintColor: UIColor = .systemBlue,
-        keyboardAppearance: UIKeyboardAppearance = .default
+        keyboardAppearance: UIKeyboardAppearance = .default,
+        backgroundColor: UIColor? = nil,
+        borderColor: UIColor? = nil,
+        borderWidth: CGFloat = 0,
+        cornerRadius: CGFloat = 0,
+        focus: StateStyle? = nil,
+        valid: StateStyle? = nil,
+        invalid: StateStyle? = nil,
+        empty: StateStyle? = nil
     ) {
         self.font = font
         self.textColor = textColor
         self.placeholderColor = placeholderColor
         self.tintColor = tintColor
         self.keyboardAppearance = keyboardAppearance
+        self.backgroundColor = backgroundColor
+        self.borderColor = borderColor
+        self.borderWidth = borderWidth
+        self.cornerRadius = cornerRadius
+        self.focus = focus
+        self.valid = valid
+        self.invalid = invalid
+        self.empty = empty
+    }
+
+    /// The overrides that apply to a field in the given state, or nil when none is configured.
+    func stateStyle(isFocused: Bool, isValid: Bool, hasContent: Bool) -> StateStyle? {
+        if isFocused, let focus { return focus }
+        if hasContent { return isValid ? valid : invalid }
+        return empty
     }
 }
 
@@ -52,6 +111,15 @@ public struct SecureFieldsConfig {
     public let environment: VaultEnvironment
 
     public let brands: [CardBrand]
+
+    /// Whether the cardholder may arbitrate the network of a co-badged card through the built-in
+    /// brand selector. Defaults to `false`, matching the web and Android SDKs: the selector stays
+    /// hidden and the SDK submits the brand its own resolution picked (the merchant's
+    /// `brands` order expresses that preference). Set it to `true` to show the chips.
+    ///
+    /// When enabled, the cardholder's pick wins over any `selectedNetwork` passed to `submit`.
+    public let brandSelector: Bool
+
     public let style: SecureFieldsStyle
     public let placeholders: SecureFieldsPlaceholders
 
@@ -91,14 +159,22 @@ public struct SecureFieldsConfig {
     /// `RemoteLogger`.
     public let monitoringEnabled: Bool
 
-    #if DEBUG
-    public var testURLSession: URLSession? = nil
-    #endif
+    /// Substitutes the `URLSession` used for BIN lookup and tokenization.
+    ///
+    /// **Tests only.** A session set here bypasses certificate pinning entirely, so it must never
+    /// be set in a shipping app. It exists outside `#if DEBUG` because the distributed
+    /// XCFramework is built in Release: gated, no consumer of the binary — including our own E2E
+    /// suite — could stub the gateway at all.
+    ///
+    /// Remote log monitoring builds its own session and is not affected; disable it with
+    /// `monitoringEnabled: false` when running against a stub.
+    public var urlSessionOverride: URLSession? = nil
 
     public init(
         tenantId: String,
         environment: VaultEnvironment = .sandbox,
         brands: [CardBrand] = CardBrand.allCases,
+        brandSelector: Bool = false,
         style: SecureFieldsStyle = .default,
         placeholders: SecureFieldsPlaceholders = .init(),
         requiresHolderName: Bool = false,
@@ -110,6 +186,7 @@ public struct SecureFieldsConfig {
         self.tenantId = tenantId
         self.environment = environment
         self.brands = brands
+        self.brandSelector = brandSelector
         self.style = style
         self.placeholders = placeholders
         self.requiresHolderName = requiresHolderName

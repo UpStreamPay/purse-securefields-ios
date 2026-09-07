@@ -13,12 +13,31 @@ struct VaultEnvironmentTests {
         #expect(VaultEnvironment.production.monitoringApiRoot == "https://api.purse-secure.com")
     }
 
-    // .test only exists in Debug builds (see VaultEnvironment) — this test itself only compiles
-    // in Debug, which is how the test target always builds.
-    #if DEBUG
+    /// `.test` now ships in the Release binary too — it is guarded at runtime, not by `#if DEBUG`.
     @Test func testResolvesToTheTestHosts() {
         #expect(VaultEnvironment.test.apiRoot == "https://api.vault.purse-test.com")
         #expect(VaultEnvironment.test.monitoringApiRoot == "https://api.purse-test.com")
     }
-    #endif
+
+    // MARK: - Runtime guard
+
+    @Test func testEnvironmentIsAllowedOnADebugHost() {
+        #expect(VaultEnvironment.resolve(.test, isDebugHost: true) == .test)
+    }
+
+    @Test func testEnvironmentFallsBackToProductionOnAReleaseHost() {
+        #expect(VaultEnvironment.resolve(.test, isDebugHost: false) == .production)
+    }
+
+    @Test func otherEnvironmentsPassThroughOnAnyHost() {
+        #expect(VaultEnvironment.resolve(.sandbox, isDebugHost: false) == .sandbox)
+        #expect(VaultEnvironment.resolve(.sandbox, isDebugHost: true) == .sandbox)
+        #expect(VaultEnvironment.resolve(.production, isDebugHost: false) == .production)
+        #expect(VaultEnvironment.resolve(.production, isDebugHost: true) == .production)
+    }
+
+    @Test func simulatorCountsAsADebugHost() {
+        // The suite always runs on the simulator, where the SDK must accept .test.
+        #expect(VaultEnvironment.isDebugHost)
+    }
 }

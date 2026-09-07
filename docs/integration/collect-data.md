@@ -15,6 +15,7 @@ Implement `SecureFieldsDelegate`, submit the form, and handle the tokenization r
   - [Handle errors](#handle-errors)
   - [Handle screenshot detection](#handle-screenshot-detection)
 - [Submit the form](#submit-the-form)
+  - [Submit with an explicit network](#submit-with-an-explicit-network)
   - [Submit with saveToken](#submit-with-savetoken)
 - [Handle the tokenization result](#handle-the-tokenization-result)
 - [Clear fields](#clear-fields)
@@ -89,7 +90,9 @@ func secureFieldsContentChanged() {
 ### Handle brand detection
 
 `secureFieldsBrandsDetected(_:)` fires when the BIN lookup returns results (≥ 8 digits typed)
-or when the card number drops below 8 digits (empty array).
+or when the card number drops below 8 digits (empty array). The lookup is repeated as the PAN
+grows, up to the 11 digits the gateway reads, so a brand may be reported after the 8th digit
+returned nothing — expect more than one event per card.
 
 ```swift
 func secureFieldsBrandsDetected(_ brands: [CardBrand]) {
@@ -159,6 +162,18 @@ Call `submit()` when the user taps Pay. The SDK validates all fields internally 
 `submit()` is a no-op and fires `secureFieldsDidFail(.fieldsIncomplete)` if any required
 field is invalid. The Pay button guard above is belt-and-suspenders only.
 
+### Submit with an explicit network
+
+For a co-badged card with `brandSelector: false` (the default), name the network yourself:
+
+```swift
+secureFields.submit(selectedNetwork: .visa)
+```
+
+The request is submitted with that `selected_network`, provided it is one of the brands detected
+on the card. When `brandSelector` is enabled the cardholder's own pick wins and this argument is
+ignored.
+
 ### Submit with saveToken
 
 Pass `saveToken: true` to persist the card for future payments:
@@ -196,6 +211,8 @@ func secureFieldsDidTokenize(_ result: TokenizationResult) {
 | `bin` | First 8 digits of the PAN (never the full card number) |
 | `lastFourDigits` | Last 4 digits of the PAN |
 | `detectedBrands` | Card networks detected by the BIN lookup |
+| `birthDate` | Oney only — the date of birth submitted, `"yyyy-MM-dd"`. Never sent to the gateway, so this is the only place it can be read back. |
+| `selectedNetwork` | The network actually submitted as `selected_network` |
 
 ---
 

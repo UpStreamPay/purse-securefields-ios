@@ -146,9 +146,12 @@ struct CheckoutView: View {
 `panContainer` is a `SecurePANContainer` — it wraps the PAN field and optionally shows a brand
 selector for co-branded cards (e.g. Visa + CB).
 
-The brand selector appears automatically when two or more brands are detected from the BIN lookup.
-The user taps to choose the network. When the selector is active, `secureFieldsBrandSelected(_:)`
-fires on your delegate.
+The selector is **opt-in**: set `brandSelector: true` in `SecureFieldsConfig` to let the
+cardholder arbitrate the network of a co-badged card. It then appears once two or more brands are
+detected from the BIN lookup, and `secureFieldsBrandSelected(_:)` fires on your delegate when the
+user taps. Left at its default (`false`, matching web and Android), the chips stay hidden and the
+SDK submits the first brand in your `brands` order that the card carries — you can still override
+that per transaction with `submit(selectedNetwork:)`.
 
 Pass `brands` in `SecureFieldsConfig` to restrict which card networks are accepted:
 
@@ -156,7 +159,8 @@ Pass `brands` in `SecureFieldsConfig` to restrict which card networks are accept
 SecureFieldsConfig(
     tenantId: "...",
     environment: .sandbox,
-    brands: [.visa, .mastercard, .carteBancaire, .oney]
+    brands: [.visa, .mastercard, .carteBancaire, .oney],
+    brandSelector: true
 )
 ```
 
@@ -193,6 +197,30 @@ SecureFieldsConfig(
 | `placeholderColor` | `UIColor` | `.placeholderText` | Placeholder text color |
 | `tintColor` | `UIColor` | `.systemBlue` | Cursor and selection color |
 | `keyboardAppearance` | `UIKeyboardAppearance` | `.default` | Light or dark keyboard |
+| `backgroundColor` | `UIColor?` | `nil` | Field background |
+| `borderColor` / `borderWidth` / `cornerRadius` | — | none | Field border and rounding |
+| `focus` / `valid` / `invalid` / `empty` | `StateStyle?` | `nil` | Per-state overrides — see below |
+
+### State-dependent styling
+
+The SDK repaints each field as it gains focus, becomes valid or invalid, or empties out — you no
+longer have to drive that yourself from the delegate callbacks:
+
+```swift
+style: SecureFieldsStyle(
+    backgroundColor: .secondarySystemBackground,
+    borderColor: .separator,
+    borderWidth: 1,
+    cornerRadius: 10,
+    focus:   .init(borderColor: .systemBlue, borderWidth: 2),
+    valid:   .init(borderColor: .systemGreen),
+    invalid: .init(borderColor: .systemRed)
+)
+```
+
+States resolve in order: `focus` while the field is first responder, then `valid` or `invalid`
+once it has content, and `empty` while it has none. Whatever a state leaves unset falls back to
+the base style. The names match `VaultStyles` on Android and the web SDK's CSS pseudo-classes.
 
 ---
 
