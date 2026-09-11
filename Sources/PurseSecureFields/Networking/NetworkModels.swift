@@ -5,7 +5,10 @@ struct TokenizationPayload: Encodable {
     // wire — web and Android do the same — and the SDK reflects it back to the integrator
     // locally via `TokenizationResult.birthDate`. `cvv` is simply omitted in that mode.
     let cvv: String?
-    let card: CardPayload
+    // CVV-only: with no PAN field there is no card to describe, and the gateway wants the key
+    // absent — not empty. A `card` carrying only `selected_network` is rejected for its missing
+    // expiry (`INVALID_FORM`). So the body is literally `{"cvv": "…"}`, as on web and Android.
+    let card: CardPayload?
 
     enum CodingKeys: String, CodingKey {
         case cvv
@@ -15,7 +18,7 @@ struct TokenizationPayload: Encodable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encodeIfPresent(cvv, forKey: .cvv)
-        try container.encode(card, forKey: .card)
+        try container.encodeIfPresent(card, forKey: .card)
     }
 
     struct CardPayload: Encodable {
@@ -39,7 +42,8 @@ struct TokenizationPayload: Encodable {
 
 struct TokenizationResponse: Decodable {
     let formToken: String
-    let card: CardResponse
+    /// Absent on a CVV-only tokenization: the gateway stored a cryptogram, not a card.
+    let card: CardResponse?
 
     struct CardResponse: Decodable {
         let bin: String

@@ -39,8 +39,11 @@ final class MonitoringCoordinator {
     }
 
     func start(config: SecureFieldsConfig) {
+        // Field *names* only — which fields the form renders (e.g. a CVV-only form), never values.
+        let fields = config.fields.configuredFields.map { String(describing: $0) }.sorted()
         logger.info(LogCode.initSDK, payload: [
             "brands": .array(config.brands.map { .string($0.rawValue) }),
+            "fields": .array(fields.map { .string($0) }),
         ])
     }
 

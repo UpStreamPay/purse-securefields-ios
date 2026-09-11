@@ -96,6 +96,8 @@ class CheckoutViewController: UIViewController, SecureFieldsDelegate {
 | `brands` | `[CardBrand]` | all | Accepted card brands |
 | `style` | `SecureFieldsStyle` | `.default` | Visual appearance |
 | `placeholders` | `SecureFieldsPlaceholders` | built-in | Placeholder text per field |
+| `fields` | `SecureFieldsFieldsConfig` | `.all` | Which fields are rendered, with per-field placeholder and accessibility label. `.cvvOnly` renders the CVV alone |
+| `requiresHolderName` | `Bool` | `false` | Whether the cardholder name gates form validity |
 | `apiKey` | `String?` | `nil` | Api key for remote log monitoring (Datadog). Monitoring silently disables itself when omitted |
 | `monitoringEnabled` | `Bool` | `true` | Opt-out for remote log monitoring |
 
@@ -133,6 +135,23 @@ SecureFieldsPlaceholders(
     holderName: "Cardholder Name"
 )
 ```
+
+### CVV-only form
+
+Renew the cryptogram of a card already on file — the cardholder types only the CVV, and the
+request carries no `card` block:
+
+```swift
+let secureFields = SecureFieldsManager(config: SecureFieldsConfig(
+    tenantId: "YOUR_TENANT_ID",
+    brands: [.amex],     // the saved card's brand → the CVV field expects 4 digits
+    fields: .cvvOnly
+))
+view.addSubview(secureFields.cvvView)   // the only view to mount
+// or name the brand later: secureFields.selectBrand(.amex)
+```
+
+See [docs/integration/api-reference.md](docs/integration/api-reference.md#cvv-only).
 
 ### Restricting accepted brands
 
@@ -188,7 +207,7 @@ public protocol SecureFieldsDelegate: AnyObject {
     func secureFieldsFormValidityChanged(_ isValid: Bool)
 
     // Optional
-    func secureFieldsBrandSelected(_ brand: CardBrand)
+    func secureFieldsBrandSelected(_ brand: CardBrand)   // chip tap, or your selectBrand(_:) call
     func secureFieldsContentChanged()
     func secureFieldsFocusChanged(field: SecureField, isFocused: Bool)
 }
@@ -251,6 +270,11 @@ public struct TokenizationResult {
 
 `Demo/Demo.xcodeproj` is a manual-testing-only UIKit app — it is not shipped. Open it in Xcode
 and run the **Demo** scheme on a simulator or device.
+
+The **Mode** row at the top switches between the full form and the CVV-only form (the screen is
+rebuilt, since the config is immutable). In CVV-only mode a **Saved card brand** row calls
+`selectBrand(_:)` so you can watch the expected CVV length change in the field label and the
+debug panel. The `--cvv-only` launch argument starts directly in CVV-only mode.
 
 ### Configuration (optional)
 

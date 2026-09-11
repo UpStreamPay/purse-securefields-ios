@@ -43,6 +43,18 @@ struct TokenizationPayloadTests {
         #expect(json["birth_date"] == nil)
     }
 
+    /// CVV-only (SDK-12287): the body must be `{"cvv": "…"}` and nothing else. The gateway wants
+    /// `card` absent — a `card` holding only `selected_network` is rejected for its missing expiry.
+    @Test func cvvOnlyPayloadCarriesOnlyTheCvv() throws {
+        let payload = TokenizationPayload(cvv: "1234", card: nil)
+
+        let json = try encodeToJSON(payload)
+
+        #expect(json["cvv"] as? String == "1234")
+        #expect(json["card"] == nil, "a CVV-only request must not carry a `card` key, not even an empty one")
+        #expect(json.count == 1)
+    }
+
     @Test func cardPayloadUsesSnakeCaseKeys() throws {
         let payload = TokenizationPayload(cvv: "123", card: makeCard())
 

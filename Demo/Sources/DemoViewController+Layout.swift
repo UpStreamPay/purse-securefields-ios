@@ -21,8 +21,25 @@ extension DemoViewController {
             stackView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -40),
         ])
 
-        stackView.addArrangedSubview(sectionLabel("Card Number"))
-        stackView.addArrangedSubview(manager.panContainer)
+        stackView.addArrangedSubview(sectionLabel("Mode"))
+        stackView.addArrangedSubview(modeControl)
+
+        // Mount only the configured fields — a CVV-only form has no PAN, expiry or holder view.
+        let fields = manager.configuredFields
+
+        if manager.isCVVOnly {
+            // The saved card's brand — what tells a CVV-only form to expect 3 or 4 digits.
+            stackView.addArrangedSubview(sectionLabel("Saved card brand"))
+            stackView.addArrangedSubview(brandControl)
+            stackView.setCustomSpacing(24, after: brandControl)
+        } else {
+            stackView.setCustomSpacing(24, after: modeControl)
+        }
+
+        if fields.contains(.pan) {
+            stackView.addArrangedSubview(sectionLabel("Card Number"))
+            stackView.addArrangedSubview(manager.panContainer)
+        }
 
         let row = UIStackView()
         row.axis = .horizontal
@@ -34,27 +51,31 @@ extension DemoViewController {
         cvvStack.spacing = 6
         let cvvLbl = sectionLabel("CVV")
         cvvSectionLabel = cvvLbl
+        defer { updateCVVLabel() }
         cvvStack.addArrangedSubview(cvvLbl)
         let cvvContainer = secureViewContainer(manager.cvvView)
         cvvContainerView = cvvContainer
         cvvStack.addArrangedSubview(cvvContainer)
-
-        let expiryStack = UIStackView()
-        expiryStack.axis = .vertical
-        expiryStack.spacing = 6
-        expiryStack.addArrangedSubview(sectionLabel("Expiry"))
-        let expiryContainer = secureViewContainer(manager.expDateView)
-        expiryContainerView = expiryContainer
-        expiryStack.addArrangedSubview(expiryContainer)
-
         row.addArrangedSubview(cvvStack)
-        row.addArrangedSubview(expiryStack)
+
+        if fields.contains(.expDate) {
+            let expiryStack = UIStackView()
+            expiryStack.axis = .vertical
+            expiryStack.spacing = 6
+            expiryStack.addArrangedSubview(sectionLabel("Expiry"))
+            let expiryContainer = secureViewContainer(manager.expDateView)
+            expiryContainerView = expiryContainer
+            expiryStack.addArrangedSubview(expiryContainer)
+            row.addArrangedSubview(expiryStack)
+        }
         stackView.addArrangedSubview(row)
 
-        stackView.addArrangedSubview(sectionLabel("Cardholder Name"))
-        let holderContainer = secureViewContainer(manager.holderNameView)
-        holderContainerView = holderContainer
-        stackView.addArrangedSubview(holderContainer)
+        if fields.contains(.holderName) {
+            stackView.addArrangedSubview(sectionLabel("Cardholder Name"))
+            let holderContainer = secureViewContainer(manager.holderNameView)
+            holderContainerView = holderContainer
+            stackView.addArrangedSubview(holderContainer)
+        }
 
         let buttonRow = UIStackView()
         buttonRow.axis = .horizontal
@@ -88,11 +109,13 @@ extension DemoViewController {
         manager.expDateView.accessibilityIdentifier = "expiry_field"
         manager.holderNameView.accessibilityIdentifier = "holder_field"
         cvvContainerView.accessibilityIdentifier = "cvv_container"
-        expiryContainerView.accessibilityIdentifier = "expiry_container"
-        holderContainerView.accessibilityIdentifier = "holder_container"
+        expiryContainerView?.accessibilityIdentifier = "expiry_container"
+        holderContainerView?.accessibilityIdentifier = "holder_container"
         payButton.accessibilityIdentifier = "pay_button"
         clearButton.accessibilityIdentifier = "clear_button"
         resultLabel.accessibilityIdentifier = "result_label"
+        debugLabel.accessibilityIdentifier = "debug_label"
+        cvvSectionLabel.accessibilityIdentifier = "cvv_label"
 
         stackView.addArrangedSubview(divider())
         stackView.addArrangedSubview(sectionLabel("Result"))
@@ -132,22 +155,28 @@ extension DemoViewController {
     }
 
     func updateFieldBorders() {
-        applyBorder(manager.panContainer,
-                    hasContent: manager.hasFieldContent(.pan),
-                    isValid: manager.isFieldValid(.pan),
-                    isFocused: manager.isFieldFocused(.pan))
+        if manager.configuredFields.contains(.pan) {
+            applyBorder(manager.panContainer,
+                        hasContent: manager.hasFieldContent(.pan),
+                        isValid: manager.isFieldValid(.pan),
+                        isFocused: manager.isFieldFocused(.pan))
+        }
         applyBorder(cvvContainerView,
                     hasContent: manager.hasFieldContent(.cvv),
                     isValid: manager.isFieldValid(.cvv),
                     isFocused: manager.isFieldFocused(.cvv))
-        applyBorder(expiryContainerView,
-                    hasContent: manager.hasFieldContent(.expDate),
-                    isValid: manager.isFieldValid(.expDate),
-                    isFocused: manager.isFieldFocused(.expDate))
-        applyBorder(holderContainerView,
-                    hasContent: manager.hasFieldContent(.holderName),
-                    isValid: manager.isFieldValid(.holderName),
-                    isFocused: manager.isFieldFocused(.holderName))
+        if let expiryContainerView {
+            applyBorder(expiryContainerView,
+                        hasContent: manager.hasFieldContent(.expDate),
+                        isValid: manager.isFieldValid(.expDate),
+                        isFocused: manager.isFieldFocused(.expDate))
+        }
+        if let holderContainerView {
+            applyBorder(holderContainerView,
+                        hasContent: manager.hasFieldContent(.holderName),
+                        isValid: manager.isFieldValid(.holderName),
+                        isFocused: manager.isFieldFocused(.holderName))
+        }
     }
 
     private func applyBorder(_ view: UIView, hasContent: Bool, isValid: Bool, isFocused: Bool) {

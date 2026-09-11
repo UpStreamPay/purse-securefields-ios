@@ -22,6 +22,55 @@ public final class SecureFieldsManager {
 
     public weak var delegate: SecureFieldsDelegate?
 
+    /// The fields this form renders, as declared by `SecureFieldsConfig.fields`. Always contains
+    /// `.cvv`. A field outside this set is hidden, ignored by form validity and by `submit()`.
+    /// Mount only these views. Mirrors `configuredFields` on Android.
+    public let configuredFields: Set<SecureField>
+
+    /// True when the form has no PAN field: `submit()` then tokenizes the CVV alone, against a
+    /// card the vault already holds, and the request carries no `card` block at all.
+    public var isCVVOnly: Bool { !configuredFields.contains(.pan) }
+
+    /// The brand currently driving the form: on a full form, the cardholder's pick on the
+    /// selector or the auto-selected detected brand; on a CVV-only form, the brand named through
+    /// `selectBrand(_:)`, or `nil` while none has been.
+    public var selectedBrand: CardBrand? {
+        isCVVOnly ? cvvOnlySelectedBrand : brandSelectorView.selectedBrand
+    }
+
+    /// Names the card's brand from the host's own knowledge or UI. Mirrors `setBrandSelection`
+    /// on Android.
+    ///
+    /// - On a **CVV-only** form this is how the SDK learns which CVV length to expect, since
+    ///   there is no PAN to look up: the field narrows to that brand's length — 4 digits for
+    ///   Amex, 3 otherwise — `expectedLengths(for: .cvv)` reflects it, and a typed CVV of the
+    ///   wrong length becomes invalid (kept, not truncated). The choice survives `clearFields()`
+    ///   and a successful `submit()`: the saved card does not change between attempts. Oney is
+    ///   refused with a warning — its birthdate flow is not available on a CVV-only form.
+    /// - On a **full** form it acts exactly like a tap on the brand selector chip, whether or not
+    ///   the selector is shown, and is refused when the BIN lookup did not announce that brand.
+    ///
+    /// Fires `secureFieldsBrandSelected(_:)` when the selection is applied.
+    public func selectBrand(_ brand: CardBrand) {
+        if isCVVOnly {
+            guard let lengths = brand.standingCVVLengths else {
+                NSLog("PurseSecureFields: selectBrand(.oney) ignored — the Oney birthdate flow is not available on a CVV-only form")
+                return
+            }
+            cvvOnlySelectedBrand = brand
+            cvvField.validLengths = lengths
+            delegate?.secureFieldsBrandSelected(brand)
+            monitoring.recordBrandSelected(brand)
+            notifyFormValidity()
+            return
+        }
+        guard detectedBrands.contains(brand) else {
+            NSLog("PurseSecureFields: selectBrand('%@') ignored — this brand was not detected on the card", brand.rawValue)
+            return
+        }
+        brandSelectorView.select(brand)
+    }
+
     /// Number of PAN digits typed. Useful for debug/UI without exposing the actual PAN.
     public var panDigitCount: Int { panField.rawValue.count }
 
@@ -101,7 +150,7 @@ public final class SecureFieldsManager {
         lastBinResult = nil
         detectedBrands = []
         panField.validLengths = [16]
-        cvvField.validLengths = [3]
+        cvvField.validLengths = defaultCVVLengths
         cvvField.setInputMode(.cvv)
         brandSelectorView.update(brands: [])
         delegate?.secureFieldsBrandsDetected([])
@@ -127,6 +176,9 @@ public final class SecureFieldsManager {
     // manager doesn't need to know about monitoring.
     private let monitoring: MonitoringCoordinator
     private var detectedBrands: [CardBrand] = []
+    /// CVV-only: the brand the host named through `selectBrand(_:)`, standing in for the BIN
+    /// lookup a form without a PAN field can never run.
+    private var cvvOnlySelectedBrand: CardBrand?
     private var lastBinResult: BinLookupResult?
     private var binLookupWorkItem: DispatchWorkItem?
     private var lastBinPrefix: String?
@@ -165,6 +217,7 @@ public final class SecureFieldsManager {
         self.monitoring = monitoring
 
         self.config = config
+        self.configuredFields = config.fields.configuredFields
         if let overrideSession = config.urlSessionOverride {
             self.apiClient = VaultAPIClient(baseURL: environment.apiRoot, session: overrideSession)
         } else {
@@ -197,13 +250,42 @@ public final class SecureFieldsManager {
     private func applyConfig(_ config: SecureFieldsConfig) {
         let style = config.style
         let ph = config.placeholders
-        for field in [panField, cvvField as SecureBaseField, expDateField, holderNameField] {
+        let legacyPlaceholders: [SecureField: String] = [
+            .pan: ph.pan, .cvv: ph.cvv, .expDate: ph.expDate, .holderName: ph.holderName,
+        ]
+        let fields: [(SecureField, SecureBaseField)] = [
+            (.pan, panField), (.cvv, cvvField), (.expDate, expDateField), (.holderName, holderNameField),
+        ]
+        for (name, field) in fields {
             field.applyStyle(style)
+            let perField = config.fields.config(for: name)
+            field.applyPlaceholder(perField?.placeholder ?? legacyPlaceholders[name]!, color: style.placeholderColor)
+            field.accessibilityLabel = perField?.accessibilityLabel
         }
-        panField.applyPlaceholder(ph.pan, color: style.placeholderColor)
-        cvvField.applyPlaceholder(ph.cvv, color: style.placeholderColor)
-        expDateField.applyPlaceholder(ph.expDate, color: style.placeholderColor)
-        holderNameField.applyPlaceholder(ph.holderName, color: style.placeholderColor)
+        // A field left out of `fields` is not part of the form. It is still constructed — the
+        // state accessors above answer for it (`isFieldValid(.pan)` is simply false, and
+        // `panDigitCount` is 0) — but it is hidden and inert, so a host that mounts it anyway
+        // cannot collect data the form will never submit.
+        let optionalViews: [(SecureField, UIView)] = [
+            (.pan, panContainer), (.expDate, expDateView), (.holderName, holderNameView),
+        ]
+        for (name, view) in optionalViews where !configuredFields.contains(name) {
+            view.isHidden = true
+            view.isUserInteractionEnabled = false
+        }
+        // No PAN field means no BIN lookup: the CVV length comes from the brands the host
+        // configured instead (see `CardBrand.cvvOnlyLengths`), or later from `selectBrand(_:)`.
+        cvvField.validLengths = defaultCVVLengths
+    }
+
+    /// The CVV lengths accepted while the BIN lookup has not answered. `[3]` on a form with a PAN
+    /// field — the lookup refines it as soon as the cardholder types. On a CVV-only form, which
+    /// has nothing to look up: the brand named through `selectBrand(_:)` if any, else what the
+    /// configured `brands` allow — one brand its exact length, several the union, none `[3, 4]`.
+    private var defaultCVVLengths: [Int] {
+        guard isCVVOnly else { return [3] }
+        if let lengths = cvvOnlySelectedBrand?.standingCVVLengths { return lengths }
+        return CardBrand.cvvOnlyLengths(for: config.brands)
     }
 
     // MARK: - Callbacks
@@ -260,7 +342,7 @@ public final class SecureFieldsManager {
             if !detectedBrands.isEmpty {
                 detectedBrands = []
                 panField.validLengths = [16]
-                cvvField.validLengths = [3]
+                cvvField.validLengths = defaultCVVLengths
                 cvvField.setInputMode(.cvv)
                 brandSelectorView.update(brands: [])
                 delegate?.secureFieldsBrandsDetected([])
@@ -423,9 +505,18 @@ public final class SecureFieldsManager {
 
     private var lastNotifiedValidity: Bool?
 
+    /// The fields whose validity gates the form: every configured field, except the cardholder
+    /// name unless `requiresHolderName` opts it in — it is optional at tokenization.
+    private var fieldsGatingValidity: [SecureBaseField] {
+        var fields: [SecureBaseField] = [cvvField]
+        if configuredFields.contains(.pan) { fields.append(panField) }
+        if configuredFields.contains(.expDate) { fields.append(expDateField) }
+        if configuredFields.contains(.holderName) && config.requiresHolderName { fields.append(holderNameField) }
+        return fields
+    }
+
     private func notifyFormValidity() {
-        let valid = panField.isValid && cvvField.isValid && expDateField.isValid
-            && (!config.requiresHolderName || holderNameField.isValid)
+        let valid = fieldsGatingValidity.allSatisfy(\.isValid)
         // Emit only on a genuine state transition. Firing on every field callback produced spurious
         // `secureFieldsFormValidityChanged` events and needless host-side UI churn.
         guard valid != lastNotifiedValidity else { return }
@@ -444,45 +535,59 @@ public final class SecureFieldsManager {
     ///     detected on this card, rather than tokenizing under a network the BIN doesn't carry.
     ///     Mirrors `SubmitOptions.selectedNetwork` on Android.
     ///   - saveToken: asks the vault to retain the card for later reuse.
+    ///
+    /// On a **CVV-only** form (no `pan` in `SecureFieldsConfig.fields`) both parameters are
+    /// ignored with a warning: they describe the `card` block, and a CVV-only request carries
+    /// none — the body is `{"cvv": "…"}` alone, as on web and Android. The result then has no
+    /// `bin`, `lastFourDigits` or `selectedNetwork`.
     public func submit(selectedNetwork: CardBrand? = nil, saveToken: Bool = false) {
         guard !isSubmitting else { return }
-        guard panField.isValid, cvvField.isValid, expDateField.isValid,
-              !config.requiresHolderName || holderNameField.isValid else {
+        guard fieldsGatingValidity.allSatisfy(\.isValid) else {
             delegate?.secureFieldsDidFail(.fieldsIncomplete)
             return
         }
-        // Require a real brand — either the user's manual pick or an auto-detected one. Defaulting
-        // to `.visa` silently tokenized non-Visa cards under the wrong network.
-        guard let resolvedBrand = brandSelectorView.selectedBrand ?? detectedBrands.first else {
-            delegate?.secureFieldsDidFail(.fieldsIncomplete)
-            return
+
+        let card: TokenizationPayload.CardPayload?
+        let selectedBrand: CardBrand?
+        if isCVVOnly {
+            if selectedNetwork != nil || saveToken {
+                NSLog("PurseSecureFields: selectedNetwork/saveToken ignored — a CVV-only form submits no card")
+            }
+            card = nil
+            selectedBrand = nil
+        } else {
+            // Require a real brand — either the user's manual pick or an auto-detected one.
+            // Defaulting to `.visa` silently tokenized non-Visa cards under the wrong network.
+            guard let resolvedBrand = brandSelectorView.selectedBrand ?? detectedBrands.first else {
+                delegate?.secureFieldsDidFail(.fieldsIncomplete)
+                return
+            }
+            let brand = Self.effectiveNetwork(
+                requested: selectedNetwork,
+                resolved: resolvedBrand,
+                detected: detectedBrands,
+                brandSelectorEnabled: config.brandSelector
+            )
+            let (month, year) = expDateField.parsedExpiry
+            let holderName = holderNameField.rawValue.trimmingCharacters(in: .whitespaces)
+            card = .init(
+                pan: panField.rawValue,
+                expiryMonth: month,
+                expiryYear: year,
+                cardHolderName: holderName.isEmpty ? nil : holderName,
+                saveToken: saveToken,
+                selectedNetwork: brand.rawValue
+            )
+            selectedBrand = brand
         }
-        let selectedBrand = Self.effectiveNetwork(
-            requested: selectedNetwork,
-            resolved: resolvedBrand,
-            detected: detectedBrands,
-            brandSelectorEnabled: config.brandSelector
-        )
         isSubmitting = true
 
         // Gate on the field's actual mode, not on the brand: `selectedBrand` can resolve to Oney
         // through the `detectedBrands.first` fallback while the CVV field never switched to
         // birthdate mode — and the value it holds is then a real CVV, not a date.
         let isBirthdate = cvvField.inputMode == .birthdate
-        let (month, year) = expDateField.parsedExpiry
-        let holderName = holderNameField.rawValue.trimmingCharacters(in: .whitespaces)
 
-        let payload = TokenizationPayload(
-            cvv: isBirthdate ? nil : cvvField.rawValue,
-            card: .init(
-                pan: panField.rawValue,
-                expiryMonth: month,
-                expiryYear: year,
-                cardHolderName: holderName.isEmpty ? nil : holderName,
-                saveToken: saveToken,
-                selectedNetwork: selectedBrand.rawValue
-            )
-        )
+        let payload = TokenizationPayload(cvv: isBirthdate ? nil : cvvField.rawValue, card: card)
 
         // Captured before the fields are zeroed just below: the birth date is deliberately not
         // sent to the gateway and not echoed by the response, so this local is the only way it
@@ -507,8 +612,8 @@ public final class SecureFieldsManager {
                     self.monitoring.recordSubmitSuccess()
                     let tokenResult = TokenizationResult(
                         vaultFormToken: response.formToken,
-                        bin: response.card.bin,
-                        lastFourDigits: response.card.lastFourDigits,
+                        bin: response.card?.bin,
+                        lastFourDigits: response.card?.lastFourDigits,
                         detectedBrands: self.detectedBrands,
                         birthDate: submittedBirthDate,
                         selectedNetwork: selectedBrand

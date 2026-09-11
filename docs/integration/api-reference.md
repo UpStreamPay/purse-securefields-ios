@@ -12,6 +12,7 @@ Module: `PurseSecureFields`
 - [VaultEnvironment](#vaultenvironment)
 - [SecureFieldsStyle](#securefieldsstyle)
 - [SecureFieldsPlaceholders](#securefieldsplaceholders)
+- [SecureFieldsFieldsConfig](#securefieldsfieldsconfig)
 - [SecureFieldsDelegate](#securefieldsdelegate)
 - [SecureField](#securefield)
 - [CardBrand](#cardbrand)
@@ -72,8 +73,32 @@ public func expectedLengths(for field: SecureField) -> [Int]
 ```
 
 Form validity (`secureFieldsFormValidityChanged` and the `submit()` completeness check) covers
-PAN, CVV and expiry date. The cardholder name is optional at tokenization and is **excluded by
-default** — opt in with `requiresHolderName: true` in the config to make it count.
+the **configured** fields — see [SecureFieldsFieldsConfig](#securefieldsfieldsconfig). With the
+default configuration that is PAN, CVV and expiry date; on a CVV-only form it is the CVV alone.
+The cardholder name is optional at tokenization and is **excluded by default** — opt in with
+`requiresHolderName: true` in the config to make it count.
+
+```swift
+// The fields this form renders, as declared by `SecureFieldsConfig.fields`. Always contains .cvv.
+public let configuredFields: Set<SecureField>
+
+// True when the form has no PAN field — submit() then tokenizes the CVV alone.
+public var isCVVOnly: Bool { get }
+
+// The brand driving the form: the selector's pick or auto-selected detected brand on a
+// full form; the brand named through selectBrand(_:) on a CVV-only form (nil until then).
+public var selectedBrand: CardBrand? { get }
+
+// Names the card's brand from your own knowledge or UI. Mirrors setBrandSelection on Android.
+// CVV-only: narrows the CVV length to that brand's (Amex 4, others 3) — expectedLengths(for: .cvv)
+// reflects it, a typed CVV of the wrong length turns invalid. Oney is refused with a warning.
+// Full form: acts like a tap on the selector chip; refused if the BIN lookup did not detect it.
+// Fires secureFieldsBrandSelected(_:) when applied.
+public func selectBrand(_ brand: CardBrand)
+```
+
+State queries keep answering for a field left out of the configuration: it is simply never
+valid, never focused and has no content.
 
 ### Submission
 
@@ -90,6 +115,11 @@ Calling `submit()` while any required field is invalid is safe — it fires
 resolution. It is ignored — with a console warning — when `brandSelector` is enabled, since the
 cardholder's pick then wins, and when the requested network was not detected on the card. Mirrors
 `SubmitOptions.selectedNetwork` on Android.
+
+On a **CVV-only** form both `selectedNetwork` and `saveToken` are ignored with a warning: they
+describe the `card` block, and a CVV-only request carries none — the body is `{"cvv": "…"}`
+alone, exactly as on web and Android. No brand needs to be resolved, and the result comes back
+without `bin`, `lastFourDigits` or `selectedNetwork`.
 
 ### Clear
 
@@ -126,6 +156,7 @@ public struct SecureFieldsConfig {
         brandSelector: Bool = false,
         style: SecureFieldsStyle = .default,
         placeholders: SecureFieldsPlaceholders = .init(),
+        fields: SecureFieldsFieldsConfig = .all,
         requiresHolderName: Bool = false,
         pinnedPublicKeyHashes: [String] = [],
         apiKey: String? = nil,
@@ -141,8 +172,9 @@ public struct SecureFieldsConfig {
 | `brands` | No | Accepted card networks, **in your preference order** — for a co-badged card, the first configured brand that matches is pre-selected. Defaults to all supported brands. |
 | `brandSelector` | No | Whether the cardholder may arbitrate the network of a co-badged card through the built-in selector. Defaults to `false` (selector hidden), matching web and Android; the SDK then submits the brand its own resolution picked. |
 | `style` | No | Visual style applied to all fields |
-| `placeholders` | No | Placeholder text for each field |
-| `requiresHolderName` | No | When `true`, the cardholder name counts toward form validity and the `submit()` completeness check (default `false` — the field is optional at tokenization, and a host that never mounts `holderNameView` must not end up with a form that can never become valid) |
+| `placeholders` | No | Placeholder text for each field. A per-field `placeholder` in `fields` takes precedence |
+| `fields` | No | Which fields the form renders, with per-field placeholder and accessibility label. Defaults to all four; `.cvvOnly` renders the CVV alone — see [SecureFieldsFieldsConfig](#securefieldsfieldsconfig) |
+| `requiresHolderName` | No | When `true`, the cardholder name counts toward form validity and the `submit()` completeness check (default `false` — the field is optional at tokenization, and a host that never mounts `holderNameView` must not end up with a form that can never become valid). No effect when `fields` leaves `holderName` out |
 | `pinnedPublicKeyHashes` | No | SHA-256 SPKI hashes (Base64) for certificate pinning |
 | `apiKey` | No | Api key for remote log monitoring (Datadog). Monitoring silently disables itself when omitted — see [Remote log monitoring](#remote-log-monitoring) |
 | `monitoringEnabled` | No | Opt-out for remote log monitoring (default `true`) |
@@ -288,7 +320,8 @@ at initialisation.
 
 ## `SecureFieldsPlaceholders`
 
-Placeholder strings for each field. Shown when the field is empty.
+Placeholder strings for each field. Shown when the field is empty. A field's own `placeholder`
+in [SecureFieldsFieldsConfig](#securefieldsfieldsconfig) wins when both are set.
 
 ```swift
 public struct SecureFieldsPlaceholders {
@@ -300,6 +333,77 @@ public struct SecureFieldsPlaceholders {
     )
 }
 ```
+
+---
+
+## `SecureFieldsFieldsConfig`
+
+Which fields the form renders, and how. **Presence decides rendering**: a field left `nil` is
+not part of the form — its view is hidden and inert, it is excluded from
+`secureFieldsFormValidityChanged`, from the `submit()` completeness check and from the
+tokenization request. `cvv` is the only mandatory field. Mirrors `SecureFieldsFieldsConfig` /
+`VaultFieldConfig` on Android and the `fields` object of the web SDK.
+
+```swift
+public struct SecureFieldConfig {
+    public init(placeholder: String? = nil, accessibilityLabel: String? = nil)
+}
+
+public struct SecureFieldsFieldsConfig {
+    public static let all: SecureFieldsFieldsConfig      // every field — the default
+    public static let cvvOnly: SecureFieldsFieldsConfig  // the CVV alone
+
+    public init(
+        pan: SecureFieldConfig? = nil,
+        expDate: SecureFieldConfig? = nil,
+        holderName: SecureFieldConfig? = nil,
+        cvv: SecureFieldConfig = .init()
+    )
+
+    public var configuredFields: Set<SecureField> { get }  // always contains .cvv
+    public var isCVVOnly: Bool { get }                      // pan == nil
+}
+```
+
+`accessibilityLabel` is applied as the view's `accessibilityLabel` for VoiceOver. The field's
+*value* stays hidden from the accessibility API regardless.
+
+**Precondition** (crash at init time if violated): a configured `pan` requires a configured
+`expDate`. The gateway rejects a card without an expiry, and `submit()` has no expiry override
+to supply one.
+
+### CVV-only
+
+The CVV-only form renews the cryptogram of a card the vault already holds: the cardholder types
+only the three or four digits on the back, never the number. Mount `cvvView` alone:
+
+```swift
+let config = SecureFieldsConfig(
+    tenantId: "YOUR_TENANT_ID",
+    fields: SecureFieldsFieldsConfig(
+        cvv: .init(placeholder: "123", accessibilityLabel: "Security code")
+    )
+)
+let secureFields = SecureFieldsManager(config: config)
+view.addSubview(secureFields.cvvView)
+```
+
+What changes in this mode:
+
+- **No BIN lookup**, so the brand comes from you. `brands` sets the CVV length at init: one
+  configured brand applies as-is (`[.amex]` → 4 digits), several accept the union of their
+  lengths (`[.visa, .amex]` → 3 or 4), the default `allCases` → 3 or 4. `selectBrand(_:)`
+  narrows it later, and `expectedLengths(for: .cvv)` tells you which length is expected. Web
+  parity, and the Android `setBrandSelection` rule.
+- `secureFieldsFormValidityChanged` follows the CVV alone; `secureFieldsBrandsDetected` never fires.
+- `submit()` sends `{"cvv": "…"}` — **no `card` key at all**. `selectedNetwork` and `saveToken`
+  are ignored with a console warning.
+- The response echoes no card block: `TokenizationResult.bin`, `lastFourDigits` and
+  `selectedNetwork` are `nil`, `detectedBrands` is empty. `vaultFormToken` is the token to send
+  to your backend, as for a full form.
+
+Not yet supported in CVV-only: the Oney date-of-birth flow (the CVV field stays in digit mode
+whatever `brands` says), and a PAN field without an expiry field.
 
 ---
 
@@ -329,7 +433,9 @@ public protocol SecureFieldsDelegate: AnyObject {
     /// the card number drops below 8 digits (brands cleared — empty array).
     func secureFieldsBrandsDetected(_ brands: [CardBrand])
 
-    /// Fires when the user selects a brand from the in-PAN brand selector.
+    /// Fires when the user selects a brand from the in-PAN brand selector, or when the
+    /// host names one through `selectBrand(_:)` — on a CVV-only form, the latter is the
+    /// only way it fires.
     func secureFieldsBrandSelected(_ brand: CardBrand)
 
     /// Fires on any keystroke in any field.
@@ -399,16 +505,20 @@ Returned via `secureFieldsDidTokenize(_:)` on successful submission.
 ```swift
 public struct TokenizationResult {
     public let vaultFormToken: String     // opaque token — send to your backend
-    public let bin: String               // first 8 digits — never the full PAN
-    public let lastFourDigits: String    // last 4 digits
-    public let detectedBrands: [CardBrand]
+    public let bin: String?              // first 8 digits — never the full PAN. nil on a CVV-only form
+    public let lastFourDigits: String?   // last 4 digits. nil on a CVV-only form
+    public let detectedBrands: [CardBrand]  // empty on a CVV-only form
     public let birthDate: String?        // Oney only — "yyyy-MM-dd"
-    public let selectedNetwork: CardBrand?  // the network submitted as `selected_network`
+    public let selectedNetwork: CardBrand?  // the network submitted as `selected_network`. nil on a CVV-only form
 }
 ```
 
 > `bin` and `lastFourDigits` are safe to display in a payment confirmation UI. `vaultFormToken`
 > is sent to your backend to complete the transaction — it never contains card data.
+
+`bin` and `lastFourDigits` are `nil` after a [CVV-only](#cvv-only) tokenization: the vault
+stored a cryptogram against a card it already knows and echoes no card block. Matches
+`SubmitResult.Success.card == null` on Android.
 
 `birthDate` and `selectedNetwork` are reflected from the SDK's own state, not from the response:
 the birth date never reaches the gateway, and the submitted network is not echoed back, so this
