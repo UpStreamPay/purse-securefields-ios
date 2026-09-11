@@ -153,7 +153,8 @@ cardholder arbitrate the network of a co-badged card. It then appears once two o
 detected from the BIN lookup, and `secureFieldsBrandSelected(_:)` fires on your delegate when the
 user taps. Left at its default (`false`, matching web and Android), the chips stay hidden and the
 SDK submits the first brand in your `brands` order that the card carries — you can still override
-that per transaction with `submit(selectedNetwork:)`.
+that per transaction with `submit(selectedNetwork:)`, or drive the choice from your own UI with
+`selectBrand(_:)`, which behaves like a chip tap whether or not the selector is shown.
 
 Pass `brands` in `SecureFieldsConfig` to restrict which card networks are accepted:
 

@@ -93,7 +93,7 @@ Tests/              — SecureFieldsTests
 - `secureFieldsFocusChanged(field:isFocused:)` — fires on focus in/out.
 - `secureFieldsFormValidityChanged(_:)` — fires only when overall form validity flips.
 - `secureFieldsBrandsDetected(_:)` — fires after BIN lookup.
-- `secureFieldsBrandSelected(_:)` — fires when user taps a brand chip (multi-brand card).
+- `secureFieldsBrandSelected(_:)` — fires when user taps a brand chip (multi-brand card) or the host calls `selectBrand(_:)` (both modes).
 
 ## CardFormatter grouping rules
 - Amex (prefix 34/37): 4-6-5

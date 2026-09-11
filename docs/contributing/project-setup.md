@@ -149,6 +149,11 @@ Demo/
 
 The demo uses a `--uitesting` launch argument in UI tests to inject a `MockURLProtocol` session,
 allowing the tokenization and BIN lookup endpoints to return fixed responses without a real network.
+`--cvv-only` starts it as a CVV-only form; without it, the **Mode** row at the top of the screen
+switches between the full form and CVV-only (rebuilding `DemoViewController`, since
+`SecureFieldsConfig` is immutable), and in CVV-only the **Saved card brand** row exercises
+`selectBrand(_:)`. Keep both controls inside the form, not in the navigation bar: the UI tests
+dismiss the keyboard by tapping the bar, and a title-view control would swallow that tap.
 
 ---
 

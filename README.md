@@ -207,7 +207,7 @@ public protocol SecureFieldsDelegate: AnyObject {
     func secureFieldsFormValidityChanged(_ isValid: Bool)
 
     // Optional
-    func secureFieldsBrandSelected(_ brand: CardBrand)
+    func secureFieldsBrandSelected(_ brand: CardBrand)   // chip tap, or your selectBrand(_:) call
     func secureFieldsContentChanged()
     func secureFieldsFocusChanged(field: SecureField, isFocused: Bool)
 }
@@ -270,6 +270,11 @@ public struct TokenizationResult {
 
 `Demo/Demo.xcodeproj` is a manual-testing-only UIKit app — it is not shipped. Open it in Xcode
 and run the **Demo** scheme on a simulator or device.
+
+The **Mode** row at the top switches between the full form and the CVV-only form (the screen is
+rebuilt, since the config is immutable). In CVV-only mode a **Saved card brand** row calls
+`selectBrand(_:)` so you can watch the expected CVV length change in the field label and the
+debug panel. The `--cvv-only` launch argument starts directly in CVV-only mode.
 
 ### Configuration (optional)
 

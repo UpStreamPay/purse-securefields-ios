@@ -102,10 +102,28 @@ func secureFieldsBrandsDetected(_ brands: [CardBrand]) {
 }
 
 func secureFieldsBrandSelected(_ brand: CardBrand) {
-    // Fires when the user picks a brand from the in-PAN brand selector.
-    // brand — the selected network
+    // Fires when the user picks a brand from the in-PAN brand selector,
+    // or when you call selectBrand(_:).
     cvvLabel.text = brand == .oney ? "Date of birth" : "CVV"
 }
+```
+
+### Name the brand yourself
+
+`selectBrand(_:)` names the card's brand from your own knowledge or UI — the counterpart of
+`setBrandSelection` on Android. On a [CVV-only form](api-reference.md#cvv-only) it is how the SDK
+learns which CVV length to expect, since there is no PAN to look up: the field narrows to that
+brand's length (4 digits for Amex, 3 otherwise), `expectedLengths(for: .cvv)` reflects it, and a
+typed CVV of the wrong length turns invalid rather than being truncated. The choice survives
+`clearFields()`. On a full form it acts like a tap on the brand selector chip, whether or not the
+selector is shown, and is refused — with a console warning — for a brand the BIN lookup did not
+detect. `selectedBrand` reads the current choice.
+
+```swift
+// CVV-only form for a stored Amex card
+secureFields.selectBrand(.amex)
+secureFields.expectedLengths(for: .cvv)   // [4]
+cvvLabel.text = "CVV (\(secureFields.expectedLengths(for: .cvv).map(String.init).joined(separator: " or ")) digits)"
 ```
 
 ### Handle errors

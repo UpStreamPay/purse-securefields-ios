@@ -433,7 +433,9 @@ public protocol SecureFieldsDelegate: AnyObject {
     /// the card number drops below 8 digits (brands cleared — empty array).
     func secureFieldsBrandsDetected(_ brands: [CardBrand])
 
-    /// Fires when the user selects a brand from the in-PAN brand selector.
+    /// Fires when the user selects a brand from the in-PAN brand selector, or when the
+    /// host names one through `selectBrand(_:)` — on a CVV-only form, the latter is the
+    /// only way it fires.
     func secureFieldsBrandSelected(_ brand: CardBrand)
 
     /// Fires on any keystroke in any field.
