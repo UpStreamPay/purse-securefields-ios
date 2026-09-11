@@ -84,6 +84,17 @@ public let configuredFields: Set<SecureField>
 
 // True when the form has no PAN field — submit() then tokenizes the CVV alone.
 public var isCVVOnly: Bool { get }
+
+// The brand driving the form: the selector's pick or auto-selected detected brand on a
+// full form; the brand named through selectBrand(_:) on a CVV-only form (nil until then).
+public var selectedBrand: CardBrand? { get }
+
+// Names the card's brand from your own knowledge or UI. Mirrors setBrandSelection on Android.
+// CVV-only: narrows the CVV length to that brand's (Amex 4, others 3) — expectedLengths(for: .cvv)
+// reflects it, a typed CVV of the wrong length turns invalid. Oney is refused with a warning.
+// Full form: acts like a tap on the selector chip; refused if the BIN lookup did not detect it.
+// Fires secureFieldsBrandSelected(_:) when applied.
+public func selectBrand(_ brand: CardBrand)
 ```
 
 State queries keep answering for a field left out of the configuration: it is simply never
@@ -379,8 +390,11 @@ view.addSubview(secureFields.cvvView)
 
 What changes in this mode:
 
-- **No BIN lookup**, so no brand is ever known. The CVV accepts **3 or 4 digits** — a saved
-  Amex card must stay submittable (web parity, and the Android `1.4.2` rule).
+- **No BIN lookup**, so the brand comes from you. `brands` sets the CVV length at init: one
+  configured brand applies as-is (`[.amex]` → 4 digits), several accept the union of their
+  lengths (`[.visa, .amex]` → 3 or 4), the default `allCases` → 3 or 4. `selectBrand(_:)`
+  narrows it later, and `expectedLengths(for: .cvv)` tells you which length is expected. Web
+  parity, and the Android `setBrandSelection` rule.
 - `secureFieldsFormValidityChanged` follows the CVV alone; `secureFieldsBrandsDetected` never fires.
 - `submit()` sends `{"cvv": "…"}` — **no `card` key at all**. `selectedNetwork` and `saveToken`
   are ignored with a console warning.

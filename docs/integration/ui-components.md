@@ -242,9 +242,12 @@ stack.addArrangedSubview(secureFields.cvvView)   // the only view to mount
 ```
 
 Each configured field carries its own optional `placeholder` (overriding
-`SecureFieldsPlaceholders`) and `accessibilityLabel`. In CVV-only mode the field accepts 3 or 4
-digits, form validity follows the CVV alone, and `submit()` sends `{"cvv": "…"}` with no `card`
-block — see the [API reference](api-reference.md#cvv-only) for the full list of differences.
+`SecureFieldsPlaceholders`) and `accessibilityLabel`. In CVV-only mode there is no BIN lookup, so
+tell the SDK the saved card's brand — `brands: [.amex]` at init, or `selectBrand(.amex)` later —
+and the field expects that brand's CVV length; with several brands (or none named) it accepts 3
+or 4 digits. `expectedLengths(for: .cvv)` says which. Form validity follows the CVV alone, and
+`submit()` sends `{"cvv": "…"}` with no `card` block — see the
+[API reference](api-reference.md#cvv-only) for the full list of differences.
 
 ---
 

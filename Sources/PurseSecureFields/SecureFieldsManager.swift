@@ -31,6 +31,46 @@ public final class SecureFieldsManager {
     /// card the vault already holds, and the request carries no `card` block at all.
     public var isCVVOnly: Bool { !configuredFields.contains(.pan) }
 
+    /// The brand currently driving the form: on a full form, the cardholder's pick on the
+    /// selector or the auto-selected detected brand; on a CVV-only form, the brand named through
+    /// `selectBrand(_:)`, or `nil` while none has been.
+    public var selectedBrand: CardBrand? {
+        isCVVOnly ? cvvOnlySelectedBrand : brandSelectorView.selectedBrand
+    }
+
+    /// Names the card's brand from the host's own knowledge or UI. Mirrors `setBrandSelection`
+    /// on Android.
+    ///
+    /// - On a **CVV-only** form this is how the SDK learns which CVV length to expect, since
+    ///   there is no PAN to look up: the field narrows to that brand's length — 4 digits for
+    ///   Amex, 3 otherwise — `expectedLengths(for: .cvv)` reflects it, and a typed CVV of the
+    ///   wrong length becomes invalid (kept, not truncated). The choice survives `clearFields()`
+    ///   and a successful `submit()`: the saved card does not change between attempts. Oney is
+    ///   refused with a warning — its birthdate flow is not available on a CVV-only form.
+    /// - On a **full** form it acts exactly like a tap on the brand selector chip, whether or not
+    ///   the selector is shown, and is refused when the BIN lookup did not announce that brand.
+    ///
+    /// Fires `secureFieldsBrandSelected(_:)` when the selection is applied.
+    public func selectBrand(_ brand: CardBrand) {
+        if isCVVOnly {
+            guard let lengths = brand.standingCVVLengths else {
+                NSLog("PurseSecureFields: selectBrand(.oney) ignored — the Oney birthdate flow is not available on a CVV-only form")
+                return
+            }
+            cvvOnlySelectedBrand = brand
+            cvvField.validLengths = lengths
+            delegate?.secureFieldsBrandSelected(brand)
+            monitoring.recordBrandSelected(brand)
+            notifyFormValidity()
+            return
+        }
+        guard detectedBrands.contains(brand) else {
+            NSLog("PurseSecureFields: selectBrand('%@') ignored — this brand was not detected on the card", brand.rawValue)
+            return
+        }
+        brandSelectorView.select(brand)
+    }
+
     /// Number of PAN digits typed. Useful for debug/UI without exposing the actual PAN.
     public var panDigitCount: Int { panField.rawValue.count }
 
@@ -136,6 +176,9 @@ public final class SecureFieldsManager {
     // manager doesn't need to know about monitoring.
     private let monitoring: MonitoringCoordinator
     private var detectedBrands: [CardBrand] = []
+    /// CVV-only: the brand the host named through `selectBrand(_:)`, standing in for the BIN
+    /// lookup a form without a PAN field can never run.
+    private var cvvOnlySelectedBrand: CardBrand?
     private var lastBinResult: BinLookupResult?
     private var binLookupWorkItem: DispatchWorkItem?
     private var lastBinPrefix: String?
@@ -230,16 +273,20 @@ public final class SecureFieldsManager {
             view.isHidden = true
             view.isUserInteractionEnabled = false
         }
-        // No PAN field means no BIN lookup, so no brand will ever narrow the CVV length: accept
-        // the two lengths in use, as web and Android do while no brand is known.
+        // No PAN field means no BIN lookup: the CVV length comes from the brands the host
+        // configured instead (see `CardBrand.cvvOnlyLengths`), or later from `selectBrand(_:)`.
         cvvField.validLengths = defaultCVVLengths
     }
 
-    /// The CVV lengths accepted while no brand is known. `[3]` on a form with a PAN field — a
-    /// BIN lookup refines it as soon as the cardholder types. `[3, 4]` on a CVV-only form, which
-    /// has nothing to refine it with: the SDK has no per-brand length table by design (BIN
-    /// lookup drives lengths), so a saved Amex card must remain submittable.
-    private var defaultCVVLengths: [Int] { isCVVOnly ? [3, 4] : [3] }
+    /// The CVV lengths accepted while the BIN lookup has not answered. `[3]` on a form with a PAN
+    /// field — the lookup refines it as soon as the cardholder types. On a CVV-only form, which
+    /// has nothing to look up: the brand named through `selectBrand(_:)` if any, else what the
+    /// configured `brands` allow — one brand its exact length, several the union, none `[3, 4]`.
+    private var defaultCVVLengths: [Int] {
+        guard isCVVOnly else { return [3] }
+        if let lengths = cvvOnlySelectedBrand?.standingCVVLengths { return lengths }
+        return CardBrand.cvvOnlyLengths(for: config.brands)
+    }
 
     // MARK: - Callbacks
 

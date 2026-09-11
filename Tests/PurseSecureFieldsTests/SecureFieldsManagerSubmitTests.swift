@@ -234,6 +234,43 @@ struct SecureFieldsManagerSubmitTests {
         #expect(delegate.tokenized?.vaultFormToken == "tok_cvv3")
     }
 
+    /// On a full form `selectBrand` is a programmatic chip tap: it changes the network submitted
+    /// for a co-badged card even with the selector hidden (mirrors Android's `setBrandSelection`).
+    @Test func fullFormSelectBrandDrivesTheSubmittedNetwork() async throws {
+        let tenantId = "select-\(UUID().uuidString)"
+        StubGatewayURLProtocol.register(tenantId: tenantId) { request, _ in
+            request.url!.path.hasSuffix("/bin-lookup")
+                ? .init(statusCode: 200, body: #"""
+                    {"brands":[{"brand":"CARTE_BANCAIRE","is_main":true,"pan_lengths":[16],"cvv_lengths":[3]},
+                               {"brand":"VISA","is_main":false,"pan_lengths":[16],"cvv_lengths":[3]}]}
+                    """#)
+                : .init(statusCode: 200, body: #"{"form_token":"tok_sel","card":{"bin":"41111111","last_four_digits":"1111"}}"#)
+        }
+        let manager = makeManager(tenantId: tenantId, brands: [.carteBancaire, .visa])
+        let delegate = SpyDelegate()
+        manager.delegate = delegate
+
+        type("4111111111111111", into: panField(manager))
+        try await waitUntil("both brands to be detected") { delegate.brands.count == 2 }
+        #expect(manager.selectedBrand == .carteBancaire, "config order pre-selects CB")
+
+        manager.selectBrand(.visa)
+        #expect(manager.selectedBrand == .visa)
+
+        type("123", into: cvvField(manager))
+        type("1230", into: expField(manager))
+        manager.submit()
+        try await waitUntil("tokenization to complete") { delegate.tokenized != nil || delegate.failure != nil }
+
+        let tokenizeCall = StubGatewayURLProtocol.requests(tenantId: tenantId)
+            .first { $0.request.url!.path.hasSuffix("/forms/secure-fields") }
+        let body = try #require(tokenizeCall?.body)
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let card = try #require(json["card"] as? [String: Any])
+        #expect(card["selected_network"] as? String == "VISA")
+        #expect(delegate.tokenized?.selectedNetwork == .visa)
+    }
+
     /// A full form still decodes the card block — the optional response field must not regress it.
     @Test func fullFormResultCarriesTheCard() async throws {
         let tenantId = "full-\(UUID().uuidString)"

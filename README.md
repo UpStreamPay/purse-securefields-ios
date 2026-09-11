@@ -144,9 +144,11 @@ request carries no `card` block:
 ```swift
 let secureFields = SecureFieldsManager(config: SecureFieldsConfig(
     tenantId: "YOUR_TENANT_ID",
+    brands: [.amex],     // the saved card's brand → the CVV field expects 4 digits
     fields: .cvvOnly
 ))
 view.addSubview(secureFields.cvvView)   // the only view to mount
+// or name the brand later: secureFields.selectBrand(.amex)
 ```
 
 See [docs/integration/api-reference.md](docs/integration/api-reference.md#cvv-only).

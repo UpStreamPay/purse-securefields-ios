@@ -7,14 +7,78 @@ final class DemoViewController: UIViewController {
 
     lazy var manager: SecureFieldsManager = makeManager()
 
-    /// `--cvv-only` launches the demo as a CVV-only form: the cryptogram-renewal flow for a card
-    /// already on file. Only the CVV view is mounted and `submit()` sends `{"cvv": "…"}` alone.
-    static var isCVVOnly: Bool { ProcessInfo.processInfo.arguments.contains("--cvv-only") }
+    /// Whether this screen runs the CVV-only form: the cryptogram-renewal flow for a card already
+    /// on file. Only the CVV view is mounted and `submit()` sends `{"cvv": "…"}` alone.
+    ///
+    /// Switch modes with the "Full form / CVV only" control in the navigation bar — the config is
+    /// immutable after init, so the screen is rebuilt in the chosen mode. `--cvv-only` on the
+    /// launch arguments starts the demo directly in CVV-only mode (used by the UI tests).
+    let isCVVOnly: Bool
 
-    private static var fields: SecureFieldsFieldsConfig {
+    init(isCVVOnly: Bool = ProcessInfo.processInfo.arguments.contains("--cvv-only")) {
+        self.isCVVOnly = isCVVOnly
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    private var fields: SecureFieldsFieldsConfig {
         isCVVOnly
             ? SecureFieldsFieldsConfig(cvv: .init(placeholder: "123 or 1234", accessibilityLabel: "Security code"))
             : .all
+    }
+
+    /// "Full form / CVV only" — rebuilds the screen in the chosen mode. Mounted as the first row
+    /// of the form (see `setupLayout`), not in the navigation bar: the XCUITests tap the bar to
+    /// dismiss the keyboard, and a title-view control would swallow that tap and switch modes.
+    lazy var modeControl: UISegmentedControl = {
+        let control = UISegmentedControl(items: ["Full form", "CVV only"])
+        control.selectedSegmentIndex = isCVVOnly ? 1 : 0
+        control.accessibilityIdentifier = "mode_control"
+        control.addTarget(self, action: #selector(modeChanged(_:)), for: .valueChanged)
+        return control
+    }()
+
+    @objc private func modeChanged(_ sender: UISegmentedControl) {
+        let next = DemoViewController(isCVVOnly: sender.selectedSegmentIndex == 1)
+        navigationController?.setViewControllers([next], animated: false)
+    }
+
+    /// CVV-only: the saved card's brand, as the merchant would know it. `Any` leaves the SDK on the
+    /// union of the configured brands (3 or 4 digits); a brand calls `selectBrand(_:)` and narrows
+    /// the field to that brand's length — watch the CVV label and the debug panel.
+    static let demoBrands: [(title: String, brand: CardBrand?)] = [
+        ("Any", nil), ("Visa", .visa), ("MC", .mastercard), ("Amex", .amex), ("CB", .carteBancaire),
+    ]
+
+    lazy var brandControl: UISegmentedControl = {
+        let control = UISegmentedControl(items: Self.demoBrands.map(\.title))
+        control.selectedSegmentIndex = 0
+        control.accessibilityIdentifier = "brand_control"
+        control.addTarget(self, action: #selector(brandChanged(_:)), for: .valueChanged)
+        return control
+    }()
+
+    @objc private func brandChanged(_ sender: UISegmentedControl) {
+        guard let brand = Self.demoBrands[sender.selectedSegmentIndex].brand else {
+            // Back to "Any": the SDK has no un-select, so rebuild the CVV-only screen.
+            navigationController?.setViewControllers([DemoViewController(isCVVOnly: true)], animated: false)
+            return
+        }
+        manager.selectBrand(brand)
+        updateCVVLabel()
+        updateDebugPanel()
+        updateFieldBorders()
+    }
+
+    /// "CVV (3 or 4 digits)" etc. — reflects `expectedLengths(for: .cvv)`, or the Oney date mode.
+    func updateCVVLabel(isOney: Bool = false) {
+        if isOney {
+            cvvSectionLabel.text = "Date of Birth"
+            return
+        }
+        let lengths = manager.expectedLengths(for: .cvv).map(String.init).joined(separator: " or ")
+        cvvSectionLabel.text = "CVV (\(lengths) digits)"
     }
 
     private func makeManager() -> SecureFieldsManager {
@@ -33,7 +97,7 @@ final class DemoViewController: UIViewController {
                     expDate: "MM/YY",
                     holderName: "Name Surname"
                 ),
-                fields: Self.fields
+                fields: fields
             )
             config.urlSessionOverride = MockURLProtocol.makeSession()
             return SecureFieldsManager(config: config)
@@ -49,7 +113,7 @@ final class DemoViewController: UIViewController {
                 expDate: "MM/YY",
                 holderName: "Name Surname"
             ),
-            fields: Self.fields,
+            fields: fields,
             apiKey: Self.monitoringApiKey
         ))
     }
@@ -156,10 +220,12 @@ final class DemoViewController: UIViewController {
     func updateDebugPanel() {
         let brands = detectedBrands.isEmpty ? "none" : detectedBrands.map(\.rawValue).joined(separator: ", ")
         let fields = manager.configuredFields.map { String(describing: $0) }.sorted().joined(separator: ", ")
+        let cvvLengths = manager.expectedLengths(for: .cvv)
+        let selected = manager.selectedBrand?.rawValue ?? "none"
         debugLabel.text = """
         Fields  \(fields)
         PAN     length=\(panLength)  valid=\(panValid ? "✓" : "✗")
-        CVV     valid=\(cvvValid ? "✓" : "✗")
+        CVV     valid=\(cvvValid ? "✓" : "✗")  expects=\(cvvLengths)  brand=\(selected)
         Expiry  valid=\(expiryValid ? "✓" : "✗")
         Brands  \(brands)
         Form    \(formValid ? "✓ ready" : "✗ incomplete")
@@ -184,7 +250,7 @@ final class DemoViewController: UIViewController {
         expiryValid = false
         detectedBrands = []
         formValid = false
-        cvvSectionLabel.text = "CVV"
+        updateCVVLabel()
         updateDebugPanel()
         updateFieldBorders()
     }

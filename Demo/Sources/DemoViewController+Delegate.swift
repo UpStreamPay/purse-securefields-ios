@@ -25,12 +25,13 @@ extension DemoViewController: SecureFieldsDelegate {
 
     func secureFieldsBrandsDetected(_ brands: [CardBrand]) {
         detectedBrands = brands
-        cvvSectionLabel.text = brands.first == .oney ? "Date of Birth" : "CVV"
+        updateCVVLabel(isOney: brands.first == .oney)
         updateDebugPanel()
     }
 
     func secureFieldsBrandSelected(_ brand: CardBrand) {
-        cvvSectionLabel.text = brand == .oney ? "Date of Birth" : "CVV"
+        updateCVVLabel(isOney: brand == .oney)
+        updateDebugPanel()
     }
 
     func secureFieldsDidTokenize(_ result: TokenizationResult) {

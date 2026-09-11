@@ -21,8 +21,20 @@ extension DemoViewController {
             stackView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -40),
         ])
 
+        stackView.addArrangedSubview(sectionLabel("Mode"))
+        stackView.addArrangedSubview(modeControl)
+
         // Mount only the configured fields — a CVV-only form has no PAN, expiry or holder view.
         let fields = manager.configuredFields
+
+        if manager.isCVVOnly {
+            // The saved card's brand — what tells a CVV-only form to expect 3 or 4 digits.
+            stackView.addArrangedSubview(sectionLabel("Saved card brand"))
+            stackView.addArrangedSubview(brandControl)
+            stackView.setCustomSpacing(24, after: brandControl)
+        } else {
+            stackView.setCustomSpacing(24, after: modeControl)
+        }
 
         if fields.contains(.pan) {
             stackView.addArrangedSubview(sectionLabel("Card Number"))
@@ -39,6 +51,7 @@ extension DemoViewController {
         cvvStack.spacing = 6
         let cvvLbl = sectionLabel("CVV")
         cvvSectionLabel = cvvLbl
+        defer { updateCVVLabel() }
         cvvStack.addArrangedSubview(cvvLbl)
         let cvvContainer = secureViewContainer(manager.cvvView)
         cvvContainerView = cvvContainer
@@ -101,6 +114,8 @@ extension DemoViewController {
         payButton.accessibilityIdentifier = "pay_button"
         clearButton.accessibilityIdentifier = "clear_button"
         resultLabel.accessibilityIdentifier = "result_label"
+        debugLabel.accessibilityIdentifier = "debug_label"
+        cvvSectionLabel.accessibilityIdentifier = "cvv_label"
 
         stackView.addArrangedSubview(divider())
         stackView.addArrangedSubview(sectionLabel("Result"))

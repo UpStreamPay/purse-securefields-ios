@@ -19,7 +19,9 @@ private final class SpyDelegate: SecureFieldsDelegate {
     var brandsDetected: [[CardBrand]] = []
     var validityChanges: [Bool] = []
     var binLookupFailures: [SecureFieldsError] = []
+    var brandsSelected: [CardBrand] = []
 
+    func secureFieldsBrandSelected(_ brand: CardBrand) { brandsSelected.append(brand) }
     func secureFieldsDidTokenize(_ result: TokenizationResult) {}
     func secureFieldsDidFail(_ error: SecureFieldsError) { failures.append(error) }
     func secureFieldsBrandsDetected(_ brands: [CardBrand]) { brandsDetected.append(brands) }
@@ -32,10 +34,12 @@ struct SecureFieldsManagerTests {
 
     private func makeManager(
         requiresHolderName: Bool = false,
-        fields: SecureFieldsFieldsConfig = .all
+        fields: SecureFieldsFieldsConfig = .all,
+        brands: [CardBrand] = CardBrand.allCases
     ) -> SecureFieldsManager {
         var config = SecureFieldsConfig(
             tenantId: "tenant",
+            brands: brands,
             fields: fields,
             requiresHolderName: requiresHolderName,
             monitoringEnabled: false
@@ -222,6 +226,84 @@ struct SecureFieldsManagerTests {
         #expect(requiredSpy.validityChanges.last != true)
         type("Jane Doe", into: holderField(required))
         #expect(requiredSpy.validityChanges.last == true)
+    }
+
+    // MARK: CVV-only — brand-driven CVV length (SDK-12287)
+
+    /// With no PAN to look up, the configured brands decide the length: one brand its own, several
+    /// the union, none (or Oney alone) both lengths.
+    @Test func cvvOnlyLengthFollowsTheConfiguredBrands() {
+        #expect(makeManager(fields: .cvvOnly, brands: [.amex]).expectedLengths(for: .cvv) == [4])
+        #expect(makeManager(fields: .cvvOnly, brands: [.visa]).expectedLengths(for: .cvv) == [3])
+        #expect(makeManager(fields: .cvvOnly, brands: [.visa, .amex]).expectedLengths(for: .cvv) == [3, 4])
+        #expect(makeManager(fields: .cvvOnly, brands: [.oney]).expectedLengths(for: .cvv) == [3, 4])
+        #expect(makeManager(fields: .cvvOnly).expectedLengths(for: .cvv) == [3, 4])
+    }
+
+    @Test func cvvOnlyAmexFormRefusesThreeDigits() {
+        let manager = makeManager(fields: .cvvOnly, brands: [.amex])
+        type("123", into: cvvField(manager))
+        #expect(manager.isFieldValid(.cvv) == false)
+        type("1234", into: cvvField(manager))
+        #expect(manager.isFieldValid(.cvv))
+    }
+
+    /// `selectBrand` narrows the field to the named brand — the host telling the SDK which saved
+    /// card the cryptogram is for. A typed CVV of the wrong length is kept and turns invalid.
+    @Test func cvvOnlySelectBrandNarrowsTheLengthAndRevalidates() {
+        let manager = makeManager(fields: .cvvOnly)
+        let delegate = SpyDelegate()
+        manager.delegate = delegate
+        #expect(manager.selectedBrand == nil)
+
+        type("123", into: cvvField(manager))
+        #expect(delegate.validityChanges.last == true)
+
+        manager.selectBrand(.amex)
+        #expect(manager.selectedBrand == .amex)
+        #expect(manager.expectedLengths(for: .cvv) == [4])
+        #expect(delegate.brandsSelected == [.amex])
+        #expect(manager.isFieldValid(.cvv) == false, "3 digits no longer fit an Amex CVV")
+        #expect(manager.hasFieldContent(.cvv), "the typed value is kept, not truncated")
+        #expect(delegate.validityChanges.last == false)
+
+        manager.selectBrand(.visa)
+        #expect(manager.expectedLengths(for: .cvv) == [3])
+        #expect(manager.isFieldValid(.cvv))
+        #expect(delegate.validityChanges.last == true)
+    }
+
+    /// The saved card does not change between attempts: the brand survives a clear.
+    @Test func cvvOnlySelectedBrandSurvivesClear() {
+        let manager = makeManager(fields: .cvvOnly)
+        manager.selectBrand(.amex)
+        type("1234", into: cvvField(manager))
+        manager.clearFields()
+        #expect(manager.selectedBrand == .amex)
+        #expect(manager.expectedLengths(for: .cvv) == [4])
+        #expect(manager.hasFieldContent(.cvv) == false)
+    }
+
+    @Test func cvvOnlyRefusesOney() {
+        let manager = makeManager(fields: .cvvOnly, brands: [.visa, .amex])
+        let delegate = SpyDelegate()
+        manager.delegate = delegate
+        manager.selectBrand(.oney)
+        #expect(manager.selectedBrand == nil)
+        #expect(manager.expectedLengths(for: .cvv) == [3, 4])
+        #expect(delegate.brandsSelected.isEmpty)
+        #expect(cvvField(manager).inputMode == .cvv, "the field must stay in digit mode")
+    }
+
+    /// On a full form the brand comes from the BIN lookup; a brand it did not announce is refused.
+    @Test func fullFormSelectBrandRefusesUndetectedBrand() {
+        let manager = makeManager()
+        let delegate = SpyDelegate()
+        manager.delegate = delegate
+        manager.selectBrand(.amex)
+        #expect(manager.selectedBrand == nil)
+        #expect(delegate.brandsSelected.isEmpty)
+        #expect(manager.expectedLengths(for: .cvv) == [3], "no static table on a full form")
     }
 
     // MARK: Per-field placeholders and accessibility

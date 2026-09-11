@@ -136,6 +136,53 @@ final class DemoUITests: XCTestCase {
         wait(for: [exp], timeout: 10)
     }
 
+    /// Naming the saved card's brand narrows the CVV-only field: Amex wants 4 digits, and a typed
+    /// 3-digit CVV turns invalid instead of being truncated.
+    func testCVVOnlyBrandNarrowsTheExpectedLength() {
+        launch(cvvOnly: true)
+        XCTAssertEqual(app.staticTexts["cvv_label"].label, "CVV (3 or 4 digits)")
+
+        let cvv = app.secureTextFields["cvv_field"]
+        cvv.tap()
+        cvv.typeText("123")
+        dismissKeyboard()
+        XCTAssertEqual(app.otherElements["cvv_container"].value as? String, "valid")
+
+        // The border stays neutral while the field keeps focus, so judge validity through the
+        // Pay button and the debug panel instead.
+        app.segmentedControls["brand_control"].buttons["Amex"].tap()
+        XCTAssertEqual(app.staticTexts["cvv_label"].label, "CVV (4 digits)")
+        XCTAssertFalse(app.buttons["pay_button"].isEnabled, "3 digits no longer fit an Amex CVV")
+        XCTAssertTrue(app.staticTexts["debug_label"].label.contains("expects=[4]  brand=AMEX"))
+
+        cvv.tap()
+        cvv.typeText("4")
+        dismissKeyboard()
+        XCTAssertEqual(app.otherElements["cvv_container"].value as? String, "valid")
+        XCTAssertTrue(app.buttons["pay_button"].isEnabled)
+
+        app.segmentedControls["brand_control"].buttons["Visa"].tap()
+        XCTAssertEqual(app.staticTexts["cvv_label"].label, "CVV (3 digits)")
+        XCTAssertFalse(app.buttons["pay_button"].isEnabled, "4 digits no longer fit a Visa CVV")
+    }
+
+    /// The mode control rebuilds the screen — the manual way to try the
+    /// CVV-only form without a launch argument.
+    func testModeControlSwitchesBetweenFullAndCVVOnly() {
+        launch()
+        XCTAssertTrue(app.textFields["pan_field"].exists)
+
+        app.segmentedControls["mode_control"].buttons["CVV only"].tap()
+        XCTAssertTrue(app.secureTextFields["cvv_field"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.textFields["pan_field"].exists, "CVV-only mode mounts no PAN field")
+        XCTAssertFalse(app.textFields["expiry_field"].exists)
+        XCTAssertFalse(app.buttons["pay_button"].isEnabled)
+
+        app.segmentedControls["mode_control"].buttons["Full form"].tap()
+        XCTAssertTrue(app.textFields["pan_field"].waitForExistence(timeout: 3), "the full form comes back")
+        XCTAssertTrue(app.textFields["expiry_field"].exists)
+    }
+
     func testClearResetsForm() {
         launch(tokenizeSuccess: true)
         fillValidCard()

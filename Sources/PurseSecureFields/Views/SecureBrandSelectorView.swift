@@ -72,10 +72,17 @@ public final class SecureBrandSelectorView: UIView {
 
     @objc private func chipTapped(_ sender: BrandChip) {
         guard sender.tag < brands.count else { return }
-        let brand = brands[sender.tag]
+        select(brands[sender.tag])
+    }
+
+    /// Selects `brand` as a chip tap would — same state change, same `onBrandSelected` callback —
+    /// so the host can drive the choice from its own UI (`SecureFieldsManager.selectBrand`).
+    /// Ignored when the brand is not among the detected ones.
+    func select(_ brand: CardBrand) {
+        guard let index = brands.firstIndex(of: brand) else { return }
         selectedBrand = brand
         stackView.arrangedSubviews.compactMap { $0 as? BrandChip }.forEach {
-            $0.isSelected = $0.tag == sender.tag
+            $0.isSelected = $0.tag == index
         }
         onBrandSelected?(brand)
     }

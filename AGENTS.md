@@ -43,7 +43,7 @@ Tests/              — SecureFieldsTests
 
 ### BIN lookup behaviour
 - Triggered at ≥ 6 digits, debounced 300ms, cached by 8-digit prefix.
-- API returns `pan_lengths: [Int]` and `cvv_lengths: [Int]`. These drive `panField.validLengths` and `cvvField.expectedLength` — never hardcode lengths per brand.
+- API returns `pan_lengths: [Int]` and `cvv_lengths: [Int]`. These drive `panField.validLengths` and `cvvField.validLengths` — on a form with a PAN field the lookup is the only source of lengths, never a hardcoded table. The one exception is the CVV-only form, which has no PAN to look up: `CardBrand.standingCVVLengths` (Amex 4, other PIN brands 3, Oney nil) stands in for the lookup there, exactly as web's `DEFAULT_BRANDS` and Android's `BrandDescription` table do. Never read that table on a form that has a PAN field.
 - Validity: `validLengths.contains(digits.count) && luhn` — supports multi-length brands (e.g. Visa 16 or 19).
 - Scheme normalisation: API returns `AMERICAN_EXPRESS` → map to `AMEX`, `DINERS_CLUB` → `DINERS` in `NetworkModels.normaliseScheme`.
 
@@ -82,7 +82,8 @@ Tests/              — SecureFieldsTests
 - All four fields are still constructed in the manager whatever `fields` says, so state accessors (`isFieldValid`, `panDigitCount`, `expectedLengths`…) keep answering for unconfigured fields — the E2E harness state probe reads all four. Unconfigured views are `isHidden = true` and `isUserInteractionEnabled = false`. Do not make the view accessors optional.
 - `configuredFields` (public) drives form validity and the `submit()` guard: every configured field counts, except `holderName` which also needs `requiresHolderName`.
 - `isCVVOnly` = no PAN field. Then `submit()` skips brand resolution, ignores `selectedNetwork`/`saveToken` with an `NSLog`, and builds `TokenizationPayload(cvv:, card: nil)` → body is literally `{"cvv": "…"}`. **Never emit `card`, even empty** — the gateway rejects a `card` without expiry (`INVALID_FORM`).
-- Default CVV lengths are `[3]` on a form with a PAN field and `[3, 4]` in CVV-only (`defaultCVVLengths`) — no BIN lookup will ever narrow them and there is deliberately no static per-brand length table. Applied at init, in `clearFields()` and in the BIN-lookup reset branch. Keep those three in sync.
+- Default CVV lengths (`defaultCVVLengths`) are `[3]` on a form with a PAN field. In CVV-only they come from the brand the host named through `selectBrand(_:)` (`cvvOnlySelectedBrand`), else from `CardBrand.cvvOnlyLengths(for: config.brands)`: one PIN brand its exact length, several the union, none `[3, 4]`. Applied at init, in `clearFields()` and in the BIN-lookup reset branch. Keep those three in sync. The CVV-only selection deliberately survives `clearFields()` — the saved card does not change between attempts.
+- `selectBrand(_:)` is public and mirrors Android's `setBrandSelection`: CVV-only → narrows the CVV length (Oney refused with a warning, field stays in `.cvv` mode); full form → `SecureBrandSelectorView.select(_:)`, a programmatic chip tap, refused when the brand is not in `detectedBrands`. The brand never goes on the wire in CVV-only.
 - `TokenizationResponse.card` and `TokenizationResult.bin`/`lastFourDigits` are optional: a CVV-only response is `{"form_token": "…"}` with no card block. There is no `cvv_token` in any SDK — the form token is the result.
 - A configured `pan` requires a configured `expDate` (precondition) until `submit()` gains an expiry override (SDK-10505).
 - Not supported yet: Oney birthdate in CVV-only (field stays in `.cvv` mode; web/Android skip the network call and return only a birth date — needs its own result shape).
@@ -115,8 +116,9 @@ Standard Luhn in `CardValidator.luhn(_:)`. Double every second digit from the ri
 1. Add case to `CardBrand` enum with the API raw value string.
 2. Add SVG badge to `Sources/PurseSecureFields/Resources/Badges.xcassets/`.
 3. Add normalisation entry in `NetworkModels.normaliseScheme` if API scheme string differs from enum raw value.
-4. No hardcoded lengths — BIN lookup drives them.
+4. Add its CVV length to `CardBrand.standingCVVLengths` — used by CVV-only forms only. Everywhere else BIN lookup drives lengths; do not add PAN lengths anywhere.
 
 ## Demo app
 The Demo target is for manual testing only. It is not shipped. `DemoViewController` is split into three files: main state/lifecycle, `+Layout` (UI construction + border logic), `+Delegate` (delegate conformance).
+A "Mode" segmented control (`Full form` / `CVV only`, id `mode_control`) sits at the top of the form and rebuilds the screen in the chosen mode — `SecureFieldsConfig` is immutable, so `DemoViewController(isCVVOnly:)` is re-created and swapped into the navigation stack. The `--cvv-only` launch argument starts directly in CVV-only mode (used by the XCUITests). Keep the control out of the navigation bar: the UI tests tap the bar to dismiss the keyboard, and a title-view control would swallow that tap.
 `TENANT_ID`/`MONITORING_API_KEY` come from `Demo/Resources/Info.plist`'s `$(VAR)` build-setting substitution, sourced from a gitignored `.env` at the repo root (see `.env.example`) via `source scripts/load-env.sh` — never hardcode real values in `DemoViewController.swift`. That script sets values with both `export` (for `xcodebuild` in the same shell) and `launchctl setenv` (so Xcode.app opened via Finder/Dock, which does not inherit shell env, still resolves them). Both vars fall back gracefully when unset — `TENANT_ID` to a shared sandbox tenant, `MONITORING_API_KEY` to `nil` (monitoring disabled) — so the demo still builds and runs without any `.env` file at all.
