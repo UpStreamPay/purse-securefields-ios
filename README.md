@@ -96,6 +96,8 @@ class CheckoutViewController: UIViewController, SecureFieldsDelegate {
 | `brands` | `[CardBrand]` | all | Accepted card brands |
 | `style` | `SecureFieldsStyle` | `.default` | Visual appearance |
 | `placeholders` | `SecureFieldsPlaceholders` | built-in | Placeholder text per field |
+| `fields` | `SecureFieldsFieldsConfig` | `.all` | Which fields are rendered, with per-field placeholder and accessibility label. `.cvvOnly` renders the CVV alone |
+| `requiresHolderName` | `Bool` | `false` | Whether the cardholder name gates form validity |
 | `apiKey` | `String?` | `nil` | Api key for remote log monitoring (Datadog). Monitoring silently disables itself when omitted |
 | `monitoringEnabled` | `Bool` | `true` | Opt-out for remote log monitoring |
 
@@ -133,6 +135,21 @@ SecureFieldsPlaceholders(
     holderName: "Cardholder Name"
 )
 ```
+
+### CVV-only form
+
+Renew the cryptogram of a card already on file — the cardholder types only the CVV, and the
+request carries no `card` block:
+
+```swift
+let secureFields = SecureFieldsManager(config: SecureFieldsConfig(
+    tenantId: "YOUR_TENANT_ID",
+    fields: .cvvOnly
+))
+view.addSubview(secureFields.cvvView)   // the only view to mount
+```
+
+See [docs/integration/api-reference.md](docs/integration/api-reference.md#cvv-only).
 
 ### Restricting accepted brands
 

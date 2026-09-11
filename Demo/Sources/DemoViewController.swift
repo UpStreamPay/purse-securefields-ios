@@ -7,6 +7,16 @@ final class DemoViewController: UIViewController {
 
     lazy var manager: SecureFieldsManager = makeManager()
 
+    /// `--cvv-only` launches the demo as a CVV-only form: the cryptogram-renewal flow for a card
+    /// already on file. Only the CVV view is mounted and `submit()` sends `{"cvv": "…"}` alone.
+    static var isCVVOnly: Bool { ProcessInfo.processInfo.arguments.contains("--cvv-only") }
+
+    private static var fields: SecureFieldsFieldsConfig {
+        isCVVOnly
+            ? SecureFieldsFieldsConfig(cvv: .init(placeholder: "123 or 1234", accessibilityLabel: "Security code"))
+            : .all
+    }
+
     private func makeManager() -> SecureFieldsManager {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--uitesting") {
@@ -22,7 +32,8 @@ final class DemoViewController: UIViewController {
                     cvv: "123",
                     expDate: "MM/YY",
                     holderName: "Name Surname"
-                )
+                ),
+                fields: Self.fields
             )
             config.urlSessionOverride = MockURLProtocol.makeSession()
             return SecureFieldsManager(config: config)
@@ -38,6 +49,7 @@ final class DemoViewController: UIViewController {
                 expDate: "MM/YY",
                 holderName: "Name Surname"
             ),
+            fields: Self.fields,
             apiKey: Self.monitoringApiKey
         ))
     }
@@ -105,9 +117,10 @@ final class DemoViewController: UIViewController {
 
     // MARK: - Field containers (for border feedback)
 
+    // Only the containers of configured fields exist — see `manager.configuredFields`.
     var cvvContainerView: UIView!
-    var expiryContainerView: UIView!
-    var holderContainerView: UIView!
+    var expiryContainerView: UIView?
+    var holderContainerView: UIView?
 
     // MARK: - State
 
@@ -123,7 +136,7 @@ final class DemoViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "SecureFields Demo"
+        title = manager.isCVVOnly ? "SecureFields Demo — CVV only" : "SecureFields Demo"
         view.backgroundColor = .systemBackground
         manager.delegate = self
         setupLayout()
@@ -142,7 +155,9 @@ final class DemoViewController: UIViewController {
 
     func updateDebugPanel() {
         let brands = detectedBrands.isEmpty ? "none" : detectedBrands.map(\.rawValue).joined(separator: ", ")
+        let fields = manager.configuredFields.map { String(describing: $0) }.sorted().joined(separator: ", ")
         debugLabel.text = """
+        Fields  \(fields)
         PAN     length=\(panLength)  valid=\(panValid ? "✓" : "✗")
         CVV     valid=\(cvvValid ? "✓" : "✗")
         Expiry  valid=\(expiryValid ? "✓" : "✗")

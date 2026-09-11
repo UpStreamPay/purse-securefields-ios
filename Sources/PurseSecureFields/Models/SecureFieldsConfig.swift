@@ -102,6 +102,78 @@ public struct SecureFieldsPlaceholders {
     }
 }
 
+/// Per-field options. Every property is optional: a `nil` placeholder falls back to the legacy
+/// `SecureFieldsPlaceholders` entry for that field, so the two configuration styles compose.
+public struct SecureFieldConfig {
+    /// Placeholder shown while the field is empty. Overrides `SecureFieldsPlaceholders` when set.
+    public let placeholder: String?
+    /// VoiceOver label for the field (`UIView.accessibilityLabel`). The field's *value* stays
+    /// hidden from the accessibility API regardless — only the label is exposed.
+    public let accessibilityLabel: String?
+
+    public init(placeholder: String? = nil, accessibilityLabel: String? = nil) {
+        self.placeholder = placeholder
+        self.accessibilityLabel = accessibilityLabel
+    }
+}
+
+/// Which fields the form renders, and how. Presence decides rendering: a field left `nil` is
+/// not part of the form — it is hidden, excluded from `secureFieldsFormValidityChanged`, from
+/// the `submit()` completeness check, and from the tokenization request. `cvv` is the only
+/// mandatory field, so a configuration holding just `cvv` is the **CVV-only** form used to
+/// renew the cryptogram of a card already on file. Mirrors `SecureFieldsFieldsConfig` on Android
+/// and the `fields` object of the web SDK.
+///
+/// A configured `pan` requires a configured `expDate`: the gateway rejects a card without an
+/// expiry and `submit()` has no expiry override to supply one.
+public struct SecureFieldsFieldsConfig {
+    public let pan: SecureFieldConfig?
+    public let expDate: SecureFieldConfig?
+    public let holderName: SecureFieldConfig?
+    public let cvv: SecureFieldConfig
+
+    /// All four fields, with no per-field overrides — the pre-`fields` behaviour.
+    public static let all = SecureFieldsFieldsConfig(pan: .init(), expDate: .init(), holderName: .init(), cvv: .init())
+
+    /// The CVV field alone.
+    public static let cvvOnly = SecureFieldsFieldsConfig(cvv: .init())
+
+    public init(
+        pan: SecureFieldConfig? = nil,
+        expDate: SecureFieldConfig? = nil,
+        holderName: SecureFieldConfig? = nil,
+        cvv: SecureFieldConfig = .init()
+    ) {
+        precondition(pan == nil || expDate != nil,
+                     "SecureFields: a configured `pan` field requires a configured `expDate` field")
+        self.pan = pan
+        self.expDate = expDate
+        self.holderName = holderName
+        self.cvv = cvv
+    }
+
+    /// The fields present in this configuration. Always contains `.cvv`.
+    public var configuredFields: Set<SecureField> {
+        var set: Set<SecureField> = [.cvv]
+        if pan != nil { set.insert(.pan) }
+        if expDate != nil { set.insert(.expDate) }
+        if holderName != nil { set.insert(.holderName) }
+        return set
+    }
+
+    /// True when no PAN field is configured — the form then tokenizes the CVV on its own.
+    public var isCVVOnly: Bool { pan == nil }
+
+    func config(for field: SecureField) -> SecureFieldConfig? {
+        switch field {
+        case .pan:        return pan
+        case .expDate:    return expDate
+        case .holderName: return holderName
+        case .cvv:        return cvv
+        }
+    }
+}
+
 public struct SecureFieldsConfig {
     public let tenantId: String
 
@@ -123,10 +195,14 @@ public struct SecureFieldsConfig {
     public let style: SecureFieldsStyle
     public let placeholders: SecureFieldsPlaceholders
 
+    /// Which fields the form renders. Defaults to all four. See `SecureFieldsFieldsConfig` —
+    /// a configuration holding only `cvv` is the CVV-only form.
+    public let fields: SecureFieldsFieldsConfig
+
     /// When true, the cardholder name counts toward `secureFieldsFormValidityChanged` and the
     /// `submit()` completeness check. Defaults to false: the field is optional at tokenization,
     /// and a host that never mounts `holderNameView` must not end up with a form that can never
-    /// become valid. Mirrors the Android rule "a configured field counts".
+    /// become valid. Has no effect when `fields` leaves `holderName` out.
     public let requiresHolderName: Bool
 
     /// SHA-256 hashes (Base64-encoded) of the vault server's SubjectPublicKeyInfo (SPKI).
@@ -177,6 +253,7 @@ public struct SecureFieldsConfig {
         brandSelector: Bool = false,
         style: SecureFieldsStyle = .default,
         placeholders: SecureFieldsPlaceholders = .init(),
+        fields: SecureFieldsFieldsConfig = .all,
         requiresHolderName: Bool = false,
         pinnedPublicKeyHashes: [String] = [],
         apiKey: String? = nil,
@@ -189,6 +266,7 @@ public struct SecureFieldsConfig {
         self.brandSelector = brandSelector
         self.style = style
         self.placeholders = placeholders
+        self.fields = fields
         self.requiresHolderName = requiresHolderName
         self.pinnedPublicKeyHashes = pinnedPublicKeyHashes
         self.apiKey = apiKey

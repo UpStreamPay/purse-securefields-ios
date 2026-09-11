@@ -162,6 +162,9 @@ Call `submit()` when the user taps Pay. The SDK validates all fields internally 
 `submit()` is a no-op and fires `secureFieldsDidFail(.fieldsIncomplete)` if any required
 field is invalid. The Pay button guard above is belt-and-suspenders only.
 
+On a [CVV-only form](api-reference.md#cvv-only) `submit()` sends the CVV alone — no `card`
+block, no network — and `selectedNetwork` / `saveToken` are ignored with a console warning.
+
 ### Submit with an explicit network
 
 For a co-badged card with `brandSelector: false` (the default), name the network yourself:
@@ -196,8 +199,8 @@ func secureFieldsDidTokenize(_ result: TokenizationResult) {
     loadingIndicator.stopAnimating()
 
     print("Token:      \(result.vaultFormToken)")
-    print("BIN:        \(result.bin)")              // first 8 digits — never the full PAN
-    print("Last four:  \(result.lastFourDigits)")
+    print("BIN:        \(result.bin ?? "—")")        // first 8 digits — never the full PAN
+    print("Last four:  \(result.lastFourDigits ?? "—")")
     print("Brands:     \(result.detectedBrands)")
 
     // Send vaultFormToken to your backend — never send raw card data
@@ -208,9 +211,9 @@ func secureFieldsDidTokenize(_ result: TokenizationResult) {
 | Field | Description |
 |---|---|
 | `vaultFormToken` | Opaque server-side token — send to your backend |
-| `bin` | First 8 digits of the PAN (never the full card number) |
-| `lastFourDigits` | Last 4 digits of the PAN |
-| `detectedBrands` | Card networks detected by the BIN lookup |
+| `bin` | First 8 digits of the PAN (never the full card number). `nil` on a CVV-only form |
+| `lastFourDigits` | Last 4 digits of the PAN. `nil` on a CVV-only form |
+| `detectedBrands` | Card networks detected by the BIN lookup. Empty on a CVV-only form |
 | `birthDate` | Oney only — the date of birth submitted, `"yyyy-MM-dd"`. Never sent to the gateway, so this is the only place it can be read back. |
 | `selectedNetwork` | The network actually submitted as `selected_network` |
 

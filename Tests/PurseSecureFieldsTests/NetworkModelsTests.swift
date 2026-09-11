@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import PurseSecureFields
 
@@ -26,6 +27,25 @@ struct NetworkModelsTests {
         let result = response.toBinLookupResult()
         #expect(result.brands == [.visa])
         #expect(result.perBrandLengths.count == 1)
+    }
+
+    // MARK: Tokenization response
+
+    @Test func tokenizationResponseDecodesCard() throws {
+        let data = Data(#"{"form_token":"tok","card":{"bin":"41111111","last_four_digits":"1111"}}"#.utf8)
+        let response = try JSONDecoder().decode(TokenizationResponse.self, from: data)
+        #expect(response.formToken == "tok")
+        #expect(response.card?.bin == "41111111")
+        #expect(response.card?.lastFourDigits == "1111")
+    }
+
+    /// A CVV-only tokenization stores a cryptogram against a card the vault already holds — the
+    /// response carries no `card` block (web and Android both tolerate its absence).
+    @Test func tokenizationResponseDecodesWithoutCard() throws {
+        let data = Data(#"{"form_token":"tok_cvv"}"#.utf8)
+        let response = try JSONDecoder().decode(TokenizationResponse.self, from: data)
+        #expect(response.formToken == "tok_cvv")
+        #expect(response.card == nil)
     }
 
     @Test func binLookupEmptyBrands() {

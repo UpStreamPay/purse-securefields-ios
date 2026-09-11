@@ -14,7 +14,7 @@ Always run a clean build after changes. BUILD SUCCEEDED is the acceptance bar.
 
 ```
 Sources/PurseSecureFields/
-  Models/           — CardBrand, SecureFieldsConfig (+ Style + Placeholders), SecureFieldsError, TokenizationResult, VaultEnvironment
+  Models/           — CardBrand, SecureFieldsConfig (+ Style + Placeholders + FieldsConfig), SecureFieldsError, TokenizationResult, VaultEnvironment
   Networking/       — VaultAPIClient, NetworkModels (BIN lookup + tokenization payloads)
   Monitoring/       — RemoteLogger, RemoteLogClient, LogQueue, SecureFieldsLog (remote log monitoring, separate from VaultAPIClient)
   Internal/         — CardFormatter (PAN display grouping), CardValidator (Luhn, expiry)
@@ -74,8 +74,18 @@ Tests/              — SecureFieldsTests
 ## Style / placeholder config
 - Applied once at init via `applyConfig(_:)` in the manager.
 - `SecureFieldsStyle` sets font, textColor, tintColor, keyboardAppearance, placeholderColor.
-- `SecureFieldsPlaceholders` sets per-field placeholder strings.
+- `SecureFieldsPlaceholders` sets per-field placeholder strings. A `SecureFieldConfig.placeholder` in `fields` wins over it.
 - No `setPlaceholders` runtime method — config is the single source.
+
+## Per-field config / CVV-only mode (SDK-12287)
+- `SecureFieldsConfig.fields: SecureFieldsFieldsConfig` decides which fields exist. **Presence decides rendering** (nil = not part of the form), mirroring Android's `SecureFieldsFieldsConfig`. `cvv` is the only mandatory field; `.all` is the default, `.cvvOnly` the CVV alone.
+- All four fields are still constructed in the manager whatever `fields` says, so state accessors (`isFieldValid`, `panDigitCount`, `expectedLengths`…) keep answering for unconfigured fields — the E2E harness state probe reads all four. Unconfigured views are `isHidden = true` and `isUserInteractionEnabled = false`. Do not make the view accessors optional.
+- `configuredFields` (public) drives form validity and the `submit()` guard: every configured field counts, except `holderName` which also needs `requiresHolderName`.
+- `isCVVOnly` = no PAN field. Then `submit()` skips brand resolution, ignores `selectedNetwork`/`saveToken` with an `NSLog`, and builds `TokenizationPayload(cvv:, card: nil)` → body is literally `{"cvv": "…"}`. **Never emit `card`, even empty** — the gateway rejects a `card` without expiry (`INVALID_FORM`).
+- Default CVV lengths are `[3]` on a form with a PAN field and `[3, 4]` in CVV-only (`defaultCVVLengths`) — no BIN lookup will ever narrow them and there is deliberately no static per-brand length table. Applied at init, in `clearFields()` and in the BIN-lookup reset branch. Keep those three in sync.
+- `TokenizationResponse.card` and `TokenizationResult.bin`/`lastFourDigits` are optional: a CVV-only response is `{"form_token": "…"}` with no card block. There is no `cvv_token` in any SDK — the form token is the result.
+- A configured `pan` requires a configured `expDate` (precondition) until `submit()` gains an expiry override (SDK-10505).
+- Not supported yet: Oney birthdate in CVV-only (field stays in `.cvv` mode; web/Android skip the network call and return only a birth date — needs its own result shape).
 
 ## Delegate events
 - `secureFieldsContentChanged()` — fires on every keystroke/change in any field.

@@ -36,10 +36,12 @@ extension DemoViewController: SecureFieldsDelegate {
     func secureFieldsDidTokenize(_ result: TokenizationResult) {
         payButton.isEnabled = true
         resultLabel.textColor = .systemGreen
+        // `bin`/`lastFourDigits` are nil on a CVV-only tokenization — the vault stored a cryptogram
+        // against a card it already knows, and echoes no card block.
         resultLabel.text = """
         vault_form_token: \(result.vaultFormToken)
-        bin: \(result.bin)
-        last_four: \(result.lastFourDigits)
+        bin: \(result.bin ?? "—")
+        last_four: \(result.lastFourDigits ?? "—")
         brands: \(result.detectedBrands.map(\.rawValue).joined(separator: ", "))
         """
     }

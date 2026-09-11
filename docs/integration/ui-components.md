@@ -32,7 +32,9 @@ managed by the SDK — raw card values are never accessible to your application 
 | `holderNameView` | `UIView` | Cardholder name (free text) |
 
 All four are `UIView` instances — place them anywhere in your view hierarchy using Auto Layout or
-frame-based layout. The underlying `UITextField` subclasses (`SecureCVVField`, etc.) are
+frame-based layout. Mount only the views listed in `secureFields.configuredFields`: a field left
+out of `SecureFieldsConfig.fields` is hidden and inert, and takes no part in the form (see
+[Rendering a subset of fields](#rendering-a-subset-of-fields)). The underlying `UITextField` subclasses (`SecureCVVField`, etc.) are
 `internal` to the SDK, so your code cannot name or cast to those concrete types. A cast to the
 public `UITextField` superclass will still succeed, but that is not a way to read card data: the
 `text`/`attributedText` getters are overridden to always return `nil` to external callers (see
@@ -224,9 +226,32 @@ the base style. The names match `VaultStyles` on Android and the web SDK's CSS p
 
 ---
 
+## Rendering a subset of fields
+
+`SecureFieldsConfig.fields` decides which fields exist. The CVV is the only mandatory one, so
+the **CVV-only** form — renewing the cryptogram of a card already on file — is:
+
+```swift
+let secureFields = SecureFieldsManager(config: SecureFieldsConfig(
+    tenantId: "...",
+    fields: SecureFieldsFieldsConfig(
+        cvv: .init(placeholder: "123", accessibilityLabel: "Security code")
+    )
+))
+stack.addArrangedSubview(secureFields.cvvView)   // the only view to mount
+```
+
+Each configured field carries its own optional `placeholder` (overriding
+`SecureFieldsPlaceholders`) and `accessibilityLabel`. In CVV-only mode the field accepts 3 or 4
+digits, form validity follows the CVV alone, and `submit()` sends `{"cvv": "…"}` with no `card`
+block — see the [API reference](api-reference.md#cvv-only) for the full list of differences.
+
+---
+
 ## Updating placeholders after init
 
-Placeholders are set at init time through `SecureFieldsPlaceholders`:
+Placeholders are set at init time through `SecureFieldsPlaceholders`, or per field through
+`SecureFieldsFieldsConfig` (which wins when both are set):
 
 ```swift
 SecureFieldsConfig(

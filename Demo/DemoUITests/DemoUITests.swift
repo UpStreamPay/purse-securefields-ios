@@ -12,8 +12,13 @@ final class DemoUITests: XCTestCase {
 
     // MARK: - Launch helpers
 
-    private func launch(tokenizeSuccess: Bool? = nil) {
+    private func launch(tokenizeSuccess: Bool? = nil, cvvOnly: Bool = false) {
         app.launchArguments.append("--uitesting")
+        if cvvOnly {
+            app.launchArguments.append("--cvv-only")
+            // A CVV-only tokenization echoes no `card` block.
+            app.launchEnvironment["MOCK_TOKENIZE_RESPONSE"] = #"{"form_token":"tok_cvv_only"}"#
+        }
         if let success = tokenizeSuccess {
             if success {
                 app.launchEnvironment["MOCK_TOKENIZE_RESPONSE"] = """
@@ -101,6 +106,32 @@ final class DemoUITests: XCTestCase {
 
         let result = app.staticTexts["result_label"]
         let predicate = NSPredicate(format: "label CONTAINS '422' AND label CONTAINS 'Card declined'")
+        let exp = XCTNSPredicateExpectation(predicate: predicate, object: result)
+        wait(for: [exp], timeout: 10)
+    }
+
+    // MARK: - CVV-only (SDK-12287)
+
+    func testCVVOnlyMountsOnlyTheCvvAndTokenizes() {
+        launch(cvvOnly: true)
+
+        XCTAssertFalse(app.textFields["pan_field"].exists, "a CVV-only form mounts no PAN field")
+        XCTAssertFalse(app.textFields["expiry_field"].exists)
+        XCTAssertFalse(app.textFields["holder_field"].exists)
+        XCTAssertFalse(app.buttons["pay_button"].isEnabled)
+
+        // 4 digits are accepted while no brand is known (a saved Amex must stay submittable).
+        let cvv = app.secureTextFields["cvv_field"]
+        cvv.tap()
+        cvv.typeText("1234")
+        dismissKeyboard()
+
+        XCTAssertEqual(app.otherElements["cvv_container"].value as? String, "valid")
+        XCTAssertTrue(app.buttons["pay_button"].isEnabled)
+
+        app.buttons["pay_button"].tap()
+        let result = app.staticTexts["result_label"]
+        let predicate = NSPredicate(format: "label CONTAINS 'tok_cvv_only'")
         let exp = XCTNSPredicateExpectation(predicate: predicate, object: result)
         wait(for: [exp], timeout: 10)
     }
