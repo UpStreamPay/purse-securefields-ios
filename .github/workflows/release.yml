@@ -17,7 +17,6 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.event.release.tag_name }}
-          token: ${{ secrets.USP_GITHUB_ADMIN_ACCES_TOKEN }}
 
       - name: Import signing certificate
         uses: apple-actions/import-codesign-certs@63fff01cd422d4b7b855d40ca1e9d34d2de9427d # v3
@@ -166,4 +165,4 @@ jobs:
             .build/PurseSecureFields.xcframework.zip \
             --clobber
         env:
-          GH_TOKEN: ${{ secrets.USP_GITHUB_ADMIN_ACCES_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
