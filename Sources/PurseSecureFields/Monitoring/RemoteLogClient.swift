@@ -1,8 +1,8 @@
 import Foundation
 
-/// Sends batches of `SecureFieldsLog` events to the widget log worker
-/// (`cf-widget-logger`'s `/logs/api/secure_fields` route, fronted by the API gateway),
-/// which forwards them to Datadog. Fire-and-forget: never throws, never retries, and is kept
+/// Sends batches of `SecureFieldsLog` events to Purse's monitoring ingestion endpoint
+/// (the `/widget/secure_fields` route), which forwards them to Datadog.
+/// Fire-and-forget: never throws, never retries, and is kept
 /// separate from `VaultAPIClient` so a telemetry failure can never affect PCI flows.
 final class RemoteLogClient {
 

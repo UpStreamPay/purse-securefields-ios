@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import PurseSecureFields
 
-/// Pins the tokenization wire contract (SDK-12108, gap 19): the birthdate must never reach the
+/// Pins the tokenization wire contract: the birthdate must never reach the
 /// gateway — under any key. Web and Android send nothing for it (the SDK reflects the date back
 /// to the integrator locally), and the gateway rejects a request carrying it with a 400 — the
 /// exact failure that made every Oney submission fail on iOS.
@@ -43,7 +43,7 @@ struct TokenizationPayloadTests {
         #expect(json["birth_date"] == nil)
     }
 
-    /// CVV-only (SDK-12287): the body must be `{"cvv": "…"}` and nothing else. The gateway wants
+    /// CVV-only: the body must be `{"cvv": "…"}` and nothing else. The gateway wants
     /// `card` absent — a `card` holding only `selected_network` is rejected for its missing expiry.
     @Test func cvvOnlyPayloadCarriesOnlyTheCvv() throws {
         let payload = TokenizationPayload(cvv: "1234", card: nil)

@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # The SDK itself has no third-party source dependencies (Package.swift declares none),
+  # so GitHub Actions is the only dependency surface worth watching.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+    labels:
+      - dependencies

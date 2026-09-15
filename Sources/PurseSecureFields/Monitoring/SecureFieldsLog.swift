@@ -21,9 +21,8 @@ enum JSONValue: Encodable {
     }
 }
 
-/// Mirrors the web vault SDK's `SecureFieldsLog` wire type
-/// (vault/packages/securefields-js-sdk/src/monitoring/types.ts) so both SDKs
-/// produce the same shape against the `cf-widget-logger` `/logs/api/secure_fields` route.
+/// Mirrors the wire type used by Purse's other SecureFields SDKs, so every platform
+/// produces the same shape against the monitoring ingestion endpoint.
 enum LogLevel: String, Encodable {
     case ok = "OK"
     case debug = "DEBUG"
@@ -33,7 +32,7 @@ enum LogLevel: String, Encodable {
     case error = "ERROR"
 }
 
-/// Mirrors the web vault SDK's `LOG_CODES` (monitoring/types.ts).
+/// Mirrors the log codes used by Purse's other SecureFields SDKs.
 enum LogCode {
     static let initSDK = "INIT_SDK"
     static let fieldFocus = "FIELD_FOCUS"

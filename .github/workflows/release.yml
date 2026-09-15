@@ -65,6 +65,10 @@ jobs:
             mkdir -p "$fw/Modules"
             cp -R "$2/Build/Intermediates.noindex/ArchiveIntermediates/PurseSecureFields/BuildProductsPath/$3/PurseSecureFields.swiftmodule" "$fw/Modules/"
             cp -R "$1/Products/Library/Frameworks/PurseSecureFields_PurseSecureFields.bundle" "$fw/"
+            # Apple looks for the privacy manifest at the framework root. SPM processes it
+            # into the resource bundle instead, so lift a copy out. This must happen before
+            # the xcframework is assembled and signed, or the signature won't cover it.
+            cp "$fw/PurseSecureFields_PurseSecureFields.bundle/PrivacyInfo.xcprivacy" "$fw/PrivacyInfo.xcprivacy"
           }
           repackage .build/ios.xcarchive     .build/dd-ios     Release-iphoneos
           repackage .build/ios-sim.xcarchive .build/dd-ios-sim Release-iphonesimulator

@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import PurseSecureFields
 
-/// Error-relay tests (SDK-12108, gap 19): a non-2xx response whose body doesn't match the
+/// Error-relay tests: a non-2xx response whose body doesn't match the
 /// documented `{"error": ...}` shape must surface the raw body, not collapse into
 /// "Unknown error" — that opacity is what made the Oney 400 undiagnosable from the outside.
 struct VaultAPIClientTests {

@@ -1,7 +1,7 @@
 import Foundation
 
-/// Buffers log events and flushes them as a batch, mirroring the web vault SDK's
-/// `SimpleQueue` (vault/packages/securefields-js-sdk/src/monitoring/queue.ts):
+/// Buffers log events and flushes them as a batch, matching the queueing behaviour of
+/// Purse's other SecureFields SDKs:
 /// flush once `batchSize` events are queued, after `flushDelay` of inactivity,
 /// or immediately if adding an event would exceed `maxBatchBytes`.
 final class LogQueue {

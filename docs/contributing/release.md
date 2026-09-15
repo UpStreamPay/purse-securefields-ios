@@ -68,13 +68,12 @@ Add these four secrets to the GitHub repository (**Settings → Secrets and vari
 
 | Secret | Used by | Value |
 |---|---|---|
-| `USP_GITHUB_ADMIN_ACCES_TOKEN` | release step | Fine-grained PAT with **Contents: Read and Write** on this repository. Needed because `GITHUB_TOKEN` cannot force-push tags. |
+| `RELEASE_PLEASE_TOKEN` | release-please | Fine-grained token scoped to this repository, with Contents, Pull requests and Issues read/write. Required because resources created with `GITHUB_TOKEN` do not trigger further workflow runs, so the release workflow would never fire. |
 | `APPLE_SIGNING_CERT_P12_BASE64` | build step | Base64-encoded `.p12` containing the Apple Distribution certificate and private key |
 | `APPLE_SIGNING_CERT_P12_PASSWORD` | build step | Password set when exporting the `.p12` |
-| `APPLE_SIGNING_IDENTITY` | build step | Full certificate common name, e.g. `Apple Distribution: Upstream Pay (XXXXXXXXXX)` |
+| `APPLE_SIGNING_IDENTITY` | build step | Full certificate common name, e.g. `Apple Distribution: <Team Name> (<Team ID>)` |
 
-The `USP_GITHUB_ADMIN_ACCES_TOKEN` secret already exists. Only the three Apple signing secrets
-are new for SDK-11958.
+Maintainers configure these once; they are repository secrets, not organisation-wide.
 
 ---
 

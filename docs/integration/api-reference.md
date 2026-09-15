@@ -191,9 +191,9 @@ host-app-supplied string.
 ## Remote log monitoring
 
 The SDK forwards health logs (SDK init, field focus/blur, brand detection, submit attempts and
-results, teardown — never card data) to Datadog via Purse's log ingestion worker
-(`cf-widget-logger`), so we can monitor SDK health in production, in real time. The wire format
-matches the web vault SDK's monitoring module.
+results, teardown — never card data) to Datadog via Purse's monitoring ingestion endpoint,
+so SDK health can be monitored in production, in real time. The wire format matches Purse's
+other SecureFields SDKs.
 
 - **Enable/disable**: on by default whenever `apiKey` is provided to `SecureFieldsConfig`.
   Omitting `apiKey`, or passing `monitoringEnabled: false`, disables it — nothing is sent, and no
@@ -211,7 +211,7 @@ matches the web vault SDK's monitoring module.
 ## `VaultEnvironment`
 
 Selects which Purse environment the SDK talks to. Resolves **both** the vault
-tokenization/BIN-lookup gateway and the `cf-widget-logger` remote monitoring endpoint internally
+tokenization/BIN-lookup gateway and the remote monitoring endpoint internally
 — no URL configuration is required in the host app.
 
 ```swift

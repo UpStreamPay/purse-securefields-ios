@@ -116,7 +116,7 @@ struct SecureFieldsManagerTests {
         #expect(!manager.isFieldValid(.pan))
     }
 
-    // MARK: CVV-only (SDK-12287)
+    // MARK: CVV-only
 
     @Test func cvvOnlyExposesItsConfiguredFields() {
         let manager = makeManager(fields: .cvvOnly)
@@ -228,7 +228,7 @@ struct SecureFieldsManagerTests {
         #expect(requiredSpy.validityChanges.last == true)
     }
 
-    // MARK: CVV-only — brand-driven CVV length (SDK-12287)
+    // MARK: CVV-only — brand-driven CVV length
 
     /// With no PAN to look up, the configured brands decide the length: one brand its own, several
     /// the union, none (or Oney alone) both lengths.

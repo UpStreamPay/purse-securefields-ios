@@ -4,20 +4,18 @@ import Foundation
 /// endpoints internally, mirroring the Android SDK's `VaultEnvironment`:
 ///
 /// - The vault tokenization/BIN-lookup gateway (`apiRoot`), always under the "vault." subdomain.
-/// - The `cf-widget-logger` remote log monitoring endpoint (`monitoringApiRoot`), a different
-///   backend service, never under the "vault." subdomain, but always mirroring `apiRoot`'s
-///   sandbox/secure word (confirmed with infra).
+/// - The remote log monitoring endpoint (`monitoringApiRoot`), a different backend service,
+///   never under the "vault." subdomain, but always mirroring `apiRoot`'s sandbox/secure word.
 ///
 /// No raw URL configuration is required in the host app.
 public enum VaultEnvironment: String {
     /// Internal-only, and refused at runtime in a release-signed host app — see
     /// `VaultEnvironment.resolve(_:isDebugHost:)`.
     ///
-    /// Compiling it out with `#if DEBUG` (as this case used to be) removed it from the
-    /// distributed XCFramework, which is archived in Release: our own E2E suite could not point
-    /// the SDK at TEST, where the rest of the platform's test data lives. The SDK ships as one
-    /// binary for every merchant regardless of their build type, so the guard has to be a
-    /// runtime one, exactly as on Android.
+    /// Compiling it out with `#if DEBUG` does not work: the distributed XCFramework is archived
+    /// in Release, so a compile-time guard would remove the case from every build that ships,
+    /// including the ones used to exercise the test environment. The SDK ships as one binary for
+    /// every merchant regardless of their build type, so the guard has to be a runtime one.
     case test
     case sandbox
     case production

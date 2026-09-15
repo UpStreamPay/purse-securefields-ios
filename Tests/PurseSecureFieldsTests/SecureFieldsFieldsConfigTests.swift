@@ -1,7 +1,7 @@
 import Testing
 @testable import PurseSecureFields
 
-/// The per-field configuration (SDK-12287): presence decides rendering, `cvv` is the only
+/// The per-field configuration: presence decides rendering, `cvv` is the only
 /// mandatory field, and the legacy `SecureFieldsPlaceholders` still applies where a field says
 /// nothing of its own.
 struct SecureFieldsFieldsConfigTests {

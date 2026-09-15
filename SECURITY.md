@@ -10,7 +10,10 @@ please report privately rather than in a public issue.
 | 1.x (latest release) | Yes |
 | Older 1.x releases | No — upgrade to the latest tag |
 
-Only the most recent release receives security fixes. Releases are published as a signed
+Only the most recent release receives security fixes. Versions follow semantic
+versioning, derived from Conventional Commit subjects: a `fix:` is a patch, a
+`feat:` a minor, and a `feat!:` or `BREAKING CHANGE:` a major. A major version
+is the only place the public API may change incompatibly. Releases are published as a signed
 XCFramework attached to each [GitHub release](https://github.com/UpStreamPay/purse-securefields-ios/releases).
 
 ## Reporting a vulnerability
@@ -19,6 +22,8 @@ XCFramework attached to each [GitHub release](https://github.com/UpStreamPay/pur
 
 Use GitHub's private vulnerability reporting: go to the **Security** tab of this repository and
 choose **Report a vulnerability**. The report stays private to you and the maintainers.
+
+If you cannot use GitHub, email **contact@purse.eu** with `SecureFields iOS` in the subject.
 
 Please include:
 
@@ -57,5 +62,4 @@ Out of scope:
 ## PCI DSS
 
 For PCI DSS scope questions rather than a vulnerability report, see
-[`docs/security/pci-comparison.md`](docs/security/pci-comparison.md) and
-[`docs/security/security.md`](docs/security/security.md), and share them with your QSA.
+[`docs/security/security.md`](docs/security/security.md) and share it with your QSA.

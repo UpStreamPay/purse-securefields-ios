@@ -4,8 +4,8 @@ import UIKit
 @testable import PurseSecureFields
 
 /// End-to-end Oney submit through the real manager, with the gateway stubbed at the URLSession
-/// seam — the scenario that failed with `API_ERROR 400` in production (SDK-12108, gap 19):
-/// BIN lookup detects ONEY, the CVV field switches to birthdate mode, and the tokenize request
+/// seam. BIN lookup detects ONEY, the CVV field switches to birthdate mode, and the tokenize
+/// request
 /// must carry neither `cvv` nor any birthdate key.
 @MainActor
 struct SecureFieldsManagerSubmitTests {
@@ -140,7 +140,7 @@ struct SecureFieldsManagerSubmitTests {
     }
 
     /// With the selector disabled (the default), the merchant names the network of a co-badged
-    /// card through `submit(selectedNetwork:)` — SDK-12108, gap 11.
+    /// card through `submit(selectedNetwork:)`.
     @Test func submitOverridesTheSelectedNetworkOnACobadgedCard() async throws {
         let tenantId = "cobadge-\(UUID().uuidString)"
         StubGatewayURLProtocol.register(tenantId: tenantId) { request, _ in
@@ -174,7 +174,7 @@ struct SecureFieldsManagerSubmitTests {
         #expect(delegate.tokenized?.selectedNetwork == .visa)
     }
 
-    // MARK: CVV-only (SDK-12287)
+    // MARK: CVV-only
 
     /// The CVV-only form end to end: no BIN lookup is ever sent, the tokenize body is exactly
     /// `{"cvv": "…"}`, and the card-less response reaches the host with `bin`, `lastFourDigits`

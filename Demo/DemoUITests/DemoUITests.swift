@@ -110,7 +110,7 @@ final class DemoUITests: XCTestCase {
         wait(for: [exp], timeout: 10)
     }
 
-    // MARK: - CVV-only (SDK-12287)
+    // MARK: - CVV-only
 
     func testCVVOnlyMountsOnlyTheCvvAndTokenizes() {
         launch(cvvOnly: true)

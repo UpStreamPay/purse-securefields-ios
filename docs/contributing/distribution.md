@@ -6,28 +6,11 @@ How the Vault iOS SDK is published and why.
 
 ## Table of Contents
 
-- [The competitive baseline](#the-competitive-baseline)
 - [Distribution options on iOS](#distribution-options-on-ios)
 - [SPM binary target vs source package](#spm-binary-target-vs-source-package)
 - [Decision: SPM binary target via GitHub Releases](#decision-spm-binary-target-via-github-releases)
 - [Signing requirement (PCI SSF)](#signing-requirement-pci-ssf)
 - [What this requires in practice](#what-this-requires-in-practice)
-
----
-
-## The competitive baseline
-
-Every major iOS payment SDK is distributed via Swift Package Manager and CocoaPods:
-
-| SDK | GitHub | SPM | CocoaPods |
-|---|---|---|---|
-| Stripe iOS | `stripe/stripe-ios` | Source | Podspec |
-| Adyen iOS | `Adyen/adyen-ios` | Source | Podspec |
-| Checkout.com frames | `checkout/frames-ios` | Source | Podspec |
-| Primer iOS | `primer-io/primer-sdk-ios` | Source | Podspec |
-| VGS Collect iOS | `verygoodsecurity/vgs-collect-ios` | **Binary target** | Podspec |
-
-Most distribute open-source via SPM source packages. VGS, like us, distributes as a binary target.
 
 ---
 
@@ -110,7 +93,7 @@ CocoaPods adoption is declining, the maintenance cost is not justified by the in
 Merchants using CocoaPods can adopt SPM for this dependency without affecting their other
 CocoaPods dependencies.
 
-**Why binary over source?** VGS uses the same binary target approach on iOS. A signed binary
+**Why binary over source?** A signed binary
 targets a specific release — the checksum in `Package.swift` pins the exact artifact consumed.
 Source packages are also pinned (to a tag), but the checksum covers the zip of the whole source
 tree, not the compiled output. The binary target's checksum covers exactly what runs on the

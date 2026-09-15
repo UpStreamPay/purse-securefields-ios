@@ -4,7 +4,7 @@ import UIKit
 @testable import PurseSecureFields
 
 /// `SecureFieldsConfig.brandSelector` and the `submit(selectedNetwork:)` override
-/// (SDK-12108, gap 11): a merchant must be able to keep the cardholder from arbitrating the
+///: a merchant must be able to keep the cardholder from arbitrating the
 /// network of a co-badged card — and, when the selector is off, to name that network itself.
 @MainActor
 struct BrandSelectorConfigTests {

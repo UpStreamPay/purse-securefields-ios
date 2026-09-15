@@ -1,0 +1,37 @@
+PurseSecureFields
+Copyright (c) 2026 Upstream Pay
+
+This product is licensed under the MIT License. See LICENSE for the full text.
+
+--------------------------------------------------------------------------------
+Third-party trademarks
+--------------------------------------------------------------------------------
+
+The MIT License above applies to the SOURCE CODE of this SDK only. It does not
+grant any right to use the trademarks, service marks, logos or trade names of
+any third party.
+
+This SDK ships card-scheme artwork in
+`Sources/PurseSecureFields/Resources/Badges.xcassets`:
+
+    visa.imageset        Visa           — Visa Inc.
+    mastercard.imageset  Mastercard     — Mastercard International Incorporated
+    maestro.imageset     Maestro        — Mastercard International Incorporated
+    amex.imageset        American Express — American Express Company
+    cb.imageset          Cartes Bancaires — Groupement des Cartes Bancaires CB
+    oney.imageset        Oney           — Oney Bank SA
+
+Each of these marks is the property of its respective owner. They are reproduced
+here solely to identify the corresponding payment network to the cardholder, and
+are NOT licensed to you under the MIT License.
+
+If you redistribute this SDK, or a product built on it, you are responsible for
+ensuring your own use of these marks complies with each scheme's brand
+guidelines and any agreement you hold with that scheme. If you cannot meet those
+terms, replace the artwork: the brand selector falls back to a text label when an
+image asset is absent (see `SecureBrandSelectorView`).
+
+--------------------------------------------------------------------------------
+
+This SDK has no third-party source dependencies. `Package.swift` declares none,
+and nothing third-party is linked into the distributed XCFramework.
