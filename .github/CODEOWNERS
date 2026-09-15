@@ -1,7 +1,5 @@
-# Default owner for the SDK. The ruleset on `main` requires a code-owner review,
-# so every PR needs an approval from this team.
-*                      @UpStreamPay/squad-widget
-
-# Release and CI pipelines handle the Apple signing certificate and the release
-# PAT — changes here also need a DevSecOps review.
-/.github/workflows/    @UpStreamPay/squad-widget @UpStreamPay/squad-devsecops
+#CODEOWNER FILE
+#Only Team PCI DSS is codeowner of project:
+* @UpStreamPay/pci-dss
+* @UpStreamPay/pci-dss-widget
+* @UpStreamPay/pci-dss-orchestration
