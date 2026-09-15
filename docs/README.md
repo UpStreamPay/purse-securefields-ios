@@ -38,10 +38,6 @@ types.
   (privacy overlay, screenshot detection, keyboard learning, accessibility blocking, memory wipe,
   remote monitoring payloads never carrying card data).
 
-- **[iOS Payment SDK Comparison](security/pci-comparison.md)** — SAQ A vs SAQ A-EP analysis
-  comparing five payment SDKs (Stripe, Adyen, Checkout.com, Primer, VGS) across iOS-specific PCI
-  DSS controls, with a detailed implementation comparison.
-
 ---
 
 ## I want to understand how the SDK works internally

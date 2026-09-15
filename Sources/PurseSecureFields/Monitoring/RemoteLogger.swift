@@ -1,10 +1,10 @@
 import Foundation
 
 /// Separate, opt-out remote logger for the secure fields SDK. Forwards error/warn/info events
-/// to the widget log worker for Datadog monitoring.
+/// to Purse's monitoring ingestion endpoint for Datadog monitoring.
 ///
-/// Events are sent continuously, as they happen — matching the web vault SDK's monitoring
-/// proxy. PCI safety comes from every payload being structural metadata only (field names,
+/// Events are sent continuously, as they happen. PCI safety comes from every payload being
+/// structural metadata only (field names,
 /// brand lists, outcome codes) and NEVER card data — never from a suppression window. No caller
 /// of this class may ever place raw field values (PAN, CVV, expiry, cardholder name) in a log
 /// payload.

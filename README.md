@@ -294,6 +294,15 @@ until logout/reboot otherwise). Without any `.env` file, the demo still builds a
 `TENANT_ID` falls back to a shared sandbox tenant and `MONITORING_API_KEY` falls back to `nil`
 (remote log monitoring disabled).
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Security issues go through
+[SECURITY.md](SECURITY.md), never a public issue or pull request.
+
 ## License
 
 Released under the [MIT License](LICENSE). Copyright © 2026 Purse.
+
+The MIT grant covers the source code only. Card-scheme artwork shipped with the SDK
+(Visa, Mastercard, Maestro, American Express, Cartes Bancaires, Oney) belongs to the
+respective schemes and is not licensed by it — see [NOTICE](NOTICE).

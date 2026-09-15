@@ -1,13 +1,13 @@
 import Foundation
 
-/// Bridges `SecureFieldsManager`'s event points to `RemoteLogger`, mirroring the web vault SDK's
-/// `WithMonitoringProxy`: telemetry is derived by observing events at the same points
+/// Bridges `SecureFieldsManager`'s event points to `RemoteLogger`:
+/// telemetry is derived by observing events at the same points
 /// `SecureFieldsManager` already reports to its own delegate, rather than storing counters as
 /// `SecureFieldsManager`'s own properties. `SecureFieldsManager` only ever calls the `record*`
 /// methods below plus `start`/`unmount` — everything else (payload shape, log codes, the
 /// DESTROY session summary) lives here.
 ///
-/// Events are sent as they happen, matching the web vault SDK — there is no suppression window.
+/// Events are sent as they happen — there is no suppression window.
 /// Every payload built here is structural metadata only (field names, brand lists, outcome
 /// codes); no caller ever has access to raw field values in the first place.
 final class MonitoringCoordinator {

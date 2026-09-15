@@ -3,7 +3,7 @@ import Testing
 import UIKit
 @testable import PurseSecureFields
 
-/// BIN-lookup re-query behaviour (SDK-12108, gap 15): the lookup must follow the PAN as it
+/// BIN-lookup re-query behaviour: the lookup must follow the PAN as it
 /// grows, or a BIN that only becomes discriminant past 8 digits is undetectable — the card
 /// below answers `brands: []` on its first 8-10 digits and MASTERCARD from the 11th.
 @MainActor

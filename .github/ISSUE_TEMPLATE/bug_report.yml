@@ -1,0 +1,45 @@
+name: Bug report
+description: Something in the SDK behaves incorrectly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not report security vulnerabilities here.** Use the Security tab —
+        see [SECURITY.md](../blob/main/SECURITY.md).
+
+        Never paste real card numbers, CVVs or `vault_form_token` values into an issue.
+  - type: input
+    id: sdk-version
+    attributes:
+      label: SDK version
+      placeholder: "1.9.0"
+    validations:
+      required: true
+  - type: input
+    id: ios-version
+    attributes:
+      label: iOS version and device
+      placeholder: "iOS 18.2, iPhone 15 Pro (and/or Simulator)"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected to happen
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened
+      description: Include the error, delegate callback or `SecureFieldsError` you received.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Your `SecureFieldsConfig` (with the api key redacted) helps a lot.
+    validations:
+      required: true

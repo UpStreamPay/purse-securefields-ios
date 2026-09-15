@@ -2,7 +2,7 @@ import Testing
 import UIKit
 @testable import PurseSecureFields
 
-/// State-dependent styling (SDK-12108, gap 17): the SDK paints focus / valid / invalid / empty
+/// State-dependent styling: the SDK paints focus / valid / invalid / empty
 /// itself, instead of leaving every integrator to reimplement it from the delegate callbacks.
 @MainActor
 struct SecureFieldsStyleTests {

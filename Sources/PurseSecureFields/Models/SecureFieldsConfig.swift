@@ -226,7 +226,7 @@ public struct SecureFieldsConfig {
     /// ```
     public let pinnedPublicKeyHashes: [String]
 
-    /// Api key used to authenticate remote log monitoring (Datadog, via the widget log worker).
+    /// Api key used to authenticate remote log monitoring.
     /// Monitoring silently disables itself when omitted.
     public let apiKey: String?
 

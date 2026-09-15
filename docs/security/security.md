@@ -17,6 +17,8 @@ code. The SDK handles tokenization directly — your app only receives the resul
 - [What your application cannot do](#what-your-application-cannot-do)
 - [Required hardening for production](#required-hardening-for-production)
 - [Built-in mitigations](#built-in-mitigations)
+- [What the SDK sends to monitoring](#what-the-sdk-sends-to-monitoring)
+- [Export compliance](#export-compliance)
 - [See also](#see-also)
 
 ---
@@ -142,7 +144,58 @@ if deviceIsJailbroken() {
 | **HTTPS by construction** | `SecureFieldsConfig` takes a `VaultEnvironment`, not a raw URL — `apiRoot` is a fixed `https://` literal per case, so there's no host-app-supplied string that could be `http://` |
 | **No card data logging** | Debug prints are guarded by `#if DEBUG` — they produce no output in production builds |
 | **Remote monitoring never carries card data** | `RemoteLogger` (separate from local debug prints, opt-out via `monitoringEnabled`/omitting `apiKey`) sends events continuously as they happen — safety comes from every payload being structural metadata only (field names, brand lists, outcome codes), not from a time window. No caller has raw field values (PAN, CVV, expiry, cardholder name) to log in the first place |
-| **`VaultEnvironment.test` cannot reach a merchant's users** | Guarded at runtime: honoured only on a development build (simulator, or `get-task-allow` in the provisioning profile), downgraded to `.production` with a warning in a release-signed app. The case ships in the binary so our own E2E suite can target TEST — the same trade-off, and the same guard, as the Android SDK |
+| **`VaultEnvironment.test` cannot reach a merchant's users** | Guarded at runtime: honoured only on a development build (simulator, or `get-task-allow` in the provisioning profile), downgraded to `.production` with a warning in a release-signed app. The case ships in the binary because the distributed XCFramework is archived in Release, so a compile-time guard would remove it from every shipped build — which is why the guard is a runtime one |
+
+
+---
+
+## What the SDK sends to monitoring
+
+Remote monitoring is **off unless you supply an `apiKey`**, and can be disabled outright with
+`monitoringEnabled: false`. When it is on, the SDK posts batched health events to Purse's
+monitoring ingestion endpoint, which forwards them to Datadog.
+
+Every event has the same flat shape:
+
+| Field | Value |
+|---|---|
+| `tenantId` | Your merchant identifier |
+| `instanceId` | A random `UUID` generated per SDK instance, never persisted and never reused across launches |
+| `version`, `platform`, `env` | SDK version, `"ios"`, and the environment name |
+| `date` | ISO 8601 timestamp |
+| `level`, `code` | Severity, and the event code (e.g. `INIT_SDK`, `FIELD_FOCUS`, `BRAND_DETECTED`, `SUBMIT_SUCCESS`, `ERROR`) |
+| `payload` | Structural metadata only — see below |
+
+The `payload` for every event type the SDK emits:
+
+| Event | Payload |
+|---|---|
+| `INIT_SDK` | Configured brand names, configured field names |
+| `FIELD_FOCUS` / `FIELD_BLUR` | The field's name (`pan`, `cvv`, `expDate`, `holderName`) |
+| `BRAND_DETECTED` / `BRAND_SELECTION_CHANGED` | Detected or selected brand names |
+| `SUBMIT` / `SUBMIT_SUCCESS` | Empty |
+| `DESTROY` | Counts of submit attempts and successes, and the error codes seen |
+| `ERROR` | A fixed code — `FIELDS_INCOMPLETE`, `NETWORK_ERROR`, `INVALID_RESPONSE`, or an HTTP status |
+
+**No cardholder data can reach a log.** The payload type is a closed enum accepting only strings,
+numbers, booleans and arrays of them, and the internal API that records events accepts only a
+field identifier, a brand, a count or a fixed error code — it is never handed a field value. The
+error *message* from a failed API call is deliberately discarded rather than logged, because it
+could echo arbitrary text back from the gateway.
+
+The SDK collects **no device or advertising identifier**. It does not read the IDFA or IDFV, and
+writes nothing to disk, `UserDefaults` or the keychain.
+
+---
+
+## Export compliance
+
+The SDK performs no cryptography of its own beyond SHA-256 hashing (via Apple's CryptoKit) for
+certificate-pin comparison, and relies on the operating system's TLS stack for transport
+security. That is exempt encryption under Apple's export rules, so integrators can normally
+answer `ITSAppUsesNonExemptEncryption = false` in their app's `Info.plist`.
+
+This is guidance, not legal advice — confirm it against your own app's full feature set.
 
 ---
 
@@ -150,4 +203,3 @@ if deviceIsJailbroken() {
 
 - [Getting Started](../integration/getting-started.md)
 - [API Reference](../integration/api-reference.md)
-- [iOS Payment SDK Comparison](pci-comparison.md) — SAQ classification and implementation comparison across SDKs

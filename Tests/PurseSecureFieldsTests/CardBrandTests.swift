@@ -1,7 +1,7 @@
 import Testing
 @testable import PurseSecureFields
 
-/// The static per-brand CVV lengths a CVV-only form falls back to (SDK-12287): there is no PAN
+/// The static per-brand CVV lengths a CVV-only form falls back to: there is no PAN
 /// to look up, so the brand the host knows is the only source — web and Android do the same.
 struct CardBrandCVVOnlyLengthsTests {
 

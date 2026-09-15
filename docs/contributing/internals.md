@@ -239,8 +239,8 @@ not retried to avoid creating duplicate vault tokens.
 
 ## Remote log monitoring
 
-`Monitoring/` forwards health telemetry to Datadog via the `cf-widget-logger` Cloudflare worker,
-matching the web vault SDK's monitoring module wire format:
+`Monitoring/` forwards health telemetry to Datadog via Purse's monitoring ingestion endpoint,
+matching the wire format used by Purse's other SecureFields SDKs:
 
 ```
 MonitoringCoordinator  ← SecureFieldsManager's ONLY awareness of monitoring
@@ -260,14 +260,14 @@ MonitoringCoordinator  ← SecureFieldsManager's ONLY awareness of monitoring
   generically, since `SecureFieldsAndroid` supports multiple listeners), `SecureFieldsManager` has
   only a single `delegate` slot, so these are explicit one-line hook calls at the same call sites
   rather than a listener registration — same end result (zero monitoring state on the manager),
-  different wiring mechanism because of that platform difference. This still mirrors the intent
-  of the web vault SDK's `WithMonitoringProxy`: telemetry is derived from events the manager
-  already reports, not threaded through its business logic as ad hoc state.
+  different wiring mechanism because of that platform difference. The intent is unchanged:
+  telemetry is derived from events the manager already reports, not threaded through its
+  business logic as ad hoc state.
 - `RemoteLogger` is deliberately kept **separate from `VaultAPIClient`** so remote sending can be
   opted out independently, and so a telemetry failure can never affect PCI flows (tokenization,
   BIN lookup). It has no dependency on `VaultAPIClient` or vice versa.
 - **No suppression window.** Events are sent continuously, as they happen — including while the
-  secure fields are on screen. This matches the web vault SDK's monitoring proxy exactly. PCI
+  secure fields are on screen. PCI
   safety comes from every payload being structural metadata only (field names, brand lists,
   outcome codes) — `MonitoringCoordinator` never has access to raw field values in the first
   place, so there's nothing for it to accidentally log.
@@ -278,8 +278,7 @@ MonitoringCoordinator  ← SecureFieldsManager's ONLY awareness of monitoring
   per manager instance), `version`, `date` (ISO 8601), `env`, `level`
   (`OK`/`DEBUG`/`VERBOSE`/`NOTICE`/`WARNING`/`ERROR`), `code`, `payload` (a small `JSONValue` enum
   standing in for arbitrary JSON — structural metadata only). A batch is a JSON array of these,
-  POSTed as the request body. This is the same shape the web vault SDK's `SecureFieldsLog` type
-  produces (`vault/packages/securefields-js-sdk/src/monitoring/types.ts`).
+  POSTed as the request body. This is the same shape Purse's other SecureFields SDKs produce.
 - **Emitted events** (`LogCode` in `SecureFieldsLog.swift`): `INIT_SDK` (brand list, from
   `start(config:)`), `FIELD_FOCUS`/`FIELD_BLUR` (from `recordFocusChanged`), `BRAND_DETECTED`/
   `BRAND_NOT_DETECTED` (from `recordBrandsDetected`), `BRAND_SELECTION_CHANGED` (from

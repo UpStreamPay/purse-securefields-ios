@@ -5,7 +5,7 @@ import Foundation
 /// MonitoringCoordinator is what keeps SecureFieldsManager itself free of monitoring plumbing —
 /// SecureFieldsManager only calls start()/unmount()/record*(), the same hook points it already
 /// reports to its own delegate. All counters and payload-building live here instead. Events are
-/// sent as they happen — there is no suppression window, matching the web vault SDK.
+/// sent as they happen — there is no suppression window.
 struct MonitoringCoordinatorTests {
 
     // batchSize: 1 so every record*() call auto-flushes as its own request — lets tests wait on

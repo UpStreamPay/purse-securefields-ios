@@ -1,0 +1,27 @@
+name: Integration question
+description: You are integrating the SDK and something is unclear
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check [the integration docs](../blob/main/docs/integration/getting-started.md) first.
+
+        Never paste real card numbers, CVVs or api keys into an issue.
+  - type: textarea
+    id: goal
+    attributes:
+      label: What are you trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What have you tried?
+    validations:
+      required: true
+  - type: input
+    id: sdk-version
+    attributes:
+      label: SDK version
+      placeholder: "1.9.0"

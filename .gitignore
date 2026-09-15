@@ -20,3 +20,6 @@ build/
 .idea
 .run
 *.iml
+
+# Internal pre-publication audit — must never be committed to a public repo
+sdk-open-sourcing-gate.html

@@ -120,4 +120,4 @@ Payment Card Industry (PCI DSS) Self-Assessment Questionnaire levels:
   Moderate compliance burden — requires app binary integrity, no debug-logging of inputs, and
   regular security assessments.
 
-See [iOS Payment SDK Comparison](security/pci-comparison.md) for the full analysis.
+See [Security](security/security.md) for how this SDK affects your SAQ classification.
