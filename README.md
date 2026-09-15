@@ -301,7 +301,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Security issues go through
 
 ## License
 
-Released under the [MIT License](LICENSE). Copyright © 2026 Upstream Pay.
+Released under the [MIT License](LICENSE). Copyright © 2026 Purse.
 
 The MIT grant covers the source code only. Card-scheme artwork shipped with the SDK
 (Visa, Mastercard, Maestro, American Express, Cartes Bancaires, Oney) belongs to the
