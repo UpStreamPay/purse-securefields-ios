@@ -14,13 +14,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.event.release.tag_name }}
           token: ${{ secrets.USP_GITHUB_ADMIN_ACCES_TOKEN }}
 
       - name: Import signing certificate
-        uses: apple-actions/import-codesign-certs@v3
+        uses: apple-actions/import-codesign-certs@63fff01cd422d4b7b855d40ca1e9d34d2de9427d # v3
         with:
           p12-file-base64: ${{ secrets.APPLE_SIGNING_CERT_P12_BASE64 }}
           p12-password: ${{ secrets.APPLE_SIGNING_CERT_P12_PASSWORD }}
