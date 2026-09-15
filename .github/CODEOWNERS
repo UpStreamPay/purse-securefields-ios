@@ -1,0 +1,5 @@
+#CODEOWNER FILE
+#Only Team PCI DSS is codeowner of project.
+#One line only: CODEOWNERS applies the LAST matching pattern, not the union of
+#every matching line, so several `*` lines would leave just the last one live.
+* @UpStreamPay/pci-dss
