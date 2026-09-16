@@ -11,3 +11,13 @@ updates:
       prefix: "ci"
     labels:
       - dependencies
+    ignore:
+      # CI exercises actions/checkout on every PR, so a major bump there is proven
+      # before it merges. These two are only ever exercised by the release workflow,
+      # which runs on `release: published` — a green PR says nothing about them, and
+      # a broken bump is only discovered at the next release, after the tag exists.
+      # Take their majors deliberately, with a test release, not automatically.
+      - dependency-name: apple-actions/import-codesign-certs
+        update-types: [version-update:semver-major]
+      - dependency-name: googleapis/release-please-action
+        update-types: [version-update:semver-major]
