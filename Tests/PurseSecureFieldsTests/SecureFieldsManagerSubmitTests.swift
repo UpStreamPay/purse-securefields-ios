@@ -218,6 +218,49 @@ struct SecureFieldsManagerSubmitTests {
         #expect(manager.expectedLengths(for: .cvv) == [3, 4])
     }
 
+    /// SDK-12287. A form configuring `pan` without `expDate` used to trap at init. It now mounts,
+    /// turns valid and submits like any other — the card block simply carries no expiry, and the
+    /// gateway is what rejects it. Same division of labour as Android's `buildRequestBody`, where
+    /// an absent expiry falls out of `toIntOrNull()` and the request goes out regardless.
+    @Test func panWithoutExpDateSubmitsWithoutExpiryAndLetsTheGatewayRefuse() async throws {
+        let tenantId = "noexp-\(UUID().uuidString)"
+        StubGatewayURLProtocol.register(tenantId: tenantId) { request, _ in
+            request.url!.path.hasSuffix("/bin-lookup")
+                ? .init(statusCode: 200, body: #"{"brands":[{"brand":"VISA","is_main":true,"pan_lengths":[16],"cvv_lengths":[3]}]}"#)
+                : .init(statusCode: 400, body: #"{"error":"Invalid expiry date"}"#)
+        }
+        let manager = makeManager(tenantId: tenantId, brands: [.visa], fields: .init(pan: .init()))
+        let delegate = SpyDelegate()
+        manager.delegate = delegate
+
+        type("4111111111111111", into: panField(manager))
+        try await waitUntil("the VISA brand to be detected") { !delegate.brands.isEmpty }
+        type("123", into: cvvField(manager))
+
+        manager.submit()
+        try await waitUntil("the gateway to answer") { delegate.tokenized != nil || delegate.failure != nil }
+
+        // The request went out, and the card block omits the expiry keys rather than inventing
+        // them — `expiry_month: 0` would be a value the cardholder never entered.
+        let calls = StubGatewayURLProtocol.requests(tenantId: tenantId)
+        let tokenizeCall = try #require(calls.first { $0.request.url!.path.hasSuffix("/forms/secure-fields") })
+        let body = try #require(tokenizeCall.body)
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let card = try #require(json["card"] as? [String: Any])
+        #expect(card["pan"] as? String == "4111111111111111")
+        #expect(card["expiry_month"] == nil, "no expiry field, no expiry key")
+        #expect(card["expiry_year"] == nil)
+
+        // And the verdict is the gateway's, surfaced verbatim.
+        #expect(delegate.tokenized == nil)
+        if case .apiError(let message, let statusCode) = delegate.failure {
+            #expect(statusCode == 400)
+            #expect(message == "Invalid expiry date")
+        } else {
+            Issue.record("expected .apiError, got \(String(describing: delegate.failure))")
+        }
+    }
+
     @Test func cvvOnlyThreeDigitsAlsoSubmits() async throws {
         let tenantId = "cvvonly3-\(UUID().uuidString)"
         StubGatewayURLProtocol.register(tenantId: tenantId) { _, _ in
