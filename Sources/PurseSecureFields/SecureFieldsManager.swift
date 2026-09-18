@@ -273,6 +273,12 @@ public final class SecureFieldsManager {
             view.isHidden = true
             view.isUserInteractionEnabled = false
         }
+        // Not behind `#if DEBUG` on purpose: the distributed XCFramework is archived in Release,
+        // so this is the only build in which a merchant would ever meet the case — and the form
+        // gives nothing else away, since it still reports valid once its own fields are filled.
+        if configuredFields.contains(.pan) && !configuredFields.contains(.expDate) {
+            NSLog("PurseSecureFields: `fields` configures `pan` without `expDate` — the card block goes out with no expiry and the gateway rejects it (INVALID_FORM). Configure `expDate` too, or use the CVV-only form.")
+        }
         // No PAN field means no BIN lookup: the CVV length comes from the brands the host
         // configured instead (see `CardBrand.cvvOnlyLengths`), or later from `selectBrand(_:)`.
         cvvField.validLengths = defaultCVVLengths
@@ -536,12 +542,20 @@ public final class SecureFieldsManager {
     ///     Mirrors `SubmitOptions.selectedNetwork` on Android.
     ///   - saveToken: asks the vault to retain the card for later reuse.
     ///
+    /// A form configuring `pan` without `expDate` submits a card block with no `expiry_month` or
+    /// `expiry_year`, which the gateway rejects as `INVALID_FORM` — surfaced as `.apiError`. The
+    /// SDK does not pre-empt that verdict, and form validity counts the configured fields alone,
+    /// exactly as on web and Android.
+    ///
     /// On a **CVV-only** form (no `pan` in `SecureFieldsConfig.fields`) both parameters are
     /// ignored with a warning: they describe the `card` block, and a CVV-only request carries
     /// none — the body is `{"cvv": "…"}` alone, as on web and Android. The result then has no
     /// `bin`, `lastFourDigits` or `selectedNetwork`.
     public func submit(selectedNetwork: CardBrand? = nil, saveToken: Bool = false) {
         guard !isSubmitting else { return }
+        // A configured `pan` has no expiry to send without a configured `expDate`, and the gateway
+        // rejects a card block without one (INVALID_FORM). Reported ahead of the completeness
+        // check: otherwise an unfilled form masks the configuration fault as `.fieldsIncomplete`.
         guard fieldsGatingValidity.allSatisfy(\.isValid) else {
             delegate?.secureFieldsDidFail(.fieldsIncomplete)
             return
@@ -568,12 +582,12 @@ public final class SecureFieldsManager {
                 detected: detectedBrands,
                 brandSelectorEnabled: config.brandSelector
             )
-            let (month, year) = expDateField.parsedExpiry
+            let expiry = expDateField.parsedExpiry
             let holderName = holderNameField.rawValue.trimmingCharacters(in: .whitespaces)
             card = .init(
                 pan: panField.rawValue,
-                expiryMonth: month,
-                expiryYear: year,
+                expiryMonth: expiry?.month,
+                expiryYear: expiry?.year,
                 cardHolderName: holderName.isEmpty ? nil : holderName,
                 saveToken: saveToken,
                 selectedNetwork: brand.rawValue

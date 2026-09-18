@@ -23,8 +23,11 @@ struct TokenizationPayload: Encodable {
 
     struct CardPayload: Encodable {
         let pan: String
-        let expiryMonth: Int
-        let expiryYear: Int
+        // Optional so they can be omitted outright: a form configuring `pan` without `expDate`
+        // sends a card block with no expiry and lets the gateway rule on it (INVALID_FORM), the
+        // same shape and the same division of labour as Android's `buildRequestBody`.
+        let expiryMonth: Int?
+        let expiryYear: Int?
         let cardHolderName: String?
         let saveToken: Bool?
         let selectedNetwork: String

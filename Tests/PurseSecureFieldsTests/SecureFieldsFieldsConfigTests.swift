@@ -27,6 +27,15 @@ struct SecureFieldsFieldsConfigTests {
         #expect(fields.isCVVOnly, "no PAN field means CVV-only, whatever else is mounted")
     }
 
+    /// SDK-12287: this combination used to trap in `init`, killing the host app before any view
+    /// was mounted. It must now build like any other — nothing rules on it before the gateway.
+    @Test func panWithoutExpDateConstructs() {
+        let fields = SecureFieldsFieldsConfig(pan: .init())
+        #expect(fields.configuredFields == [.pan, .cvv])
+        #expect(fields.isCVVOnly == false, "a PAN field is configured, so this is not the CVV-only form")
+        #expect(fields.expDate == nil)
+    }
+
     @Test func perFieldOptionsAreKept() {
         let fields = SecureFieldsFieldsConfig(cvv: .init(placeholder: "ex: 1234", accessibilityLabel: "Security code"))
         #expect(fields.cvv.placeholder == "ex: 1234")
