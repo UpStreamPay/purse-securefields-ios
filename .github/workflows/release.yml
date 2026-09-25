@@ -7,16 +7,34 @@ on:
 permissions:
   contents: write
 
+# Read by every step through the environment, never interpolated into a script: a tag name
+# is text anyone with write access chooses.
+env:
+  TAG: ${{ github.event.release.tag_name }}
+
 jobs:
   xcframework:
     name: Build & publish XCFramework
+    # Older than CI's macos-26 on purpose: the .swiftinterface is written by this Xcode, and
+    # an older one keeps the binary importable by merchants who have not upgraded yet.
     runs-on: macos-15
+    timeout-minutes: 45
+    # Every release waits for a codeowner: the `release` environment requires a review from
+    # @UpStreamPay/pci-dss and holds the signing secrets.
+    environment: release
 
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
+
+      # Only code that went through a reviewed PR ships.
+      - name: Refuse a tag that is not on main
+        run: |
+          git merge-base --is-ancestor "$TAG" origin/main \
+            || { echo "::error::$TAG is not on main — only reviewed code is released."; exit 1; }
 
       - name: Import signing certificate
         uses: apple-actions/import-codesign-certs@5142e029c445c10ffc7149d172e540235a065466 # v7.0.0
@@ -81,17 +99,12 @@ jobs:
             -output .build/PurseSecureFields.xcframework
 
           # Sign the finished .xcframework bundle so consumers can verify it
-          # (Xcode 15+ third-party XCFramework signatures). Prefer a fully-valid
-          # identity; fall back to any identity with a private key, since `-v`
-          # rejects an untrusted chain (e.g. missing Apple WWDR intermediate) or
-          # expiry even though codesign can still sign with it.
+          # (Xcode 15+ third-party XCFramework signatures). A *valid* identity only: an
+          # expired or untrusted one would still sign, and ship a signature no consumer can
+          # trust.
           IDENTITY=$(security find-identity -v -p codesigning | awk '/^[[:space:]]*[0-9]+\)/ {print $2; exit}')
           if [ -z "$IDENTITY" ]; then
-            IDENTITY=$(security find-identity -p codesigning | awk '/^[[:space:]]*[0-9]+\)/ {print $2; exit}')
-            [ -n "$IDENTITY" ] && echo "::warning::No *valid* identity (untrusted chain or expired?). Falling back to identity $IDENTITY, which has a private key."
-          fi
-          if [ -z "$IDENTITY" ]; then
-            echo "::error::No codesigning identity with a private key found. The .p12 likely contains only the certificate, not the private key — re-export it from Keychain Access selecting BOTH the certificate and its private key, then regenerate APPLE_SIGNING_CERT_P12_BASE64."
+            echo "::error::No valid codesigning identity. Either the certificate is expired or its chain is untrusted, or the .p12 holds only the certificate without its private key — re-export BOTH from Keychain Access, then regenerate APPLE_SIGNING_CERT_P12_BASE64."
             exit 1
           fi
           echo "Signing xcframework with identity $IDENTITY"
@@ -129,9 +142,8 @@ jobs:
 
       - name: Update Package.swift to binary target
         run: |
-          VERSION="${{ github.event.release.tag_name }}"
-          REPO="${{ github.repository }}"
-          CHECKSUM="${{ env.CHECKSUM }}"
+          VERSION="$TAG"
+          REPO="$GITHUB_REPOSITORY"
           URL="https://github.com/${REPO}/releases/download/${VERSION}/PurseSecureFields.xcframework.zip"
           cat > Package.swift << EOF
           // swift-tools-version: 5.9
@@ -155,7 +167,6 @@ jobs:
 
       - name: Commit & retag
         run: |
-          TAG="${{ github.event.release.tag_name }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Package.swift
@@ -165,7 +176,7 @@ jobs:
 
       - name: Upload XCFramework to release
         run: |
-          gh release upload "${{ github.event.release.tag_name }}" \
+          gh release upload "$TAG" \
             .build/PurseSecureFields.xcframework.zip \
             --clobber
         env:

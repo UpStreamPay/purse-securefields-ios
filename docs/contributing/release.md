@@ -15,9 +15,10 @@ The release process is fully driven from GitHub:
 |---|---|---|
 | 1 | Push to `main` | release-please opens or updates a release PR with a changelog and version bump |
 | 2 | Merge the release PR | release-please creates the GitHub Release and tag (e.g. `v1.1.0`) |
-| 3 | GitHub Release published | CI builds a signed XCFramework, computes its checksum, and updates `Package.swift` to a binary target pointing to the new release |
+| 3 | GitHub Release published | A codeowner approves the `release` environment; CI then builds a signed XCFramework, computes its checksum, and updates `Package.swift` to a binary target pointing to the new release |
 
-Merging the release PR is all you need to trigger a release. There is no manual publish step.
+Merging the release PR triggers the release; a codeowner then approves it before anything is built
+or signed (see [Release approval](#release-approval)).
 
 ---
 
@@ -26,6 +27,7 @@ Merging the release PR is all you need to trigger a release. There is no manual 
 - [Prerequisites (one-time setup)](#prerequisites-one-time-setup)
   - [Apple Distribution certificate](#apple-distribution-certificate)
   - [GitHub secrets](#github-secrets)
+  - [Release approval](#release-approval)
 - [Versioning](#versioning)
 - [Step 1 — Push to main](#step-1--push-to-main)
 - [Step 2 — Merge the release PR](#step-2--merge-the-release-pr)
@@ -73,7 +75,22 @@ Add these four secrets to the GitHub repository (**Settings → Secrets and vari
 | `APPLE_SIGNING_CERT_P12_PASSWORD` | build step | Password set when exporting the `.p12` |
 | `APPLE_SIGNING_IDENTITY` | build step | Full certificate common name, e.g. `Apple Distribution: <Team Name> (<Team ID>)` |
 
-Maintainers configure these once; they are repository secrets, not organisation-wide.
+Maintainers configure these once. `RELEASE_PLEASE_TOKEN` is a repository secret; the three
+`APPLE_SIGNING_*` secrets belong to the `release` environment (see below). None is
+organisation-wide.
+
+### Release approval
+
+Every release waits for a codeowner. `release.yml` runs in the **`release`** environment
+(**Settings → Environments → release**), configured with:
+
+- **Required reviewers**: `@UpStreamPay/pci-dss`, with *Prevent self-review* on
+- **Deployment branches and tags**: tags matching `v*` only
+- The signing secrets below, as **environment** secrets rather than repository ones, so no other
+  workflow can read them
+
+The workflow also refuses a tag that is not on `main`, so only code that went through a reviewed
+PR is ever built and signed.
 
 ---
 
@@ -121,9 +138,10 @@ When the version is ready to ship, merge the release PR. release-please:
 
 ## Step 3 — CI builds and signs the XCFramework
 
-`.github/workflows/release.yml` triggers on `release: published`:
+`.github/workflows/release.yml` triggers on `release: published`, then waits for a codeowner to
+approve the `release` environment:
 
-1. Checks out the tagged commit
+1. Checks out the tagged commit, and fails unless it is on `main`
 2. Imports the Apple Distribution certificate from `APPLE_SIGNING_CERT_P12_BASE64` into a
    temporary CI keychain
 3. Builds the device archive (`ios-arm64`) with `CODE_SIGN_IDENTITY=Apple Distribution`
