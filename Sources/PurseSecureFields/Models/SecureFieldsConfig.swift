@@ -124,8 +124,11 @@ public struct SecureFieldConfig {
 /// renew the cryptogram of a card already on file. Mirrors `SecureFieldsFieldsConfig` on Android
 /// and the `fields` object of the web SDK.
 ///
-/// A configured `pan` requires a configured `expDate`: the gateway rejects a card without an
-/// expiry and `submit()` has no expiry override to supply one.
+/// A configured `pan` needs a configured `expDate` to be tokenizable, but nothing here enforces
+/// that: the configuration builds, mounts and reports valid like any other, and `submit()` sends
+/// a card block with no expiry which the gateway rejects as `INVALID_FORM` (surfaced as
+/// `.apiError`). That division of labour — the SDK collects, the gateway rules — is what web and
+/// Android do, and it is why this initialiser no longer traps on the combination.
 public struct SecureFieldsFieldsConfig {
     public let pan: SecureFieldConfig?
     public let expDate: SecureFieldConfig?
@@ -144,8 +147,6 @@ public struct SecureFieldsFieldsConfig {
         holderName: SecureFieldConfig? = nil,
         cvv: SecureFieldConfig = .init()
     ) {
-        precondition(pan == nil || expDate != nil,
-                     "SecureFields: a configured `pan` field requires a configured `expDate` field")
         self.pan = pan
         self.expDate = expDate
         self.holderName = holderName

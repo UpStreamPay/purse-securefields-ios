@@ -212,6 +212,11 @@ POST /v1/tenants/{tenantId}/forms/secure-fields
 }
 ```
 
+`expiry_month` and `expiry_year` are omitted outright when the form configures no `expDate`
+field — never sent as `0`. The gateway then rejects the request (`INVALID_FORM` / "Invalid expiry
+date"); the SDK does not pre-empt it. Android does the same, via `toIntOrNull()` on an empty
+expiry string.
+
 For Oney flows the CVV field holds a birth date rather than a PIN, and the request carries
 **neither** key — the gateway accepts no birth-date field and rejects a request containing one
 with a 400. The date never leaves the device. Same contract as the web and Android SDKs:

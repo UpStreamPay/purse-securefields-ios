@@ -368,9 +368,14 @@ public struct SecureFieldsFieldsConfig {
 `accessibilityLabel` is applied as the view's `accessibilityLabel` for VoiceOver. The field's
 *value* stays hidden from the accessibility API regardless.
 
-**Precondition** (crash at init time if violated): a configured `pan` requires a configured
-`expDate`. The gateway rejects a card without an expiry, and `submit()` has no expiry override
-to supply one.
+**A configured `pan` needs a configured `expDate` to be tokenizable** — but the SDK does not
+enforce it, exactly as on web and Android. Such a configuration builds, mounts and reports valid
+like any other; `submit()` then sends a `card` block with no `expiry_month` / `expiry_year`, and
+the gateway rejects it as `INVALID_FORM`, reaching you as `.apiError`. The SDK writes one warning
+to the console at init and otherwise leaves the verdict to the gateway.
+
+There is no expiry override on `submit()` on any of the three SDKs except web, so a PAN form
+without an expiry field cannot be made to succeed — configure `expDate`, or use the CVV-only form.
 
 ### CVV-only
 

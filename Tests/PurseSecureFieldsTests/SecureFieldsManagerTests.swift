@@ -387,6 +387,36 @@ struct SecureFieldsManagerTests {
         }
     }
 
+    // MARK: pan without expDate (SDK-12287)
+
+    /// Form validity counts the configured fields and nothing else — the same rule as Android's
+    /// `emitFormValid` and the web SDK — so this form turns valid and the host's Pay button
+    /// enables. The SDK passes no judgement on the combination; the gateway does.
+    @Test func panWithoutExpDateStillReportsTheFormValid() {
+        let manager = makeManager(fields: .init(pan: .init()))
+        let spy = SpyDelegate()
+        manager.delegate = spy
+
+        type("4111111111111111", into: panField(manager))
+        type("123", into: cvvField(manager))
+
+        #expect(spy.validityChanges.last == true)
+        #expect(spy.failures.isEmpty, "nothing is reported before the gateway has ruled")
+    }
+
+    /// The counterpart: configuring the expiry field changes nothing about how validity is reached.
+    @Test func panWithExpDateStillReportsTheFormValid() {
+        let manager = makeManager(fields: .init(pan: .init(), expDate: .init()))
+        let spy = SpyDelegate()
+        manager.delegate = spy
+
+        type("4111111111111111", into: panField(manager))
+        type("123", into: cvvField(manager))
+        type("1230", into: expField(manager))
+
+        #expect(spy.validityChanges.last == true)
+    }
+
     // MARK: BIN lookup failure
 
     @Test func binLookupFailureReachesDelegate() async throws {

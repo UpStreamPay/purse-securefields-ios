@@ -110,22 +110,26 @@ struct SecureExpDateFieldTests {
 
     // MARK: parsedExpiry
 
-    @Test func parsedExpiryCorrect() {
+    @Test func parsedExpiryCorrect() throws {
         let field = SecureExpDateField()
         field.text = "0627"
         field.textDidChange()
-        let expiry = field.parsedExpiry
+        let expiry = try #require(field.parsedExpiry)
         #expect(expiry.month == 6)
         #expect(expiry.year == 2027)
     }
 
-    @Test func parsedExpiryPartialReturnsZeros() {
+    /// Nil, not `(0, 0)`: `submit()` omits `expiry_month`/`expiry_year` from the card block
+    /// rather than sending a month the cardholder never typed (SDK-12287).
+    @Test func parsedExpiryPartialReturnsNil() {
         let field = SecureExpDateField()
         field.text = "06"
         field.textDidChange()
-        let expiry = field.parsedExpiry
-        #expect(expiry.month == 0)
-        #expect(expiry.year == 0)
+        #expect(field.parsedExpiry == nil)
+    }
+
+    @Test func parsedExpiryEmptyReturnsNil() {
+        #expect(SecureExpDateField().parsedExpiry == nil)
     }
 
     // MARK: PCI — text always nil
