@@ -22,11 +22,10 @@ review covers the GitHub Actions the workflows use, and will cover the first pac
 Dependabot (`.github/dependabot.yml`) proposes weekly updates of the pinned GitHub Actions only (there
 is no Swift package to watch), under a `ci:` prefix that keeps them out of the changelog.
 
-`.github/workflows/codeql.yml` scans **Swift** and the **workflows** (`actions`) on every pull
-request, every push to `main` and weekly. It is an advanced setup on purpose: GitHub's default setup
-builds Swift with `swift build`, which fails for an iOS-only package, so the Swift job builds the
-`PurseSecureFields` scheme for the simulator instead. Code scanning must be enabled with **default
-setup off** — GitHub rejects advanced-setup results while default setup is on.
+CodeQL runs as GitHub's default setup, which an organisation administrator enforces, and scans the
+workflows (`actions`) only. Swift is not scanned continuously: default setup builds Swift with
+`swift build`, which fails for an iOS-only package, and an advanced setup (which would build the
+`PurseSecureFields` scheme for the simulator) is rejected while default setup is on.
 
 ## Workflow hygiene
 
@@ -51,7 +50,7 @@ which CODEOWNERS needs to apply.
 - no deletion, no force-push, no bypass
 - pull request required, **1 approval**, **review from a code owner**, approvals dismissed on a new push
 - status checks, **strict** (branch up to date with `main`): `Library Tests`, `Demo UI Tests`,
-  `Dependency review`, `CodeQL (swift)`, `CodeQL (actions)`
+  `Dependency review`
 
 **`release tags` ruleset** on `refs/tags/v*`: creation, update and deletion restricted, bypass for
 the **repository admin** role only. SPM resolves a version from its tag, so moving one changes the
@@ -72,9 +71,9 @@ deployments only from `v*` tags. It holds the `APPLE_SIGNING_*` secrets and the 
 creates it with no protection — the same goes for `release-please`. Read it back after changing
 it: an environment that exists is not one that is protected (v1.10.0 shipped through an empty one).
 
-**Code security**: code scanning (CodeQL, default setup off — see [Dependencies](#dependencies)),
-secret scanning and push protection on; Dependabot security updates on. The repository is public, so
-none of these needs GitHub Advanced Security.
+**Code security**: code scanning (CodeQL default setup, see [Dependencies](#dependencies)), secret
+scanning and push protection on; Dependabot security updates on. The repository is public, so none
+of these needs GitHub Advanced Security.
 
 **Actions** (Settings → Actions → General): the default `GITHUB_TOKEN` is read-only and workflows
 cannot approve pull requests.
