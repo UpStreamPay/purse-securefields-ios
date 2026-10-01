@@ -34,7 +34,7 @@ jobs:
                       print(dev['udid'])
                       raise SystemExit
           ")
-          echo "SIM_ID=$SIM_ID" >> $GITHUB_ENV
+          echo "SIM_ID=$SIM_ID" >> "$GITHUB_ENV"
           xcrun simctl boot "$SIM_ID" || true
 
       - name: Run
@@ -66,7 +66,7 @@ jobs:
                       print(dev['udid'])
                       raise SystemExit
           ")
-          echo "SIM_ID=$SIM_ID" >> $GITHUB_ENV
+          echo "SIM_ID=$SIM_ID" >> "$GITHUB_ENV"
           xcrun simctl boot "$SIM_ID" || true
 
       - name: Run

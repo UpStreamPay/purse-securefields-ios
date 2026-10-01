@@ -20,7 +20,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 45
     # Every release waits for a codeowner: the `release` environment requires a review from
-    # @UpStreamPay/pci-dss and holds the signing secrets.
+    # @UpStreamPay/pci-dss and holds the signing secrets and the release token.
     environment: release
 
     steps:
@@ -35,6 +35,20 @@ jobs:
         run: |
           git merge-base --is-ancestor "$TAG" origin/main \
             || { echo "::error::$TAG is not on main — only reviewed code is released."; exit 1; }
+
+      # A missing secret otherwise surfaces deep inside the certificate import ("At least one of
+      # p12-filepath or p12-file-base64 must be provided") or at the retag. Say what is missing instead.
+      - name: Check the release secrets
+        env:
+          P12: ${{ secrets.APPLE_SIGNING_CERT_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.APPLE_SIGNING_CERT_P12_PASSWORD }}
+          RELEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          missing=""
+          [ -n "$RELEASE_TOKEN" ] || missing="$missing RELEASE_PLEASE_TOKEN"
+          [ -n "$P12" ] || missing="$missing APPLE_SIGNING_CERT_P12_BASE64"
+          [ -n "$P12_PASSWORD" ] || missing="$missing APPLE_SIGNING_CERT_P12_PASSWORD"
+          [ -z "$missing" ] || { echo "::error::Missing secrets:$missing — see docs/contributing/release.md."; exit 1; }
 
       - name: Import signing certificate
         uses: apple-actions/import-codesign-certs@5142e029c445c10ffc7149d172e540235a065466 # v7.0.0
@@ -112,7 +126,7 @@ jobs:
 
           cd .build
           zip -r PurseSecureFields.xcframework.zip PurseSecureFields.xcframework
-          echo "CHECKSUM=$(swift package compute-checksum PurseSecureFields.xcframework.zip)" >> $GITHUB_ENV
+          echo "CHECKSUM=$(swift package compute-checksum PurseSecureFields.xcframework.zip)" >> "$GITHUB_ENV"
 
       # Non-regression gate: v1.1.6–v1.5.0 shipped without Modules/ (so `import
       # PurseSecureFields` failed for every consumer) and without the resource bundle.
@@ -165,14 +179,24 @@ jobs:
           )
           EOF
 
+      # The `release tags` ruleset lets only repository admins create or move a v* tag, so the push
+      # goes out as RELEASE_PLEASE_TOKEN (an admin's token, readable only inside this approved job)
+      # and not as GITHUB_TOKEN: bypassing the GitHub Actions app instead would let any workflow on
+      # any branch move a tag. The token is used for this one command only, never handed to
+      # checkout, so it is not in .git/config while package code builds.
       - name: Commit & retag
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Package.swift
           git commit -m "release: ${TAG} — binary target"
           git tag -f "${TAG}"
-          git push origin "${TAG}" --force
+          # The empty extraheader drops checkout's GITHUB_TOKEN header, so the URL's token is used.
+          git -c http.https://github.com/.extraheader= \
+            push "https://x-access-token:${RELEASE_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "refs/tags/${TAG}" --force
 
       - name: Upload XCFramework to release
         run: |
