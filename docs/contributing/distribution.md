@@ -128,15 +128,15 @@ signed XCFrameworks and is not a limitation of the Purse SDK specifically.
 
 1. **An Apple Developer account** with an active "Apple Distribution" certificate (used for
    App Store and enterprise distribution). The team's current distribution certificate is stored
-   as a base64-encoded P12 in the GitHub repository secrets.
+   as a base64-encoded P12 in the secrets of the `release` environment.
 
-2. **Three GitHub secrets** (see [Release guide](release.md#prerequisites-one-time-setup)):
+2. **Two signing secrets** in the `release` environment (see
+   [Release guide](release.md#github-secrets), which also covers `RELEASE_PLEASE_TOKEN`):
 
    | Secret | Value |
    |---|---|
    | `APPLE_SIGNING_CERT_P12_BASE64` | Base64-encoded Apple Distribution certificate + private key (.p12) |
    | `APPLE_SIGNING_CERT_P12_PASSWORD` | Password protecting the .p12 file |
-   | `APPLE_SIGNING_IDENTITY` | Full certificate common name (e.g. `Apple Distribution: Upstream Pay (XXXXXXXXXX)`) |
 
 3. **Xcode 14+ on the CI runner.** The `-codesign` flag for `xcodebuild -create-xcframework`
    was introduced in Xcode 14. The release workflow runs on `macos-15` (Xcode 16), which
