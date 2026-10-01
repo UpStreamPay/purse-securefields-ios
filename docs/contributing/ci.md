@@ -1,21 +1,32 @@
 # CI and quality gates
 
-`.github/workflows/ci.yml` runs on every pull request and every push to `main`:
+`.github/workflows/ci.yml` runs on every pull request and every push to `main`. The `main` ruleset
+requires its two jobs, so a merge is blocked on any of:
 
 | Job | Gate | Fails when |
 |---|---|---|
 | Library Tests | tests | `xcodebuild test -scheme PurseSecureFields` fails on the newest iPhone simulator |
 | Demo UI Tests | consumer build + UI tests | `xcodebuild test -project Demo/Demo.xcodeproj -scheme DemoUITests` fails on the same simulator |
 
-Neither is a required check yet (see [Repository settings](#repository-settings)): a red PR can
-still be merged.
+Both are UI-driven on a hosted simulator and occasionally fail on a change that touches no code
+(a lost keyboard focus in `DemoUITests`): re-run the failed job before investigating.
 
 ## Dependencies
 
-The SDK declares no third-party source dependency in `Package.swift`, so Dependabot
-(`.github/dependabot.yml`) watches the pinned GitHub Actions only, weekly, under a `ci:` prefix that
-keeps the updates out of the changelog. CodeQL runs as GitHub's default setup and scans the
-workflows (`actions`).
+`.github/workflows/dependencies.yml` runs `Dependency review` on every pull request: it fails when
+the change adds or moves a dependency to a version with a known **high** or **critical**
+vulnerability. GitHub reads `Package.resolved` directly, so — unlike Android — there is no graph to
+submit first. The SDK declares no third-party source dependency in `Package.swift` today, so the
+review covers the GitHub Actions the workflows use, and will cover the first package added.
+
+Dependabot (`.github/dependabot.yml`) proposes weekly updates of the pinned GitHub Actions only (there
+is no Swift package to watch), under a `ci:` prefix that keeps them out of the changelog.
+
+`.github/workflows/codeql.yml` scans **Swift** and the **workflows** (`actions`) on every pull
+request, every push to `main` and weekly. It is an advanced setup on purpose: GitHub's default setup
+builds Swift with `swift build`, which fails for an iOS-only package, so the Swift job builds the
+`PurseSecureFields` scheme for the simulator instead. Code scanning must be enabled with **default
+setup off** — GitHub rejects advanced-setup results while default setup is on.
 
 ## Workflow hygiene
 
@@ -35,9 +46,12 @@ Repository settings, not code — a repository admin applies them once. `.github
 `@UpStreamPay/pci-dss` the owner of every file; the team has **write** access to the repository,
 which CODEOWNERS needs to apply.
 
-**`main` ruleset** ("Main prorection", Settings → Rules → Rulesets): no deletion, no force-push, no
-bypass; pull request required, **1 approval**, **review from a code owner**. Not yet: `Library
-Tests` and `Demo UI Tests` as required checks, and approvals dismissed on a new push.
+**`main` ruleset** ("Main prorection", Settings → Rules → Rulesets):
+
+- no deletion, no force-push, no bypass
+- pull request required, **1 approval**, **review from a code owner**, approvals dismissed on a new push
+- status checks, **strict** (branch up to date with `main`): `Library Tests`, `Demo UI Tests`,
+  `Dependency review`, `CodeQL (swift)`, `CodeQL (actions)`
 
 **`release tags` ruleset** on `refs/tags/v*`: creation, update and deletion restricted, bypass for
 the **repository admin** role only. SPM resolves a version from its tag, so moving one changes the
@@ -58,7 +72,9 @@ deployments only from `v*` tags. It holds the `APPLE_SIGNING_*` secrets and the 
 creates it with no protection — the same goes for `release-please`. Read it back after changing
 it: an environment that exists is not one that is protected (v1.10.0 shipped through an empty one).
 
-**Code security**: secret scanning and push protection on; Dependabot security updates on.
+**Code security**: code scanning (CodeQL, default setup off — see [Dependencies](#dependencies)),
+secret scanning and push protection on; Dependabot security updates on. The repository is public, so
+none of these needs GitHub Advanced Security.
 
 **Actions** (Settings → Actions → General): the default `GITHUB_TOKEN` is read-only and workflows
 cannot approve pull requests.
