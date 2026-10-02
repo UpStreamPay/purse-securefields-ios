@@ -30,6 +30,25 @@ final class DemoUITests: XCTestCase {
             }
         }
         app.launch()
+        // The first query after launch can run before the form is laid out: wait for the field
+        // every mode mounts, instead of letting the first assertion race it.
+        XCTAssertTrue(app.secureTextFields["cvv_field"].waitForExistence(timeout: 10), "the form never appeared")
+    }
+
+    /// Taps `field` and types `text`, once the tap has given it keyboard focus. A tap that lands
+    /// while the screen is still settling leaves no first responder, and `typeText` then fails
+    /// with "Neither element nor any descendant has keyboard focus".
+    private func enter(_ text: String, into field: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "\(field) does not exist", file: file, line: line)
+        let focused = NSPredicate(format: "hasKeyboardFocus == true")
+        for _ in 0..<3 {
+            field.tap()
+            if XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: focused, object: field)], timeout: 2) == .completed {
+                field.typeText(text)
+                return
+            }
+        }
+        XCTFail("\(field) never got keyboard focus", file: file, line: line)
     }
 
     private func dismissKeyboard() {
@@ -38,17 +57,10 @@ final class DemoUITests: XCTestCase {
     }
 
     private func fillValidCard() {
-        app.textFields["pan_field"].tap()
-        app.textFields["pan_field"].typeText("4111111111111111")
-
-        app.textFields["expiry_field"].tap()
-        app.textFields["expiry_field"].typeText("1230")
-
-        app.textFields["holder_field"].tap()
-        app.textFields["holder_field"].typeText("John Doe")
-
-        app.secureTextFields["cvv_field"].tap()
-        app.secureTextFields["cvv_field"].typeText("123")
+        enter("4111111111111111", into: app.textFields["pan_field"])
+        enter("1230", into: app.textFields["expiry_field"])
+        enter("John Doe", into: app.textFields["holder_field"])
+        enter("123", into: app.secureTextFields["cvv_field"])
 
         dismissKeyboard()
     }
@@ -67,9 +79,7 @@ final class DemoUITests: XCTestCase {
 
     func testInvalidPANShowsErrorState() {
         launch()
-        let pan = app.textFields["pan_field"]
-        pan.tap()
-        pan.typeText("4111111111111112") // bad Luhn
+        enter("4111111111111112", into: app.textFields["pan_field"]) // bad Luhn
         // Move focus to another field to trigger PAN editingDidEnd
         app.textFields["expiry_field"].tap()
         dismissKeyboard()
@@ -121,9 +131,7 @@ final class DemoUITests: XCTestCase {
         XCTAssertFalse(app.buttons["pay_button"].isEnabled)
 
         // 4 digits are accepted while no brand is known (a saved Amex must stay submittable).
-        let cvv = app.secureTextFields["cvv_field"]
-        cvv.tap()
-        cvv.typeText("1234")
+        enter("1234", into: app.secureTextFields["cvv_field"])
         dismissKeyboard()
 
         XCTAssertEqual(app.otherElements["cvv_container"].value as? String, "valid")
@@ -143,8 +151,7 @@ final class DemoUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["cvv_label"].label, "CVV (3 or 4 digits)")
 
         let cvv = app.secureTextFields["cvv_field"]
-        cvv.tap()
-        cvv.typeText("123")
+        enter("123", into: cvv)
         dismissKeyboard()
         XCTAssertEqual(app.otherElements["cvv_container"].value as? String, "valid")
 
@@ -155,8 +162,7 @@ final class DemoUITests: XCTestCase {
         XCTAssertFalse(app.buttons["pay_button"].isEnabled, "3 digits no longer fit an Amex CVV")
         XCTAssertTrue(app.staticTexts["debug_label"].label.contains("expects=[4]  brand=AMEX"))
 
-        cvv.tap()
-        cvv.typeText("4")
+        enter("4", into: cvv)
         dismissKeyboard()
         XCTAssertEqual(app.otherElements["cvv_container"].value as? String, "valid")
         XCTAssertTrue(app.buttons["pay_button"].isEnabled)
@@ -170,7 +176,7 @@ final class DemoUITests: XCTestCase {
     /// CVV-only form without a launch argument.
     func testModeControlSwitchesBetweenFullAndCVVOnly() {
         launch()
-        XCTAssertTrue(app.textFields["pan_field"].exists)
+        XCTAssertTrue(app.textFields["pan_field"].waitForExistence(timeout: 5))
 
         app.segmentedControls["mode_control"].buttons["CVV only"].tap()
         XCTAssertTrue(app.secureTextFields["cvv_field"].waitForExistence(timeout: 3))

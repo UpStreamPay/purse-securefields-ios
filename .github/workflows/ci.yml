@@ -22,20 +22,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Pick iOS Simulator
-        run: |
-          SIM_ID=$(xcrun simctl list -j devices available | python3 -c "
-          import json, sys
-          d = json.load(sys.stdin)['devices']
-          for rt, devs in sorted(d.items(), reverse=True):
-              if 'iOS' not in rt: continue
-              for dev in devs:
-                  if 'iPhone' in dev['name']:
-                      print(dev['udid'])
-                      raise SystemExit
-          ")
-          echo "SIM_ID=$SIM_ID" >> "$GITHUB_ENV"
-          xcrun simctl boot "$SIM_ID" || true
+      - uses: ./.github/actions/ios-simulator
 
       - name: Run
         run: |
@@ -54,21 +41,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Pick iOS Simulator
-        run: |
-          SIM_ID=$(xcrun simctl list -j devices available | python3 -c "
-          import json, sys
-          d = json.load(sys.stdin)['devices']
-          for rt, devs in sorted(d.items(), reverse=True):
-              if 'iOS' not in rt: continue
-              for dev in devs:
-                  if 'iPhone' in dev['name']:
-                      print(dev['udid'])
-                      raise SystemExit
-          ")
-          echo "SIM_ID=$SIM_ID" >> "$GITHUB_ENV"
-          xcrun simctl boot "$SIM_ID" || true
+      - uses: ./.github/actions/ios-simulator
 
+      # One retry per failing test, for the hosted simulator: its test runner sometimes hangs on the
+      # first launch (kAXErrorIPCTimeout, "Failed to terminate"), and every later test then passes.
+      # A real regression fails both attempts; a retried pass still shows as "failed" in the log.
       - name: Run
         run: |
           set -o pipefail
@@ -79,5 +56,6 @@ jobs:
             -parallel-testing-enabled NO \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 120 \
+            -retry-tests-on-failure -test-iterations 2 \
             CODE_SIGNING_ALLOWED=NO \
             | grep --line-buffered -E "(Test Suite|Test Case|passed|failed|error:|BUILD)"
