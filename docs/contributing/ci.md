@@ -8,8 +8,12 @@ requires its two jobs, so a merge is blocked on any of:
 | Library Tests | tests | `xcodebuild test -scheme PurseSecureFields` fails on the newest iPhone simulator |
 | Demo UI Tests | consumer build + UI tests | `xcodebuild test -project Demo/Demo.xcodeproj -scheme DemoUITests` fails on the same simulator |
 
-Both are UI-driven on a hosted simulator and occasionally fail on a change that touches no code
-(a lost keyboard focus in `DemoUITests`): re-run the failed job before investigating.
+Both boot the newest iPhone simulator through `.github/actions/ios-simulator`, which waits for the
+boot to finish so a slow boot is not reported as a test failure. `DemoUITests` waits for the form
+after each launch and for keyboard focus before typing. The hosted simulator's test runner still
+hangs now and then on its first launch (`kAXErrorIPCTimeout`, "Failed to terminate"), so a failing
+UI test is retried once (`-retry-tests-on-failure -test-iterations 2`): a real regression fails both
+attempts, and a retried pass still shows as `failed` in the log.
 
 ## Dependencies
 
