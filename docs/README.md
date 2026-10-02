@@ -57,6 +57,9 @@ types.
 - **[Release](contributing/release.md)** — step-by-step release runbook: Apple Developer certificate
   setup, CI signing, release-please versioning, and GitHub Actions automation.
 
+- **[CI and quality gates](contributing/ci.md)** — what CI checks, and the repository settings
+  (rulesets, `release` and `release-please` environments) a release depends on.
+
 ---
 
 ## I'm setting up the project from scratch (SDK contributors)

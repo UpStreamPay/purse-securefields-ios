@@ -13,6 +13,10 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # The token lives only in this environment (deployable from main alone) and in `release`, never
+    # as a repository secret: a workflow pushed on any other branch could read a repository secret,
+    # and this one is an admin's, which bypasses the `release tags` ruleset.
+    environment: release-please
     steps:
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
