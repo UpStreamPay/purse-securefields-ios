@@ -21,6 +21,15 @@ hangs now and then on its first launch (`kAXErrorIPCTimeout`, "Failed to termina
 UI test is retried once (`-retry-tests-on-failure -test-iterations 2`): a real regression fails both
 attempts, and a retried pass still shows as `failed` in the log.
 
+## Pull request titles
+
+Merges into `main` are squash-only, so a pull request's **title** becomes the commit on `main`, and
+release-please reads it to decide the next version and the changelog section. `PR title`
+(`.github/workflows/pr-title.yml`, a required check) fails unless the title is a Conventional Commit:
+`<type>(<optional scope>)<optional !>: <description>`, with type one of `feat`, `fix`, `perf`,
+`revert`, `docs`, `refactor`, `test`, `ci`, `build`, `chore` or `style`. It reruns when the title is
+edited. A title that would fail here — `Feat/monitoring`, a branch name — releases nothing.
+
 ## Dependencies
 
 `.github/workflows/dependencies.yml` runs `Dependency review` on every pull request: it fails when
