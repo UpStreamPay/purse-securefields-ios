@@ -56,6 +56,7 @@ which CODEOWNERS needs to apply.
 - pull request required, **1 approval**, **review from a code owner**, approvals dismissed on a new push
 - status checks, **strict** (branch up to date with `main`): `Library Tests`, `Demo UI Tests`,
   `Dependency review`, `CodeQL (swift)`, `CodeQL (actions)`
+- code scanning: CodeQL, blocking on high or critical security alerts and on errors
 
 **`release tags` ruleset** on `refs/tags/v*`: creation, update and deletion restricted, bypass for
 the **repository admin** role only. SPM resolves a version from its tag, so moving one changes the
