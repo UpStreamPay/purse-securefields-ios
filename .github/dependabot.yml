@@ -1,13 +1,22 @@
 version: 2
+
+# One pull request a week for every dependency, as in the other three SDKs: every ecosystem shares
+# this group, so a single review (and a single run of the required checks) covers them all.
+# Security updates still open their own pull request as soon as an advisory lands.
+multi-ecosystem-groups:
+  dependencies:
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+
 updates:
   # The SDK itself has no third-party source dependencies (Package.swift declares none),
   # so GitHub Actions is the only dependency surface worth watching.
   - package-ecosystem: github-actions
     directory: /
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+    multi-ecosystem-group: dependencies
+    patterns:
+      - "*"
     commit-message:
       prefix: "ci"
-    labels:
-      - dependencies
