@@ -59,3 +59,18 @@ jobs:
             -retry-tests-on-failure -test-iterations 2 \
             CODE_SIGNING_ALLOWED=NO \
             | grep --line-buffered -E "(Test Suite|Test Case|passed|failed|error:|BUILD)"
+
+  release-build:
+    name: Release build (macos-15)
+    # What release.yml builds, on the toolchain it builds with (macos-15, an older Xcode on purpose),
+    # unsigned. That compiler is not the one the jobs above use: Headless Checkout iOS v1.2.0 failed
+    # to release on a Swift 6.1 concurrency error that Xcode 26 accepts, because nothing had built
+    # with Xcode 16 before the release did.
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build XCFramework
+        run: ./scripts/build-xcframework.sh

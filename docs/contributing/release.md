@@ -222,18 +222,20 @@ approve the `release` environment:
 2. Fails with their names if any of its three secrets is missing
 3. Imports the Apple Distribution certificate from `APPLE_SIGNING_CERT_P12_BASE64` into a
    temporary CI keychain
-4. Builds the device (`ios-arm64`) and simulator (`ios-arm64_x86_64-simulator`) archives unsigned,
-   then repackages `Modules/`, the resource bundle and the privacy manifest into each framework
-5. Creates the XCFramework with `xcodebuild -create-xcframework`, then signs the whole bundle with
-   `codesign` using the first **valid** identity from the certificate
+4. Runs `scripts/build-xcframework.sh` — the script CI's `Release build (macos-15)` job also runs:
+   - builds the device (`ios-arm64`) and simulator (`ios-arm64_x86_64-simulator`) archives
+     unsigned, then repackages `Modules/`, the resource bundle and the privacy manifest into each
+     framework
+   - creates the XCFramework with `xcodebuild -create-xcframework`
+   - verifies it (`.swiftinterface` and resource bundle in every slice, and
+     `import PurseSecureFields` compiles against it)
+5. Signs the whole bundle with `codesign` using the first **valid** identity from the certificate
 6. Zips the XCFramework and computes its SHA-256 checksum with `swift package compute-checksum`
-7. Verifies the XCFramework (`.swiftinterface` and resource bundle in every slice, and
-   `import PurseSecureFields` compiles against it)
-8. Rewrites `Package.swift` to a `.binaryTarget` pointing to the GitHub Release download URL
+7. Rewrites `Package.swift` to a `.binaryTarget` pointing to the GitHub Release download URL
    and the computed checksum
-9. Commits the updated `Package.swift`, force-tags the release commit, and force-pushes the tag
+8. Commits the updated `Package.swift`, force-tags the release commit, and force-pushes the tag
    with `RELEASE_PLEASE_TOKEN` (the only token the `release tags` ruleset lets through)
-10. Uploads `PurseSecureFields.xcframework.zip` to the GitHub Release as a binary asset
+9. Uploads `PurseSecureFields.xcframework.zip` to the GitHub Release as a binary asset
 
 After CI completes, the GitHub Release contains the signed XCFramework zip and the updated
 `Package.swift` (on the tag) declares the binary target. Merchants who add the package in

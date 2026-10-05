@@ -1,12 +1,18 @@
 # CI and quality gates
 
 `.github/workflows/ci.yml` runs on every pull request and every push to `main`. The `main` ruleset
-requires its two jobs, so a merge is blocked on any of:
+requires its test jobs, so a merge is blocked on any of:
 
 | Job | Gate | Fails when |
 |---|---|---|
 | Library Tests | tests | `xcodebuild test -scheme PurseSecureFields` fails on the newest iPhone simulator |
 | Demo UI Tests | consumer build + UI tests | `xcodebuild test -project Demo/Demo.xcodeproj -scheme DemoUITests` fails on the same simulator |
+| Release build (macos-15) | release toolchain | `scripts/build-xcframework.sh` — what `release.yml` builds, unsigned — fails on `macos-15` |
+
+The release builds on `macos-15` on purpose: an older Xcode writes a `.swiftinterface` more
+merchant toolchains can import. That compiler is not the one the test jobs use (`macos-26`), so
+code that Xcode 26 accepts can still fail at release time — Headless Checkout iOS v1.2.0 did, on a
+Swift 6.1 concurrency error. `Release build (macos-15)` catches that on the pull request instead.
 
 Both boot the newest iPhone simulator through `.github/actions/ios-simulator`, which waits for the
 boot to finish so a slow boot is not reported as a test failure. `DemoUITests` waits for the form
