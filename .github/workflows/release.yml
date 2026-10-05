@@ -56,62 +56,14 @@ jobs:
           p12-file-base64: ${{ secrets.APPLE_SIGNING_CERT_P12_BASE64 }}
           p12-password: ${{ secrets.APPLE_SIGNING_CERT_P12_PASSWORD }}
 
+      # Archives, repackages and checks the XCFramework (unsigned). The same script runs in CI's
+      # "Release build (macos-15)" job, so a release only builds what CI already built.
       - name: Build XCFramework
+        run: ./scripts/build-xcframework.sh
+
+      - name: Sign, zip, checksum
         run: |
           set -o pipefail
-
-          # Device archive — built UNSIGNED. A library XCFramework does not need a
-          # signed slice; the whole .xcframework bundle is signed after creation
-          # (below). Forcing a manual identity here also fails the SPM-generated
-          # resource-bundle target (PurseSecureFields_PurseSecureFields), which has
-          # no development team.
-          xcodebuild archive \
-            -scheme PurseSecureFields \
-            -destination "generic/platform=iOS" \
-            -archivePath .build/ios.xcarchive \
-            -derivedDataPath .build/dd-ios \
-            SKIP_INSTALL=NO \
-            BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
-            CODE_SIGNING_ALLOWED=NO \
-            INSTALL_PATH='/Library/Frameworks'
-
-          # Simulator archive — also unsigned (Apple issues no simulator distribution certs).
-          xcodebuild archive \
-            -scheme PurseSecureFields \
-            -destination "generic/platform=iOS Simulator" \
-            -archivePath .build/ios-sim.xcarchive \
-            -derivedDataPath .build/dd-ios-sim \
-            SKIP_INSTALL=NO \
-            BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
-            CODE_SIGNING_ALLOWED=NO \
-            INSTALL_PATH='/Library/Frameworks'
-
-          # Archiving an SPM scheme (no .xcodeproj) leaves the framework wrapper with only
-          # the binary + Info.plist: the .swiftmodule stays behind in the archive
-          # intermediates, and the SPM resource bundle lands NEXT TO the framework in
-          # Products/Library/Frameworks, so -create-xcframework drops both. Without
-          # Modules/, `import PurseSecureFields` fails for every consumer of the
-          # published binary. Repackage them into each framework before assembly.
-          repackage() { # <archive> <derived-data> <platform-dir: Release-iphoneos|Release-iphonesimulator>
-            local fw="$1/Products/Library/Frameworks/PurseSecureFields.framework"
-            mkdir -p "$fw/Modules"
-            cp -R "$2/Build/Intermediates.noindex/ArchiveIntermediates/PurseSecureFields/BuildProductsPath/$3/PurseSecureFields.swiftmodule" "$fw/Modules/"
-            cp -R "$1/Products/Library/Frameworks/PurseSecureFields_PurseSecureFields.bundle" "$fw/"
-            # Apple looks for the privacy manifest at the framework root. SPM processes it
-            # into the resource bundle instead, so lift a copy out. This must happen before
-            # the xcframework is assembled and signed, or the signature won't cover it.
-            cp "$fw/PurseSecureFields_PurseSecureFields.bundle/PrivacyInfo.xcprivacy" "$fw/PrivacyInfo.xcprivacy"
-          }
-          repackage .build/ios.xcarchive     .build/dd-ios     Release-iphoneos
-          repackage .build/ios-sim.xcarchive .build/dd-ios-sim Release-iphonesimulator
-
-          # Create the (unsigned) XCFramework. Note: `xcodebuild -create-xcframework`
-          # has no -codesign flag — the bundle is signed separately below.
-          xcodebuild -create-xcframework \
-            -framework .build/ios.xcarchive/Products/Library/Frameworks/PurseSecureFields.framework \
-            -framework .build/ios-sim.xcarchive/Products/Library/Frameworks/PurseSecureFields.framework \
-            -output .build/PurseSecureFields.xcframework
-
           # Sign the finished .xcframework bundle so consumers can verify it
           # (Xcode 15+ third-party XCFramework signatures). A *valid* identity only: an
           # expired or untrusted one would still sign, and ship a signature no consumer can
@@ -127,32 +79,6 @@ jobs:
           cd .build
           zip -r PurseSecureFields.xcframework.zip PurseSecureFields.xcframework
           echo "CHECKSUM=$(swift package compute-checksum PurseSecureFields.xcframework.zip)" >> "$GITHUB_ENV"
-
-      # Non-regression gate: v1.1.6–v1.5.0 shipped without Modules/ (so `import
-      # PurseSecureFields` failed for every consumer) and without the resource bundle.
-      # Fail the release before anything is published if either regresses.
-      - name: Verify XCFramework before publishing
-        run: |
-          set -o pipefail
-          XCFW=.build/PurseSecureFields.xcframework
-
-          for slice in "$XCFW"/ios-*; do
-            fw="$slice/PurseSecureFields.framework"
-            ls "$fw/Modules/PurseSecureFields.swiftmodule/"*.swiftinterface > /dev/null \
-              || { echo "::error::$slice is missing Modules/PurseSecureFields.swiftmodule/*.swiftinterface — consumers cannot import the SDK."; exit 1; }
-            test -d "$fw/PurseSecureFields_PurseSecureFields.bundle" \
-              || { echo "::error::$slice is missing PurseSecureFields_PurseSecureFields.bundle — badge assets would be absent at runtime."; exit 1; }
-          done
-
-          # Smoke test: actually compile an `import PurseSecureFields` against the
-          # simulator slice, exactly as a consumer's build would.
-          echo 'import PurseSecureFields' > /tmp/smoke.swift
-          xcrun -sdk iphonesimulator swiftc \
-            -target arm64-apple-ios15.0-simulator \
-            -F "$XCFW/ios-arm64_x86_64-simulator" \
-            -emit-object -o /dev/null /tmp/smoke.swift \
-            || { echo "::error::'import PurseSecureFields' does not compile against the built XCFramework."; exit 1; }
-          echo "XCFramework verified: Modules/ + resource bundle present, import compiles."
 
       - name: Update Package.swift to binary target
         run: |
