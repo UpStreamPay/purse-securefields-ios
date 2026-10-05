@@ -94,6 +94,12 @@ never given to checkout, so it is not in `.git/config` while package code builds
 the reviewers. The person who started the run cannot approve it, and only `v*` tags may deploy to
 the environment (PCI-DSS 6.5.1).
 
+**The owner of `RELEASE_PLEASE_TOKEN` can never approve a release.** release-please publishes the
+GitHub release with that token, so GitHub counts its owner as the person who started every release
+run, and *Prevent self-review* excludes them. Another member of `@UpStreamPay/pci-dss` approves.
+Do not turn self-review prevention off to work around it. A GitHub App instead of a personal token
+would start releases as `<app>[bot]` and let every reviewer approve; it needs an org admin to create.
+
 The environment must be configured **before** a workflow naming it runs: GitHub creates a missing
 environment on the first run, with no protection at all. Configuring it is not enough either — read
 it back. v1.10.0 was signed and published without any approval because `release` existed with no
@@ -169,6 +175,16 @@ the git tag. `Package.swift` is updated by CI after the release is created.
 | `docs:`, `chore:`, `style:`, `test:`, `ci:` | No release | — |
 
 Pushes that contain only non-releasable commits produce no release PR and no tag.
+
+### Known issue: the release PR lists the whole history
+
+release-please finds the previous release by walking `main` back to the commit its tag points to.
+`release.yml` then moves every tag onto its binary-target commit (the `Package.swift` rewrite), which
+is never on `main`, so release-please never finds it. It walks back to the first commit instead:
+every release PR lists the whole history in its changelog, and any push to `main` — even `ci:` or
+`docs:` only — reopens a release PR for the next minor version, because old `feat:` commits count
+again. Until this is fixed, **check the changelog of every release PR**, and close it when `main`
+holds nothing new to ship (#55 and #56 were closed for that reason).
 
 ---
 
