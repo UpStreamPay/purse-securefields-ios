@@ -14,7 +14,7 @@ The release process is fully driven from GitHub:
 | Step | Trigger | What happens |
 |---|---|---|
 | 1 | Push to `main` | release-please opens or updates a release PR with a changelog and version bump |
-| 2 | Merge the release PR | release-please creates the GitHub Release and tag (e.g. `v1.1.0`) |
+| 2 | Merge the release PR | release-please creates the GitHub Release and its tag (e.g. `sdk-v1.11.0`) on `main` |
 | 3 | GitHub Release published | A codeowner approves the `release` environment; CI then builds a signed XCFramework, computes its checksum, and updates `Package.swift` to a binary target pointing to the new release |
 
 Merging the release PR triggers the release; a codeowner then approves it before anything is built
@@ -82,8 +82,8 @@ identity secret to keep in sync.
 `release.yml` checks its three secrets inside the gated job and **fails** with their names when one
 is missing, instead of dying inside the certificate import or at the retag.
 
-`GITHUB_TOKEN` covers the asset upload, under the job's `contents: write`. The tag move does not use
-it: `GITHUB_TOKEN` cannot bypass the `release tags` ruleset (see
+`GITHUB_TOKEN` covers the asset upload, under the job's `contents: write`. Creating the SPM tag does
+not use it: `GITHUB_TOKEN` cannot bypass the `release tags` ruleset (see
 [ci.md](ci.md#repository-settings)). `RELEASE_PLEASE_TOKEN` is used for that one `git push` only and
 never given to checkout, so it is not in `.git/config` while package code builds.
 
@@ -91,7 +91,7 @@ never given to checkout, so it is not in `.git/config` while package code builds
 
 `release.yml` runs in the **`release` environment**. Each run waits until a member of
 `@UpStreamPay/pci-dss` approves it under **Actions → the run → Review deployments**; GitHub emails
-the reviewers. The person who started the run cannot approve it, and only `v*` tags may deploy to
+the reviewers. The person who started the run cannot approve it, and only `sdk-v*` tags may deploy to
 the environment (PCI-DSS 6.5.1).
 
 **The owner of `RELEASE_PLEASE_TOKEN` can never approve a release.** release-please publishes the
@@ -134,9 +134,9 @@ one set of rules (one reviewer list, one list of refs allowed to deploy):
 | | `release-please` | `release` |
 |---|---|---|
 | Job | `release-please.yml` | `release.yml` |
-| Runs | on every push to `main`, unattended | on a published release (`v*` tag) |
+| Runs | on every push to `main`, unattended | on a published release (`sdk-v*` tag) |
 | Approval | none: it only opens or updates the release PR, which is reviewed anyway | `@UpStreamPay/pci-dss`: it signs and publishes binaries |
-| Deploys from | `main` | `v*` tags |
+| Deploys from | `main` | `sdk-v*` tags |
 | Secrets | `RELEASE_PLEASE_TOKEN` | `RELEASE_PLEASE_TOKEN`, `APPLE_SIGNING_*` |
 
 Every way of collapsing them into one gives one of the jobs the wrong rules:
@@ -176,15 +176,21 @@ the git tag. `Package.swift` is updated by CI after the release is created.
 
 Pushes that contain only non-releasable commits produce no release PR and no tag.
 
-### Known issue: the release PR lists the whole history
+### Two tags per version
 
-release-please finds the previous release by walking `main` back to the commit its tag points to.
-`release.yml` then moves every tag onto its binary-target commit (the `Package.swift` rewrite), which
-is never on `main`, so release-please never finds it. It walks back to the first commit instead:
-every release PR lists the whole history in its changelog, and any push to `main` — even `ci:` or
-`docs:` only — reopens a release PR for the next minor version, because old `feat:` commits count
-again. Until this is fixed, **check the changelog of every release PR**, and close it when `main`
-holds nothing new to ship (#55 and #56 were closed for that reason).
+Every version has two tags, each with one job:
+
+| Tag | Created by | Points to | Read by |
+|---|---|---|---|
+| `sdk-v1.11.0` | release-please, when the release PR is merged | the release commit, **on `main`**; never moved | release-please, to find the previous release; the GitHub release (and its zip) hangs off it |
+| `v1.11.0` | `release.yml`, after approval | the binary-target commit (`Package.swift` pointing at the signed zip), never on `main` | **SPM** — merchants resolve `1.11.0` from it |
+
+SPM only reads semver tags, so it ignores `sdk-v*`; release-please only reads its own `sdk-v*`
+tags, so it ignores `v*`. Until 1.10.0 a single `vX.Y.Z` tag did both jobs: `release.yml` moved it
+off `main` onto the binary commit, release-please then never found the previous release, and every
+release PR listed the whole history (#55, #56, #58, #60, #62 and #64 were closed for that reason).
+`bootstrap-sha` in `release-please-config.json` tells release-please where 1.10.0 is on `main`,
+since the old tags are not in its format; it is only used until the first `sdk-v*` release exists.
 
 ---
 
@@ -206,7 +212,7 @@ are included.
 
 When the version is ready to ship, merge the release PR. release-please:
 
-1. Creates an annotated git tag (e.g. `v1.1.0`)
+1. Creates a git tag on the release commit (e.g. `sdk-v1.11.0`)
 2. Creates a GitHub Release with the changelog as the body
 3. Sets the release status to `published` — this fires the `.github/workflows/release.yml`
    workflow
@@ -233,8 +239,9 @@ approve the `release` environment:
 6. Zips the XCFramework and computes its SHA-256 checksum with `swift package compute-checksum`
 7. Rewrites `Package.swift` to a `.binaryTarget` pointing to the GitHub Release download URL
    and the computed checksum
-8. Commits the updated `Package.swift`, force-tags the release commit, and force-pushes the tag
-   with `RELEASE_PLEASE_TOKEN` (the only token the `release tags` ruleset lets through)
+8. Commits the updated `Package.swift` and **creates** the SPM tag (`v1.11.0`) on that commit,
+   pushed with `RELEASE_PLEASE_TOKEN` (the only token the `release tags` ruleset lets through) —
+   never `--force`, so a re-run cannot rewrite a tag merchants already resolve
 9. Uploads `PurseSecureFields.xcframework.zip` to the GitHub Release as a binary asset
 
 After CI completes, the GitHub Release contains the signed XCFramework zip and the updated
