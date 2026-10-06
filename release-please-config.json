@@ -1,7 +1,11 @@
 {
+  "bootstrap-sha": "e415040cb16be2f907d507ead4936be35fa87441",
   "packages": {
     ".": {
       "release-type": "simple",
+      "component": "sdk",
+      "include-component-in-tag": true,
+      "pull-request-title-pattern": "chore${scope}: release ${version}",
       "changelog-sections": [
         {"type": "feat",     "section": "Features"},
         {"type": "fix",      "section": "Bug Fixes"},

@@ -7,8 +7,11 @@ on:
 permissions:
   contents: write
 
-# Read by every step through the environment, never interpolated into a script: a tag name
-# is text anyone with write access chooses.
+# Two tags per version. release-please creates `sdk-vX.Y.Z` on the release commit on main and
+# never moves it — that is how it finds the previous release. This workflow then creates `vX.Y.Z`
+# on the binary-target commit (Package.swift pointing at the signed zip), the only tag SPM sees.
+# TAG (the release's) is read by every step through the environment, never interpolated into a
+# script: a tag name is text anyone with write access chooses.
 env:
   TAG: ${{ github.event.release.tag_name }}
 
@@ -35,6 +38,14 @@ jobs:
         run: |
           git merge-base --is-ancestor "$TAG" origin/main \
             || { echo "::error::$TAG is not on main — only reviewed code is released."; exit 1; }
+
+      # The release tag must be release-please's own `sdk-vX.Y.Z`; VERSION (`vX.Y.Z`) is the SPM
+      # tag this run creates. Anything else — an old-style `vX.Y.Z` release, a typo — stops here.
+      - name: Read the version from the release tag
+        run: |
+          [[ "$TAG" =~ ^sdk-v[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+            || { echo "::error::$TAG is not a release-please tag (sdk-vX.Y.Z)."; exit 1; }
+          echo "VERSION=${TAG#sdk-}" >> "$GITHUB_ENV"
 
       # A missing secret otherwise surfaces deep inside the certificate import ("At least one of
       # p12-filepath or p12-file-base64 must be provided") or at the retag. Say what is missing instead.
@@ -82,9 +93,8 @@ jobs:
 
       - name: Update Package.swift to binary target
         run: |
-          VERSION="$TAG"
-          REPO="$GITHUB_REPOSITORY"
-          URL="https://github.com/${REPO}/releases/download/${VERSION}/PurseSecureFields.xcframework.zip"
+          # The zip is attached to the GitHub release, which hangs off the release-please tag.
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/PurseSecureFields.xcframework.zip"
           cat > Package.swift << EOF
           // swift-tools-version: 5.9
           import PackageDescription
@@ -105,24 +115,25 @@ jobs:
           )
           EOF
 
-      # The `release tags` ruleset lets only repository admins create or move a v* tag, so the push
-      # goes out as RELEASE_PLEASE_TOKEN (an admin's token, readable only inside this approved job)
-      # and not as GITHUB_TOKEN: bypassing the GitHub Actions app instead would let any workflow on
-      # any branch move a tag. The token is used for this one command only, never handed to
-      # checkout, so it is not in .git/config while package code builds.
-      - name: Commit & retag
+      # The `release tags` ruleset lets only repository admins create a v* tag, so the push goes
+      # out as RELEASE_PLEASE_TOKEN (an admin's token, readable only inside this approved job) and
+      # not as GITHUB_TOKEN: bypassing the GitHub Actions app instead would let any workflow on any
+      # branch write a tag. The token is used for this one command only, never handed to checkout,
+      # so it is not in .git/config while package code builds. The SPM tag is created, never moved:
+      # no --force, so a re-run that finds it already there fails instead of rewriting it.
+      - name: Commit & tag for SPM
         env:
           RELEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Package.swift
-          git commit -m "release: ${TAG} — binary target"
-          git tag -f "${TAG}"
+          git commit -m "release: ${VERSION} — binary target"
+          git tag "${VERSION}"
           # The empty extraheader drops checkout's GITHUB_TOKEN header, so the URL's token is used.
           git -c http.https://github.com/.extraheader= \
             push "https://x-access-token:${RELEASE_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
-            "refs/tags/${TAG}" --force
+            "refs/tags/${VERSION}"
 
       - name: Upload XCFramework to release
         run: |
