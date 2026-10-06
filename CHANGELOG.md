@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.10.1](https://github.com/UpStreamPay/purse-securefields-ios/compare/sdk-v1.10.0...sdk-v1.10.1) (2026-10-06)
+
+
+### Documentation
+
+* document the release environments and the tag ruleset (SDK-12357) ([a6d7f20](https://github.com/UpStreamPay/purse-securefields-ios/commit/a6d7f20ad96b4164cc45fbf6e355b2916f57ef40))
+* who can approve a release, and the full-history changelog (SDK-12357) ([#57](https://github.com/UpStreamPay/purse-securefields-ios/issues/57)) ([cb0c387](https://github.com/UpStreamPay/purse-securefields-ios/commit/cb0c3872869114e83e78aae9072980fb2c4d3460))
+
 ## [1.10.0](https://github.com/UpStreamPay/purse-securefields-ios/compare/v1.9.0...v1.10.0) (2026-09-30)
 
 
