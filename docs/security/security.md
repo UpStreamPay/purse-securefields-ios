@@ -6,7 +6,7 @@ code. The SDK handles tokenization directly — your app only receives the resul
 `vault_form_token`.
 
 > For PCI DSS compliance review, share this page with your QSA. The SDK is designed to support
-> SAQ A-EP eligibility, but formal scope determination requires a QSA assessment.
+> SAQ A eligibility, but formal scope determination requires a QSA assessment.
 
 ---
 
