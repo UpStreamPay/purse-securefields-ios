@@ -3,8 +3,11 @@ import Foundation
 /// Card bytes the SDK can overwrite. A Swift `String` is immutable and its storage is released
 /// without being cleared, so a PAN or CVV held in one stays readable in a memory dump until the
 /// allocator happens to reuse that memory. This buffer owns its allocation and zeroes it on
-/// `wipe()`, on `deinit`, and every time it outgrows it — no copy of its bytes is ever left behind.
-/// See docs/security/security.md, "Card data in memory".
+/// `wipe()`, on `deinit`, and every time it outgrows it, so the buffer itself leaves no copy of its
+/// bytes behind. The one way out is `data()`: it shares the bytes in place only from
+/// `minimumSharedCount` bytes up — below that, `Data` copies them inline, out of `wipe()`'s reach,
+/// and the `assert` guarding it is stripped in Release. See docs/security/security.md, "Card data
+/// in memory".
 ///
 /// A class, not a struct: a copy-on-write value would leave stray, unzeroed copies of the bytes
 /// wherever it was mutated while shared.

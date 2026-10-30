@@ -556,6 +556,11 @@ public final class SecureFieldsManager {
     /// the card. On success the form is reset with `clearFields()` before
     /// `secureFieldsDidTokenize` fires. Either way the SDK's internal copies of the card are
     /// zeroed once the gateway has answered.
+    ///
+    /// Form validity does not change at submit: the fields stay valid while the request is in
+    /// flight, so `secureFieldsFormValidityChanged` does not fire, and a second `submit()` before
+    /// the first completes is ignored. A host that disables its Pay button on tap must re-enable
+    /// it in `secureFieldsDidFail` — no validity event will.
     public func submit(selectedNetwork: CardBrand? = nil, saveToken: Bool = false) {
         guard !isSubmitting else { return }
         // A configured `pan` has no expiry to send without a configured `expDate`, and the gateway

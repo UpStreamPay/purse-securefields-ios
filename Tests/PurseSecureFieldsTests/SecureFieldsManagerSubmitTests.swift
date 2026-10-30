@@ -232,6 +232,52 @@ struct SecureFieldsManagerSubmitTests {
         #expect(manager.selectedBrand == nil)
     }
 
+    /// `clearFields()` while a request is in flight must not touch its body: hosts may well call it
+    /// right after `submit()`. The first answer is held until the clear, then a 503 makes the client
+    /// retry — and the retried request's body is read only after `clearFields()` ran.
+    @Test func clearFieldsDuringTheRequestLeavesTheBodyIntact() async throws {
+        let tenantId = "inflight-\(UUID().uuidString)"
+        let attempts = Counter()
+        let release = DispatchSemaphore(value: 0)
+        StubGatewayURLProtocol.register(tenantId: tenantId) { request, _ in
+            if request.url!.path.hasSuffix("/bin-lookup") {
+                return .init(statusCode: 200, body: #"{"brands":[{"brand":"VISA","is_main":true,"pan_lengths":[16],"cvv_lengths":[3]}]}"#)
+            }
+            guard attempts.next() == 1 else {
+                return .init(statusCode: 200, body: #"{"form_token":"tok_inflight","card":{"bin":"41111111","last_four_digits":"1111"}}"#)
+            }
+            _ = release.wait(timeout: .now() + 10)
+            return .init(statusCode: 503, body: "")
+        }
+        let manager = makeManager(tenantId: tenantId, brands: [.visa])
+        let delegate = SpyDelegate()
+        manager.delegate = delegate
+
+        type("4111111111111111", into: panField(manager))
+        try await waitUntil("the VISA brand to be detected") { !delegate.brands.isEmpty }
+        type("123", into: cvvField(manager))
+        type("1230", into: expField(manager))
+
+        manager.submit()
+        try await waitUntil("the first request to reach the gateway") {
+            StubGatewayURLProtocol.requests(tenantId: tenantId)
+                .contains { $0.request.url!.path.hasSuffix("/forms/secure-fields") }
+        }
+        manager.clearFields()
+        release.signal()
+        try await waitUntil("tokenization to complete") { delegate.tokenized != nil || delegate.failure != nil }
+
+        #expect(delegate.tokenized?.vaultFormToken == "tok_inflight")
+        let bodies = StubGatewayURLProtocol.requests(tenantId: tenantId)
+            .filter { $0.request.url!.path.hasSuffix("/forms/secure-fields") }
+            .compactMap(\.body)
+        #expect(bodies.count == 2)
+        let retried = try #require(bodies.last)
+        let json = try #require(try JSONSerialization.jsonObject(with: retried) as? [String: Any])
+        #expect(json["cvv"] as? String == "123")
+        #expect((json["card"] as? [String: Any])?["pan"] as? String == "4111111111111111")
+    }
+
     // MARK: CVV-only
 
     /// The CVV-only form end to end: no BIN lookup is ever sent, the tokenize body is exactly

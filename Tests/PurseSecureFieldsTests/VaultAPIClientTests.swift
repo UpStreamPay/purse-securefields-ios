@@ -104,17 +104,20 @@ struct VaultAPIClientTests {
 
     /// The payload's card values are zeroed as soon as the body has been built from them,
     /// before the request even goes out.
-    @Test func payloadIsWipedOnceTheBodyIsBuilt() {
+    @Test func payloadIsWipedOnceTheBodyIsBuilt() async {
         let tenantId = "t-\(UUID().uuidString)"
         StubGatewayURLProtocol.register(tenantId: tenantId) { _, _ in
             .init(statusCode: 200, body: #"{"form_token":"tok"}"#)
         }
         let payload = makePayload()
+        let client = makeClient(tenantId: tenantId)
 
-        makeClient(tenantId: tenantId).tokenize(tenantId: tenantId, payload: payload) { _ in }
-
-        #expect(payload.cvv!.isZeroed)
-        #expect(payload.card!.pan.isZeroed)
+        await withCheckedContinuation { continuation in
+            client.tokenize(tenantId: tenantId, payload: payload) { _ in continuation.resume() }
+            // Checked before the request completes: the wipe must not wait for the gateway.
+            #expect(payload.cvv!.isZeroed)
+            #expect(payload.card!.pan.isZeroed)
+        }
     }
 
     /// The body is zeroed once the gateway has answered, whatever the answer — and is still

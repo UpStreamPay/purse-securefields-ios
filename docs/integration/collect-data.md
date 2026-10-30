@@ -184,6 +184,11 @@ After a declined or failed tokenization the fields keep their content, so the us
 without re-entering the card. After a successful one the SDK has already reset the form by the
 time `secureFieldsDidTokenize` fires.
 
+Form validity does not change at submit: the fields stay valid while the request is in flight,
+so `secureFieldsFormValidityChanged` does not fire, and a second `submit()` before the first one
+completes is ignored. If you disable your Pay button on tap, re-enable it in
+`secureFieldsDidFail`, as the [error-handling example](#handle-errors) does — no validity event will do it for you.
+
 On a [CVV-only form](api-reference.md#cvv-only) `submit()` sends the CVV alone — no `card`
 block, no network — and `selectedNetwork` / `saveToken` are ignored with a console warning.
 
