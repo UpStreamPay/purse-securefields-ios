@@ -32,7 +32,10 @@ Tests/              — SecureFieldsTests
 - Three read-blocking overrides in `SecureBaseField` prevent the host app from reading card data via UITextField casts. Do not remove any of them:
   - `override var text: String? { get { nil } … }` — blocks `(field as? UITextField)?.text`
   - `override var attributedText: NSAttributedString? { get { nil } … }` — blocks `attributedText` reads (which would expose card data even with the `text` override)
-  - `override var accessibilityValue: String? { get { nil } … }` — blocks VoiceOver / accessibility API reads
+  - `override var accessibilityValue: String? { get { nil } … }` — blocks reads of the public property (UIKit's accessibility runtime still reads the value through its own private path; see docs/security/security.md)
+- `text(in:)` and `attributedText(in:)` (the `UITextInput` read path) return `SecureBaseField.masked(_:)` — one `•` per UTF-16 unit, whitespace kept. **Never make them return `nil` or a different length**: UIKit's keyboard bridge (`UIKBRTIPartner`) builds the keyboard's document context from `text(in:)` on every keystroke, and offsets are UTF-16. `DemoUITests.testKeyboardDeleteStillEditsMaskedPAN` covers it.
+- The `font` setter forces tabular digits (`withTabularDigits(_:)`). Do not bypass it with `super.font`: proportional digits make `firstRect(for:)`/`selectionRects(for:)` vary by digit, a geometry side channel on the PAN.
+- Swizzling, calling `UITextField`'s implementation directly, private KVC keys, the `UIFieldEditor` subview and memory/pixel reads are out of reach of in-process controls. Accepted and documented in docs/security/security.md ("Limits of in-process isolation", SDK-12548). Do not add runtime integrity checks without revisiting that decision.
 - UIKit renders from its internal backing storage and is unaffected by these getter overrides.
 - All internal reads use `super.text` (bypasses the nil override). Never change these to `self.text`.
 - PAN, CVV, expDate, holderName fields are `private` in the manager. They are exposed only as `UIView` (`cvvView`, `expDateView`, `holderNameView`) or `SecurePANContainer` (`panContainer`).
@@ -73,7 +76,7 @@ Tests/              — SecureFieldsTests
 
 ## Style / placeholder config
 - Applied once at init via `applyConfig(_:)` in the manager.
-- `SecureFieldsStyle` sets font, textColor, tintColor, keyboardAppearance, placeholderColor.
+- `SecureFieldsStyle` sets font (digits always rendered tabular, see Field isolation), textColor, tintColor, keyboardAppearance, placeholderColor.
 - `SecureFieldsPlaceholders` sets per-field placeholder strings. A `SecureFieldConfig.placeholder` in `fields` wins over it.
 - No `setPlaceholders` runtime method — config is the single source.
 
