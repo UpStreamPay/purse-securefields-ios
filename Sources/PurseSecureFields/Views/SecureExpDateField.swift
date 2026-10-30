@@ -32,8 +32,11 @@ final class SecureExpDateField: SecureBaseField {
         text = truncated.count > 2
             ? String(truncated.prefix(2)) + "/" + String(truncated.dropFirst(2))
             : truncated
+        if let (month, year) = parsedExpiry {
+            setValidity(month >= 1 && month <= 12 && CardValidator.isExpiryValid(month: month, year: year))
+        } else {
+            setValidity(false)
+        }
         onContentChanged?()
-        guard let (month, year) = parsedExpiry else { return setValidity(false) }
-        setValidity(month >= 1 && month <= 12 && CardValidator.isExpiryValid(month: month, year: year))
     }
 }

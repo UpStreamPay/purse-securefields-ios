@@ -75,8 +75,8 @@ final class SecureCVVField: SecureBaseField {
         fmt.calendar = Calendar(identifier: .gregorian)
         fmt.dateFormat = "yyyy-MM-dd"
         text = fmt.string(from: picker.date)
-        onContentChanged?()
         setValidity(true)
+        onContentChanged?()
     }
 
     /// Re-checks validity against the current `validLengths` without touching the stored text.
@@ -99,8 +99,8 @@ final class SecureCVVField: SecureBaseField {
         // safety bound against unbounded growth, not a format rule.
         let kept = String(digits.prefix(Self.maxStoredLength))
         if storedText != kept { text = kept }
-        onContentChanged?()
         setValidity(validLengths.contains(kept.count))
+        onContentChanged?()
     }
 
     /// Well past every real CVV length (and past the 10 characters of a `yyyy-MM-dd` birth date):

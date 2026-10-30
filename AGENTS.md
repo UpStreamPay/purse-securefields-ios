@@ -90,7 +90,7 @@ Tests/              — SecureFieldsTests
 - Not supported yet: Oney birthdate in CVV-only (field stays in `.cvv` mode; web/Android skip the network call and return only a birth date — needs its own result shape).
 
 ## Delegate events
-- `secureFieldsContentChanged()` — fires on every keystroke/change in any field.
+- `secureFieldsContentChanged()` — fires on every keystroke/change in any field, **after** that field has revalidated: every field calls `setValidity` before `onContentChanged`/`onDigitsChanged`, so `isFieldValid` read from this callback is current. Keep that order in any new field (`contentChangedSeesThisKeystrokesValidity` guards it).
 - `secureFieldsFocusChanged(field:isFocused:)` — fires on focus in/out.
 - `secureFieldsFormValidityChanged(_:)` — fires only when overall form validity flips.
 - `secureFieldsBrandsDetected(_:)` — fires after BIN lookup.
