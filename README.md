@@ -253,7 +253,8 @@ PAN length and CVV length are driven by the BIN lookup API response — not hard
 - Sensitive field classes are `internal` — inaccessible to the host app module
 - No card data is logged; network logs are gated behind `#if DEBUG` and limited to status codes
 - `X-Purse-SDK-Version` and `X-Request-ID` headers are sent on every request
-- Memory is cleared on `clearFields()` — call this after successful tokenization if you do not need the form to persist
+- The SDK's internal copies of the PAN, CVV and cardholder name are zeroable byte buffers, wiped once the tokenization request has been answered
+- A failed `submit()` leaves the fields filled, so the tokenization can be retried; a successful one resets the form with `clearFields()`
 
 ## TokenizationResult
 

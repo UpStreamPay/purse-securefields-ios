@@ -551,6 +551,11 @@ public final class SecureFieldsManager {
     /// ignored with a warning: they describe the `card` block, and a CVV-only request carries
     /// none — the body is `{"cvv": "…"}` alone, as on web and Android. The result then has no
     /// `bin`, `lastFourDigits` or `selectedNetwork`.
+    ///
+    /// On failure the fields keep their content, so the cardholder can retry without re-entering
+    /// the card. On success the form is reset with `clearFields()` before
+    /// `secureFieldsDidTokenize` fires. Either way the SDK's internal copies of the card are
+    /// zeroed once the gateway has answered.
     public func submit(selectedNetwork: CardBrand? = nil, saveToken: Bool = false) {
         guard !isSubmitting else { return }
         // A configured `pan` has no expiry to send without a configured `expDate`, and the gateway
@@ -583,9 +588,9 @@ public final class SecureFieldsManager {
                 brandSelectorEnabled: config.brandSelector
             )
             let expiry = expDateField.parsedExpiry
-            let holderName = holderNameField.rawValue.trimmingCharacters(in: .whitespaces)
+            let holderName = holderNameField.copyTrimmedValue()
             card = .init(
-                pan: panField.rawValue,
+                pan: panField.copyRawValue(),
                 expiryMonth: expiry?.month,
                 expiryYear: expiry?.year,
                 cardHolderName: holderName.isEmpty ? nil : holderName,
@@ -601,20 +606,15 @@ public final class SecureFieldsManager {
         // birthdate mode — and the value it holds is then a real CVV, not a date.
         let isBirthdate = cvvField.inputMode == .birthdate
 
-        let payload = TokenizationPayload(cvv: isBirthdate ? nil : cvvField.rawValue, card: card)
+        // The card values are copied into wipeable buffers, not `String`s: `apiClient` zeroes
+        // them once the body is built, and the body once the gateway has answered. The fields on
+        // screen are left alone here, so a failed tokenization can be retried without
+        // re-entering the card; only a success resets them (below).
+        let payload = TokenizationPayload(cvv: isBirthdate ? nil : cvvField.copyRawValue(), card: card)
 
-        // Captured before the fields are zeroed just below: the birth date is deliberately not
-        // sent to the gateway and not echoed by the response, so this local is the only way it
-        // can still reach the host on the result.
+        // The birth date is deliberately not sent to the gateway and not echoed by the response,
+        // so this local is the only way it can still reach the host on the result.
         let submittedBirthDate = isBirthdate ? cvvField.rawValue : nil
-
-        // PCI compliance: raw values are copied into `payload` above — zero the field
-        // buffers immediately, before the network round-trip, not on completion.
-        panField.clearSensitiveData()
-        cvvField.clearSensitiveData()
-        expDateField.clearSensitiveData()
-        holderNameField.clearSensitiveData()
-        notifyFormValidity()
 
         monitoring.recordSubmitStart()
         apiClient.tokenize(tenantId: config.tenantId, payload: payload) { [weak self] result in
@@ -632,10 +632,10 @@ public final class SecureFieldsManager {
                         birthDate: submittedBirthDate,
                         selectedNetwork: selectedBrand
                     )
-                    // Reset brand/BIN state after a successful tokenization (fields were already
-                    // zeroed at submit). Otherwise stale `detectedBrands`/`selectedBrand`/lengths
-                    // bleed into the next transaction. Built `tokenResult` first so it still
-                    // carries the brands from this transaction.
+                    // The card is tokenized: the form has served its purpose, so reset it —
+                    // fields, brand and BIN state — or stale `detectedBrands`/`selectedBrand`/
+                    // lengths bleed into the next transaction. Built `tokenResult` first so it
+                    // still carries this transaction's brands. A failure leaves the form alone.
                     self.clearFields()
                     self.delegate?.secureFieldsDidTokenize(tokenResult)
                 case .failure(let error):

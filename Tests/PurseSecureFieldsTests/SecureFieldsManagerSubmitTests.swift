@@ -35,6 +35,13 @@ struct SecureFieldsManagerSubmitTests {
         return SecureFieldsManager(config: config)
     }
 
+    /// Counts gateway calls; the stub handler runs on URLSession's queue.
+    private final class Counter: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value = 0
+        func next() -> Int { lock.lock(); defer { lock.unlock() }; value += 1; return value }
+    }
+
     private func type(_ value: String, into field: SecureBaseField) {
         field.text = value
         field.textDidChange()
@@ -174,6 +181,57 @@ struct SecureFieldsManagerSubmitTests {
         #expect(delegate.tokenized?.selectedNetwork == .visa)
     }
 
+    // MARK: Fields kept on submit
+
+    /// SDK-12549. A failed tokenization must not cost the cardholder their card: the fields keep
+    /// their text and validity through submit, so the same form can be submitted again as-is.
+    /// Only the SDK's internal copies are zeroed. The success that follows resets the form.
+    @Test func failedSubmitKeepsTheFieldsSoTheCardholderCanRetry() async throws {
+        let tenantId = "retry-\(UUID().uuidString)"
+        let attempts = Counter()
+        StubGatewayURLProtocol.register(tenantId: tenantId) { request, _ in
+            if request.url!.path.hasSuffix("/bin-lookup") {
+                return .init(statusCode: 200, body: #"{"brands":[{"brand":"VISA","is_main":true,"pan_lengths":[16],"cvv_lengths":[3]}]}"#)
+            }
+            return attempts.next() == 1
+                ? .init(statusCode: 400, body: #"{"error":"INVALID_FORM"}"#)
+                : .init(statusCode: 200, body: #"{"form_token":"tok_retry","card":{"bin":"41111111","last_four_digits":"1111"}}"#)
+        }
+        let manager = makeManager(tenantId: tenantId, brands: [.visa])
+        let delegate = SpyDelegate()
+        manager.delegate = delegate
+
+        type("4111111111111111", into: panField(manager))
+        try await waitUntil("the VISA brand to be detected") { !delegate.brands.isEmpty }
+        type("123", into: cvvField(manager))
+        type("1230", into: expField(manager))
+
+        manager.submit()
+        try await waitUntil("the first attempt to fail") { delegate.failure != nil }
+
+        for field in [SecureField.pan, .cvv, .expDate] {
+            #expect(manager.hasFieldContent(field), "\(field) must survive a failed submit")
+            #expect(manager.isFieldValid(field))
+        }
+        #expect(manager.selectedBrand == .visa)
+
+        manager.submit()
+        try await waitUntil("the retry to succeed") { delegate.tokenized != nil }
+
+        let bodies = StubGatewayURLProtocol.requests(tenantId: tenantId)
+            .filter { $0.request.url!.path.hasSuffix("/forms/secure-fields") }
+            .compactMap(\.body)
+        #expect(bodies.count == 2)
+        let retried = try #require(try JSONSerialization.jsonObject(with: bodies[1]) as? [String: Any])
+        #expect(retried["cvv"] as? String == "123")
+        #expect((retried["card"] as? [String: Any])?["pan"] as? String == "4111111111111111")
+
+        for field in [SecureField.pan, .cvv, .expDate] {
+            #expect(!manager.hasFieldContent(field), "\(field) must be reset once tokenized")
+        }
+        #expect(manager.selectedBrand == nil)
+    }
+
     // MARK: CVV-only
 
     /// The CVV-only form end to end: no BIN lookup is ever sent, the tokenize body is exactly
@@ -213,7 +271,7 @@ struct SecureFieldsManagerSubmitTests {
         #expect(json["card"] == nil, "a CVV-only request must not carry `card`, not even empty")
         #expect(json.count == 1)
 
-        // Fields are zeroed at submit and brand state reset on success, as for a full form.
+        // A success resets the form, as for a full form.
         #expect(manager.hasFieldContent(.cvv) == false)
         #expect(manager.expectedLengths(for: .cvv) == [3, 4])
     }

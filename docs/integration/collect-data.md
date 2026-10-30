@@ -180,6 +180,10 @@ Call `submit()` when the user taps Pay. The SDK validates all fields internally 
 `submit()` is a no-op and fires `secureFieldsDidFail(.fieldsIncomplete)` if any required
 field is invalid. The Pay button guard above is belt-and-suspenders only.
 
+After a declined or failed tokenization the fields keep their content, so the user can retry
+without re-entering the card. After a successful one the SDK has already reset the form by the
+time `secureFieldsDidTokenize` fires.
+
 On a [CVV-only form](api-reference.md#cvv-only) `submit()` sends the CVV alone — no `card`
 block, no network — and `selectedNetwork` / `saveToken` are ignored with a console warning.
 
@@ -239,7 +243,8 @@ func secureFieldsDidTokenize(_ result: TokenizationResult) {
 
 ## Clear fields
 
-Call `clearFields()` to wipe all card data from memory and reset the form:
+A successful `submit()` resets the form itself. To empty it at any other time — the user
+abandons the payment, a screenshot was taken — call `clearFields()`:
 
 ```swift
 @objc func clearTapped() {
@@ -249,7 +254,7 @@ Call `clearFields()` to wipe all card data from memory and reset the form:
 }
 ```
 
-`clearFields()` zeroes all internal field buffers, cancels any pending BIN lookup, resets the
+`clearFields()` empties every field, cancels any pending BIN lookup, resets the
 brand selector, and fires `secureFieldsBrandsDetected([])` and
 `secureFieldsFormValidityChanged(false)` on your delegate.
 

@@ -17,6 +17,7 @@ code. The SDK handles tokenization directly — your app only receives the resul
 - [What your application cannot do](#what-your-application-cannot-do)
 - [Required hardening for production](#required-hardening-for-production)
 - [Built-in mitigations](#built-in-mitigations)
+- [Card data in memory](#card-data-in-memory)
 - [What the SDK sends to monitoring](#what-the-sdk-sends-to-monitoring)
 - [Export compliance](#export-compliance)
 - [See also](#see-also)
@@ -39,12 +40,18 @@ code. The SDK handles tokenization directly — your app only receives the resul
    `SecureExpDateField`, `SecureHolderNameField`).
 2. Field state (validity, character count — never the raw value) is delivered as delegate
    callbacks to your app.
-3. On `submit()`, the SDK reads raw values from its internal fields, makes a single HTTP POST
-   to the vault API, and immediately zeroes the in-memory buffers via `clearSensitiveData()`.
+3. On `submit()`, the SDK copies the raw values out of its fields into zeroable byte buffers,
+   builds the request body from them, makes a single HTTP POST to the vault API, and zeroes its
+   copies — see [Card data in memory](#card-data-in-memory). If tokenization fails, the fields
+   on screen keep their text, so the user can retry without re-entering the card. If it
+   succeeds, the SDK resets the form with `clearFields()`.
 4. Your app receives only `TokenizationResult` (with the token) or `SecureFieldsError`.
+5. Your app can call `clearFields()` at any other time the form should be emptied — after a
+   screenshot, or when the user abandons the payment.
 
-Raw card data exists only within the SDK module's memory during active user input and the brief
-tokenization window. It is not passed to your application code at any point.
+Raw card data exists only within the SDK module's memory: in the fields until they are cleared or
+the manager is released, and in the SDK's request copies until the gateway answers. It is not
+passed to your application code at any point.
 
 ---
 
@@ -138,14 +145,56 @@ if deviceIsJailbroken() {
 | **Keyboard learning disabled** | `autocorrectionType = .no` on all four fields; `spellCheckingType = .no` on PAN and cardholder name — keyboard never stores PAN, CVV, or name input |
 | **Autofill scoped intentionally** | PAN uses `textContentType = .creditCardNumber` (enables Wallet-saved-card suggestions and camera card scan); cardholder name uses `.name` (contact autofill); CVV and expiry leave it unset since no matching autofill type exists — password managers and iCloud Keychain never see or cache these values, as none are exposed via `text`/`attributedText` getters (see above) |
 | **isSecureTextEntry on CVV** | CVV field uses `isSecureTextEntry = true` — input is masked and excluded from screenshots |
-| **Memory cleared on submit** | `clearSensitiveData()` zeroes internal field content immediately after the tokenization request is built |
-| **Memory cleared on clearFields()** | All field buffers are zeroed; pending BIN lookups are cancelled |
+| **Card copies zeroed after send** | The PAN, CVV and cardholder name the SDK copies to build the tokenization request are held in `SensitiveBuffer`s, never `String`s, and are zeroed as soon as they have been sent — see [Card data in memory](#card-data-in-memory) |
+| **Fields cleared on clearFields()** | All fields are emptied, pending BIN lookups are cancelled and brand state is reset. A successful `submit()` calls it; a failed one leaves the fields for a retry |
 | **Ephemeral URLSession** | No URL cache, no cookie storage, `reloadIgnoringLocalCacheData` policy — no card data persists in the HTTP layer |
 | **HTTPS by construction** | `SecureFieldsConfig` takes a `VaultEnvironment`, not a raw URL — `apiRoot` is a fixed `https://` literal per case, so there's no host-app-supplied string that could be `http://` |
 | **No card data logging** | Debug prints are guarded by `#if DEBUG` — they produce no output in production builds |
 | **Remote monitoring never carries card data** | `RemoteLogger` (separate from local debug prints, opt-out via `monitoringEnabled`/omitting `apiKey`) sends events continuously as they happen — safety comes from every payload being structural metadata only (field names, brand lists, outcome codes), not from a time window. No caller has raw field values (PAN, CVV, expiry, cardholder name) to log in the first place |
 | **`VaultEnvironment.test` cannot reach a merchant's users** | Guarded at runtime: honoured only on a development build (simulator, or `get-task-allow` in the provisioning profile), downgraded to `.production` with a warning in a release-signed app. The case ships in the binary because the distributed XCFramework is archived in Release, so a compile-time guard would remove it from every shipped build — which is why the guard is a runtime one |
 
+---
+
+## Card data in memory
+
+A Swift `String` is immutable and its storage is released without being cleared: a PAN or CVV
+held in one stays in memory until the allocator happens to reuse it, which a memory dump can
+catch. So the copies the SDK makes **to build the tokenization request** never go through a
+`String`:
+
+1. On `submit()`, the PAN, CVV and cardholder name are copied straight from the fields' text into
+   `SensitiveBuffer`s — byte buffers the SDK allocates itself and can overwrite in place.
+2. The JSON request body is written from those buffers into another `SensitiveBuffer`
+   (`SensitiveJSONWriter`) — no `JSONEncoder`, no intermediate `String` or `Data`. Every
+   allocation outgrown along the way is zeroed before it is freed.
+3. The card buffers are zeroed as soon as the body is built. The body is handed to `URLSession`
+   without a copy, and zeroed once the gateway has answered or the request has failed — not
+   before, since a 5xx is retried with the same body. A buffer is also zeroed when it is freed,
+   whatever the path.
+
+The expiry date is not copied this way: on its own it is not sensitive authentication data, and
+it is sent as JSON integers.
+
+**What this does not cover:**
+
+- **The fields on screen after a failure.** Their text is left intact when tokenization fails, by
+  design: it is what lets the user retry without re-entering the card. No PCI DSS requirement
+  calls for clearing them — requirement 3.3.1 forbids *storing* sensitive authentication data
+  after authorization, and a field still displayed during the session is not storage.
+  Comparable SDKs (VGS Collect, Checkout.com Frames, Basis Theory Elements) keep them too. Once
+  tokenization succeeds the SDK clears them itself; at any other point clearing is up to you,
+  through `clearFields()`.
+- **UIKit's own storage.** A `UITextField` keeps its text in a `String` the SDK cannot zero,
+  and `clearFields()` can only replace it with an empty one. Formatting, validation and the BIN
+  lookup also read the field text as short-lived `String`s on each keystroke.
+- **Below the SDK.** `URLSession` and the TLS stack make their own copies of the bytes they send,
+  which no app code can reach.
+- **The Oney birth date on success.** `TokenizationResult.birthDate` hands the entered date back
+  to your app as a `String`, as public API output.
+
+None of this changes the SDK's exposure surface — this memory is never accessible to your app —
+but it narrows how long the SDK's own copies of card data survive in memory. The SDK persists
+nothing: no disk, no `UserDefaults`, no keychain, and an ephemeral `URLSession` with no cache.
 
 ---
 

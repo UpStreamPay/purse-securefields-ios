@@ -102,14 +102,31 @@ final class VaultAPIClient {
         }.resume()
     }
 
+    /// Takes ownership of `payload`: it is zeroed as soon as the request body is built, and the
+    /// body once the request has been answered — see `tokenize(tenantId:body:completion:)`.
     func tokenize(
         tenantId: String,
         payload: TokenizationPayload,
         completion: @escaping (Result<TokenizationResponse, SecureFieldsError>) -> Void
     ) {
+        let body = payload.jsonBody()
+        payload.wipe()
+        tokenize(tenantId: tenantId, body: body, completion: completion)
+    }
+
+    /// Takes ownership of `body` (UTF-8 JSON): the request reads it in place, without a copy, and
+    /// it is zeroed once the request has been answered or has failed — not before, since a 5xx is
+    /// retried with the same body. Below the SDK, URLSession and the TLS stack make their own
+    /// copies of the bytes they send, out of the SDK's reach.
+    func tokenize(
+        tenantId: String,
+        body: SensitiveBuffer,
+        completion: @escaping (Result<TokenizationResponse, SecureFieldsError>) -> Void
+    ) {
         let encoded = tenantId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? tenantId
         let urlString = "\(baseURL)/v1/tenants/\(encoded)/forms/secure-fields"
         guard let url = URL(string: urlString) else {
+            body.wipe()
             completion(.failure(.invalidResponse))
             return
         }
@@ -119,15 +136,12 @@ final class VaultAPIClient {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(Self.sdkVersion, forHTTPHeaderField: "X-Purse-SDK-Version")
         request.setValue(UUID().uuidString, forHTTPHeaderField: "X-Request-ID")
+        request.httpBody = body.data()
 
-        do {
-            request.httpBody = try JSONEncoder().encode(payload)
-        } catch {
-            completion(.failure(.networkError(error)))
-            return
+        perform(request: request, retries: maxRetries) { result in
+            body.wipe()
+            completion(result)
         }
-
-        perform(request: request, retries: maxRetries, completion: completion)
     }
 
     /// Error text for a non-2xx response. The gateway's documented shape is `{"error": "..."}`;
