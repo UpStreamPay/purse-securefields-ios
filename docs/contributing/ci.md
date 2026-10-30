@@ -39,7 +39,8 @@ submit first. The SDK declares no third-party source dependency in `Package.swif
 review covers the GitHub Actions the workflows use, and will cover the first package added.
 
 Dependabot (`.github/dependabot.yml`) proposes weekly updates of the pinned GitHub Actions only (there
-is no Swift package to watch), under a `ci:` prefix that keeps them out of the changelog.
+is no Swift package to watch), grouped into one pull request a week, under a `ci:` prefix that keeps
+them out of the changelog.
 
 `.github/workflows/codeql.yml` scans **Swift** and the **workflows** (`actions`) on every pull
 request, every push to `main` and weekly. It is an advanced setup on purpose: GitHub's default setup
