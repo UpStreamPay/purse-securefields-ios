@@ -39,7 +39,8 @@ submit first. The SDK declares no third-party source dependency in `Package.swif
 review covers the GitHub Actions the workflows use, and will cover the first package added.
 
 Dependabot (`.github/dependabot.yml`) proposes weekly updates of the pinned GitHub Actions only (there
-is no Swift package to watch), under a `ci:` prefix that keeps them out of the changelog.
+is no Swift package to watch), grouped into one pull request a week, under a `ci:` prefix that keeps
+them out of the changelog.
 
 `.github/workflows/codeql.yml` scans **Swift** and the **workflows** (`actions`) on every pull
 request, every push to `main` and weekly. It is an advanced setup on purpose: GitHub's default setup
@@ -76,7 +77,7 @@ which CODEOWNERS needs to apply.
 **`release tags` ruleset** on `refs/tags/v*` and `refs/tags/sdk-v*`: creation, update and deletion
 restricted, bypass for the **repository admin** role only. SPM resolves a version from its `v*` tag,
 so moving one changes the code every merchant gets. Both legitimate tag writes go out as
-`RELEASE_PLEASE_TOKEN`, an admin's token: release-please creating `sdk-vX.Y.Z` on `main`, and
+`TF_REPO_AUTOMATION_PAT`, an admin's token: release-please creating `sdk-vX.Y.Z` on `main`, and
 `release.yml` creating `vX.Y.Z` on the binary-target commit (see
 [release.md](release.md#two-tags-per-version)). Neither is ever moved. The GitHub Actions app is
 deliberately **not** a bypass actor: `GITHUB_TOKEN` belongs to every workflow run, and a workflow on
@@ -84,13 +85,13 @@ any branch can ask for `contents: write`, so that bypass would let anyone with w
 release tag.
 
 **`release-please` environment**: no reviewers, deployments from `main` only. It holds a copy of
-`RELEASE_PLEASE_TOKEN`, so only `release-please.yml` running on `main` can read it. Why this is a
+`TF_REPO_AUTOMATION_PAT`, so only `release-please.yml` running on `main` can read it. Why this is a
 separate environment from `release`:
 [release.md](release.md#why-two-environments-release-please-and-release).
 
 **`release` environment**: required reviewers `@UpStreamPay/pci-dss`, self-review prevented,
 deployments only from `sdk-v*` tags. It holds the `APPLE_SIGNING_*` secrets and the other copy of
-`RELEASE_PLEASE_TOKEN`. It must exist **before** a workflow naming it runs, otherwise GitHub
+`TF_REPO_AUTOMATION_PAT`. It must exist **before** a workflow naming it runs, otherwise GitHub
 creates it with no protection — the same goes for `release-please`. Read it back after changing
 it: an environment that exists is not one that is protected (v1.10.0 shipped through an empty one).
 
