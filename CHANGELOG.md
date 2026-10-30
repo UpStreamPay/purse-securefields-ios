@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.2](https://github.com/UpStreamPay/purse-securefields-ios/compare/sdk-v1.10.1...sdk-v1.10.2) (2026-10-30)
+
+
+### Documentation
+
+* **security:** the SDK supports SAQ A eligibility, not SAQ A-EP ([#67](https://github.com/UpStreamPay/purse-securefields-ios/issues/67)) ([78dc841](https://github.com/UpStreamPay/purse-securefields-ios/commit/78dc841ff3882516725ca947f62f3b5ff718cd94))
+
 ## [1.10.1](https://github.com/UpStreamPay/purse-securefields-ios/compare/sdk-v1.10.0...sdk-v1.10.1) (2026-10-06)
 
 
