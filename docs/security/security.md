@@ -15,6 +15,7 @@ code. The SDK handles tokenization directly — your app only receives the resul
 - [What your application receives](#what-your-application-receives)
 - [Card data lifecycle](#card-data-lifecycle)
 - [What your application cannot do](#what-your-application-cannot-do)
+- [Limits of in-process isolation](#limits-of-in-process-isolation)
 - [Required hardening for production](#required-hardening-for-production)
 - [Built-in mitigations](#built-in-mitigations)
 - [What the SDK sends to monitoring](#what-the-sdk-sends-to-monitoring)
@@ -65,15 +66,87 @@ override var text: String? {
 Any attempt to cast a card field to `UITextField` and read `.text` returns `nil`. Display is
 unaffected — UIKit renders from its internal backing storage, bypassing the getter.
 
+### Read through `UITextInput`
+
+`UITextField` also conforms to `UITextInput`, whose `text(in:)` and `attributedText(in:)` read
+the document without going through `text`. Both are overridden to return a mask instead of the
+value: one `•` per character, whitespace kept.
+
+```swift
+let input = cvvView as! UITextInput
+let all = input.textRange(from: input.beginningOfDocument, to: input.endOfDocument)!
+input.text(in: all)   // "•••" (never "123")
+```
+
+The mask is the same length as the value rather than `nil`, because UIKit's own keyboard bridge
+builds the keyboard's document context from `text(in:)` on every keystroke. A consistent length
+and word boundaries keep deletion and autocapitalization working, while the system keyboard and
+any third-party keyboard extension receive only bullets. Field length and the PAN grouping stay
+visible, but your app already gets both through `panDigitCount` and the detected brand.
+
+The fields also force tabular (fixed-width) digits on the font you set in `SecureFieldsStyle`.
+With proportional digits, the per-character rectangles `UITextInput` exposes
+(`firstRect(for:)`, `selectionRects(for:)`) differ by digit (a system-font `1` is about 3pt
+narrower), which would let code measure the PAN it cannot read. A custom font with no tabular
+figures cannot honour this, so prefer one that has them.
+
 ### Read via accessibility
 
-`accessibilityValue` is also overridden to return `nil`, blocking VoiceOver and third-party
-accessibility services from announcing card field content.
+`accessibilityValue` is also overridden to return `nil`, so code in your app reading the
+property gets nothing. This does not reach UIKit's accessibility runtime, which serves assistive
+technologies through a private path of its own: VoiceOver and UI-testing tools can still read
+what is in the field, which is also what lets a VoiceOver user check what they typed.
 
 ### Access the internal field views
 
 All card field classes (`SecurePANField`, `SecureCVVField`, etc.) are `internal` to the SDK.
 They are not reachable via the public API.
+
+---
+
+## Limits of in-process isolation
+
+The controls above close the read paths in UIKit's **public** API: the properties a
+`UITextField` exposes, and the `UITextInput` protocol it conforms to. They keep card data out of
+your code paths, including SDKs that read text fields as a matter of course (analytics,
+session replay). They are not a boundary against code built to attack the SDK from inside your
+app's process, and no SDK running in that process can be one.
+
+### Swizzling and runtime access: assessment
+
+Your app, and every third-party SDK linked into it, runs in the same process as the card fields,
+with the same privileges. The Objective-C runtime offers that code several ways around the
+overrides:
+
+| Technique | Example |
+|---|---|
+| Method swizzling | Replacing `-[SecureBaseField text]` with the original implementation, or `-[UITextField insertText:]` with one that records each keystroke |
+| Calling the superclass implementation | Looking up `UITextField`'s own `text` getter with `class_getMethodImplementation` and calling it on the field (no swizzling needed) |
+| Private keys and views | Key-value coding on undocumented keys (`_text`, `textStorage`), or `UITextInput` reads on UIKit's private field-editor subview |
+| Accessibility runtime | Querying the field through UIKit's private accessibility interfaces (see [Read via accessibility](#read-via-accessibility)) |
+| Memory and pixels | Reading the process heap, or rendering the window to an image and running OCR on it |
+
+**Decision: accepted, not countered in code** (SDK-12548, October 2026). Options considered:
+
+1. **Runtime integrity checks.** Compare the implementations of the overridden methods with
+   the expected ones at mount and before submit, and refuse to tokenize on a mismatch.
+   Rejected: a check only sees the methods it knows about, the check itself can be swizzled
+   out, and it is blind to every other row of the table. It would also fail real checkouts
+   on false positives, since analytics, APM, session-replay and UI-testing SDKs legitimately
+   swizzle UIKit.
+2. **A custom input view instead of `UITextField`.** Keep the value in private Swift storage
+   and draw it ourselves. Rejected: it removes only the `UITextField`-specific rows.
+   Keystrokes still arrive through `insertText(_:)`, which can be swizzled; the value still
+   lives in process memory; the digits are still on screen. It would also give up UIKit
+   behaviours the SDK relies on: selection, pasting a 19-digit Oney PAN, and Wallet autofill
+   and card scanning through `textContentType`.
+3. **Accept and document.** Retained. The SDK guarantees that no public API returns card
+   data, whether a property read, a `UITextInput` call, a documented KVC key, or a cast to
+   `UITextField` or `UITextInput`. Against deliberately hostile code, the control is what you
+   ship: review the third-party SDKs you link, do not load code at runtime, and, if your risk
+   model calls for it, refuse to render the form on a compromised device (see
+   [Jailbreak detection](#jailbreak-detection-optional-high-security-environments)).
+   Raise this with your QSA when scoping.
 
 ---
 
@@ -130,8 +203,10 @@ if deviceIsJailbroken() {
 
 | Mitigation | Detail |
 |---|---|
-| **Field value getter override** | `UITextField.text` and `attributedText` return `nil` — external code cannot read card data through any cast |
-| **Accessibility blocked** | `accessibilityValue` returns `nil` — VoiceOver and third-party accessibility services cannot read field content |
+| **Field value getter override** | `UITextField.text` and `attributedText` return `nil` — external code cannot read card data through a cast to `UITextField` |
+| **`UITextInput` reads masked** | `text(in:)` and `attributedText(in:)` return one `•` per character (whitespace kept) — the protocol path, and the keyboard's document context, never carry the value |
+| **Tabular digits** | Fonts are forced to fixed-width digits, so the character geometry `UITextInput` exposes does not depend on which digit was typed |
+| **`accessibilityValue` returns `nil`** | Code reading the property gets nothing. UIKit's accessibility runtime still serves the value to assistive technologies (see [Read via accessibility](#read-via-accessibility)) |
 | **Privacy overlay on background** | `UIBlurEffect` placed over all card fields on `willResignActiveNotification` — card data not visible in app-switcher thumbnails |
 | **Screen recording detection** | `UIScreen.capturedDidChangeNotification` triggers the privacy overlay automatically when screen recording starts |
 | **Screenshot notification** | `UIApplication.userDidTakeScreenshotNotification` fires `secureFieldsScreenshotDetected()` — host app can clear fields and warn the user |

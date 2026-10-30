@@ -15,8 +15,8 @@ final class SecureHolderNameField: SecureBaseField {
     }
 
     @objc override func textDidChange() {
-        onContentChanged?()
         setValidity(!(storedText ?? "").trimmingCharacters(in: .whitespaces).isEmpty)
+        onContentChanged?()
     }
 
 

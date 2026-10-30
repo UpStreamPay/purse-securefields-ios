@@ -57,8 +57,10 @@ final class SecurePANField: SecureBaseField {
             selectedTextRange = textRange(from: pos, to: pos)
         }
 
-        onDigitsChanged?(digits)
+        // Validate before notifying, so a host reading `isFieldValid` from
+        // `secureFieldsContentChanged()` sees this keystroke's validity, not the previous one's.
         setValidity(validLengths.contains(digits.count) && CardValidator.luhn(digits))
+        onDigitsChanged?(digits)
     }
 }
 
