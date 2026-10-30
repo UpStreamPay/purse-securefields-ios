@@ -17,7 +17,7 @@ Sources/PurseSecureFields/
   Models/           — CardBrand, SecureFieldsConfig (+ Style + Placeholders + FieldsConfig), SecureFieldsError, TokenizationResult, VaultEnvironment
   Networking/       — VaultAPIClient, NetworkModels (BIN lookup + tokenization payloads)
   Monitoring/       — RemoteLogger, RemoteLogClient, LogQueue, SecureFieldsLog (remote log monitoring, separate from VaultAPIClient)
-  Internal/         — CardFormatter (PAN display grouping), CardValidator (Luhn, expiry)
+  Internal/         — CardFormatter (PAN display grouping), CardValidator (Luhn, expiry), SensitiveBuffer (+ SensitiveJSONWriter)
   Views/            — SecureBaseField, SecurePAN/CVV/ExpDate/HolderNameField, SecurePANContainer, SecureBrandSelectorView
   SecureFieldsManager.swift   — public API entry point
   SecureFieldsDelegate.swift  — delegate protocol + SecureField enum
@@ -52,8 +52,13 @@ Tests/              — SecureFieldsTests
 - CVV field switches to `UIDatePicker` (birthdate mode) when brand is Oney.
 - Tokenization payload sends `birth_date` instead of `cvv` for Oney.
 
-### Field buffers cleared on submit
-- `submit()` calls `clearSensitiveData()` on all four fields immediately after building the tokenization payload (before the network call), per PCI compliance requirements. This only zeroes text/validity — it does NOT reset BIN lookup state, detected brands, or the brand selector. Host app still calls `manager.clearFields()` for a full reset (e.g. to start a new form).
+### Card data in memory (SDK-12549)
+- `submit()` does **not** clear the fields when it sends the request, nor when tokenization fails: they keep their text so the cardholder can retry without re-entering the card. No PCI requirement calls for clearing them at submit: DSS 3.3.1 forbids *storing* SAD after authorization, and a displayed field is not storage.
+- On **success** the completion calls the full `clearFields()` (fields + BIN/brand state) before `secureFieldsDidTokenize`, so a tokenized card never lingers and stale brand state cannot bleed into the next transaction. This is a deliberate divergence from Android, which keeps the fields until `destroy()`.
+- What *is* zeroed is the SDK's own copy of the card. `submit()` copies the PAN, CVV and holder name into `SensitiveBuffer`s (`copyRawValue()` / `copyTrimmedValue()` on the fields — never `rawValue`, which is a `String`) to build `TokenizationPayload`. `VaultAPIClient.tokenize(tenantId:payload:)` writes the JSON body with `SensitiveJSONWriter`, wipes the payload, and wipes the body when `perform` completes (after retries). Keep `JSONEncoder` and `String` off that path.
+- `SensitiveBuffer.data()` hands the body to `URLRequest` without a copy — but `Data` copies anything ≤ 14 bytes into its inline storage, so `jsonBody()` pads short bodies (the CVV-only `{"cvv":"123"}`) with trailing JSON whitespace up to `minimumSharedCount`. Don't remove that padding.
+- `clearFields()` does not wipe an in-flight request body: a host may well call it right after `submit()`, and zeroing the body before URLSession has sent it would fail the tokenization. The body is wiped on completion, or on release whatever the path.
+- Known limit: UIKit stores a `UITextField`'s text in a `String` the SDK cannot zero. See `docs/security/security.md`, "Card data in memory".
 
 ## Networking
 - All requests are HTTPS by construction — `VaultEnvironment.apiRoot` is a fixed `https://` literal per case, so there's no raw URL for a host app to get wrong. `SecureFieldsConfig` no longer takes a `baseURL` parameter at all.
@@ -111,7 +116,8 @@ Standard Luhn in `CardValidator.luhn(_:)`. Double every second digit from the ri
 - Do not re-add `setPlaceholders` to the manager — use `SecureFieldsConfig`.
 - Do not truncate PAN input — `maxLength` was replaced by `validLengths` for a reason (pasting a 19-char Oney PAN before BIN lookup would be truncated).
 - Do not use `self.text` inside field implementations — always `super.text`.
-- Do not call the full `clearFields()` automatically after `submit()` — only `clearSensitiveData()` per field runs there; BIN/brand state reset is still host-triggered.
+- Do not clear the fields when `submit()` sends the request or on its failure path — neither `clearSensitiveData()` nor `clearFields()`. A failed tokenization must be retryable as-is. Only the success path calls `clearFields()`.
+- Do not put the PAN, CVV or holder name in a `String` (or encode them with `JSONEncoder`) on the tokenization path — use `SensitiveBuffer`.
 
 ## Adding a new card brand
 1. Add case to `CardBrand` enum with the API raw value string.

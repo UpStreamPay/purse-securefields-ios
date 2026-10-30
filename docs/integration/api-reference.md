@@ -111,6 +111,17 @@ public func submit(selectedNetwork: CardBrand? = nil, saveToken: Bool = false)
 Calling `submit()` while any required field is invalid is safe — it fires
 `secureFieldsDidFail(.fieldsIncomplete)` without making a network request.
 
+When tokenization fails, `submit()` leaves the fields as they are: the cardholder can correct a
+field or simply retry, without re-entering the card. When it succeeds, the SDK resets the form
+with `clearFields()` before `secureFieldsDidTokenize` fires. Either way the SDK's internal copies
+of the card are zeroed once the gateway has answered (see
+[Card data in memory](../security/security.md#card-data-in-memory)).
+
+Form validity does not change at submit: the fields stay valid while the request is in flight,
+so `secureFieldsFormValidityChanged` does not fire, and a second `submit()` before the first one
+completes is ignored. If you disable your Pay button on tap, re-enable it in
+`secureFieldsDidFail` — no validity event will do it for you.
+
 `selectedNetwork` names the network to submit for a co-badged card, overriding the SDK's own
 resolution. It is ignored — with a console warning — when `brandSelector` is enabled, since the
 cardholder's pick then wins, and when the requested network was not detected on the card. Mirrors
@@ -124,7 +135,8 @@ without `bin`, `lastFourDigits` or `selectedNetwork`.
 ### Clear
 
 ```swift
-// Zeroes all field buffers, cancels pending BIN lookup, resets brand state.
+// Empties every field, cancels pending BIN lookup, resets brand state.
+// A successful submit() calls it; a failed one does not.
 public func clearFields()
 
 // Clears a single field through the same reformat/validate path as user typing,

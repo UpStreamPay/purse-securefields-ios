@@ -1,45 +1,76 @@
-struct TokenizationPayload: Encodable {
+/// The SDK's own copy of the entered card, made at submit time to build the tokenization request.
+/// Card values are `SensitiveBuffer`s, never `String`s, so `wipe()` can zero them once the body is
+/// built. The expiry stays numeric: on its own it is not sensitive authentication data.
+struct TokenizationPayload {
     // Oney: when the CVV field is in birthdate mode its value is a "yyyy-MM-dd" date, not a
     // 3-4 digit PIN — the gateway's `cvv` field only accepts a PIN, and it accepts no birthdate
     // key at all (sending one is rejected with a 400). The date therefore never goes on the
     // wire — web and Android do the same — and the SDK reflects it back to the integrator
     // locally via `TokenizationResult.birthDate`. `cvv` is simply omitted in that mode.
-    let cvv: String?
+    let cvv: SensitiveBuffer?
     // CVV-only: with no PAN field there is no card to describe, and the gateway wants the key
     // absent — not empty. A `card` carrying only `selected_network` is rejected for its missing
     // expiry (`INVALID_FORM`). So the body is literally `{"cvv": "…"}`, as on web and Android.
     let card: CardPayload?
 
-    enum CodingKeys: String, CodingKey {
-        case cvv
-        case card
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encodeIfPresent(cvv, forKey: .cvv)
-        try container.encodeIfPresent(card, forKey: .card)
-    }
-
-    struct CardPayload: Encodable {
-        let pan: String
+    struct CardPayload {
+        let pan: SensitiveBuffer
         // Optional so they can be omitted outright: a form configuring `pan` without `expDate`
         // sends a card block with no expiry and lets the gateway rule on it (INVALID_FORM), the
         // same shape and the same division of labour as Android's `buildRequestBody`.
         let expiryMonth: Int?
         let expiryYear: Int?
-        let cardHolderName: String?
+        let cardHolderName: SensitiveBuffer?
         let saveToken: Bool?
         let selectedNetwork: String
+    }
 
-        enum CodingKeys: String, CodingKey {
-            case pan
-            case expiryMonth = "expiry_month"
-            case expiryYear = "expiry_year"
-            case cardHolderName = "card_holder_name"
-            case saveToken = "save_token"
-            case selectedNetwork = "selected_network"
+    /// The request body as UTF-8 JSON, written without an intermediate `String` or `Data` (see
+    /// `SensitiveJSONWriter`). The returned buffer is the caller's to wipe.
+    func jsonBody() -> SensitiveBuffer {
+        var json = SensitiveJSONWriter()
+        json.beginObject()
+        if let cvv {
+            json.key("cvv")
+            json.value(cvv)
         }
+        if let card {
+            json.key("card")
+            json.beginObject()
+            json.key("pan")
+            json.value(card.pan)
+            if let month = card.expiryMonth {
+                json.key("expiry_month")
+                json.value(month)
+            }
+            if let year = card.expiryYear {
+                json.key("expiry_year")
+                json.value(year)
+            }
+            if let name = card.cardHolderName {
+                json.key("card_holder_name")
+                json.value(name)
+            }
+            if let saveToken = card.saveToken {
+                json.key("save_token")
+                json.value(saveToken)
+            }
+            json.key("selected_network")
+            json.value(card.selectedNetwork)
+            json.endObject()
+        }
+        json.endObject()
+        // A CVV-only body — `{"cvv":"123"}`, 13 bytes — is short enough for `Data` to copy it
+        // rather than read it in place; see `SensitiveBuffer.minimumSharedCount`.
+        json.pad(toCount: SensitiveBuffer.minimumSharedCount)
+        return json.buffer
+    }
+
+    /// Zeroes every card value in place. Idempotent; the fields on screen are not touched.
+    func wipe() {
+        cvv?.wipe()
+        card?.pan.wipe()
+        card?.cardHolderName?.wipe()
     }
 }
 

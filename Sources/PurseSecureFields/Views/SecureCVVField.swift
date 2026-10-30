@@ -12,6 +12,13 @@ final class SecureCVVField: SecureBaseField {
     var rawValue: String { storedText ?? "" }
     var hasContent: Bool { !rawValue.isEmpty }
 
+    /// `rawValue` for the tokenization request: a wipeable copy, never a `String`.
+    func copyRawValue() -> SensitiveBuffer {
+        let buffer = SensitiveBuffer()
+        buffer.append(contentsOf: (storedText ?? "").utf8)
+        return buffer
+    }
+
     var validLengths: [Int] = [3] {
         didSet {
             if oldValue != validLengths && inputMode == .cvv { revalidate() }
