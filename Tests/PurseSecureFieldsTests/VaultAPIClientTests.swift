@@ -13,9 +13,9 @@ struct VaultAPIClientTests {
 
     private func makePayload() -> TokenizationPayload {
         TokenizationPayload(
-            cvv: "123",
+            cvv: SensitiveBuffer("123"),
             card: .init(
-                pan: "4111111111111111", expiryMonth: 12, expiryYear: 2030,
+                pan: SensitiveBuffer("4111111111111111"), expiryMonth: 12, expiryYear: 2030,
                 cardHolderName: nil, saveToken: false, selectedNetwork: "VISA"
             )
         )
@@ -98,5 +98,48 @@ struct VaultAPIClientTests {
         }
         #expect(message == #"{"detail":"tenant not allowed"}"#)
         #expect(statusCode == 403)
+    }
+
+    // MARK: Card data wiped
+
+    /// The payload's card values are zeroed as soon as the body has been built from them,
+    /// before the request even goes out.
+    @Test func payloadIsWipedOnceTheBodyIsBuilt() async {
+        let tenantId = "t-\(UUID().uuidString)"
+        StubGatewayURLProtocol.register(tenantId: tenantId) { _, _ in
+            .init(statusCode: 200, body: #"{"form_token":"tok"}"#)
+        }
+        let payload = makePayload()
+        let client = makeClient(tenantId: tenantId)
+
+        await withCheckedContinuation { continuation in
+            client.tokenize(tenantId: tenantId, payload: payload) { _ in continuation.resume() }
+            // Checked before the request completes: the wipe must not wait for the gateway.
+            #expect(payload.cvv!.isZeroed)
+            #expect(payload.card!.pan.isZeroed)
+        }
+    }
+
+    /// The body is zeroed once the gateway has answered, whatever the answer — and is still
+    /// intact on the wire until then.
+    @Test(arguments: [200, 400, 503])
+    func bodyIsWipedOnceAnswered(statusCode: Int) async throws {
+        let tenantId = "t-\(UUID().uuidString)"
+        StubGatewayURLProtocol.register(tenantId: tenantId) { _, _ in
+            .init(statusCode: statusCode, body: #"{"form_token":"tok"}"#)
+        }
+        let body = TokenizationPayload(cvv: SensitiveBuffer("123"), card: nil).jsonBody()
+        let view = body.data()
+        let client = makeClient(tenantId: tenantId)
+
+        await withCheckedContinuation { continuation in
+            client.tokenize(tenantId: tenantId, body: body) { _ in continuation.resume() }
+        }
+
+        let sent = try #require(StubGatewayURLProtocol.requests(tenantId: tenantId).last?.body)
+        let json = try #require(try JSONSerialization.jsonObject(with: sent) as? [String: Any])
+        #expect(json["cvv"] as? String == "123")
+        #expect(body.isZeroed)
+        #expect(view.allSatisfy { $0 == 0 })
     }
 }

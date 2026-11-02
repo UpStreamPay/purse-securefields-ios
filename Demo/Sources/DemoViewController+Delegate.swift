@@ -35,7 +35,8 @@ extension DemoViewController: SecureFieldsDelegate {
     }
 
     func secureFieldsDidTokenize(_ result: TokenizationResult) {
-        payButton.isEnabled = true
+        // The SDK has already reset the form (and reported it invalid) by the time this fires.
+        payButton.isEnabled = formValid
         resultLabel.textColor = .systemGreen
         // `bin`/`lastFourDigits` are nil on a CVV-only tokenization — the vault stored a cryptogram
         // against a card it already knows, and echoes no card block.

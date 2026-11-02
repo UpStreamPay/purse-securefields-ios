@@ -190,7 +190,11 @@ CVV value from being submitted as a birthdate or vice versa.
 
 ## Tokenization
 
-`VaultAPIClient.tokenize(tenantId:payload:completion:)` makes a single POST:
+`VaultAPIClient.tokenize(tenantId:payload:completion:)` makes a single POST. The payload holds
+the PAN, CVV and holder name as `SensitiveBuffer`s; the body is written from them by
+`SensitiveJSONWriter`, the payload is zeroed once the body is built, and the body once the request
+completes — see [Card data in memory](../security/security.md#card-data-in-memory). The fields
+themselves are left as they are on failure, and reset with `clearFields()` on success.
 
 ```
 POST /v1/tenants/{tenantId}/forms/secure-fields

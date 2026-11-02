@@ -107,6 +107,13 @@ final class DemoUITests: XCTestCase {
         let predicate = NSPredicate(format: "label CONTAINS 'tok_test_abc123'")
         let exp = XCTNSPredicateExpectation(predicate: predicate, object: result)
         wait(for: [exp], timeout: 10)
+
+        // A tokenized card does not linger: the SDK resets the form on success. Read through the
+        // debug panel — a field that kept focus reports "focused" on its container, not "empty".
+        let debug = app.staticTexts["debug_label"].label
+        XCTAssertTrue(debug.contains("length=0"), debug)
+        XCTAssertTrue(debug.contains("incomplete"), debug)
+        XCTAssertFalse(app.buttons["pay_button"].isEnabled)
     }
 
     func testAPIError() {
@@ -118,6 +125,11 @@ final class DemoUITests: XCTestCase {
         let predicate = NSPredicate(format: "label CONTAINS '422' AND label CONTAINS 'Card declined'")
         let exp = XCTNSPredicateExpectation(predicate: predicate, object: result)
         wait(for: [exp], timeout: 10)
+
+        // The card survives the failure: the user can retry without re-entering it.
+        XCTAssertEqual(app.otherElements["pan_container"].value as? String, "valid")
+        XCTAssertEqual(app.otherElements["cvv_container"].value as? String, "valid")
+        XCTAssertTrue(app.buttons["pay_button"].isEnabled)
     }
 
     // MARK: - CVV-only
