@@ -41,8 +41,9 @@ and SwiftUI apps.
 ## UITextField
 
 The standard iOS single-line text input control. `SecureBaseField` (the internal SDK base class)
-subclasses `UITextField` and overrides `text` and `attributedText` getters to return `nil`,
-preventing external code from reading card data even if a cast is attempted.
+subclasses `UITextField` and overrides `text` and `attributedText` getters to return `nil`, and
+masks the `UITextInput` reads (`text(in:)`, `attributedText(in:)`), preventing external code
+from reading card data even if a cast is attempted.
 
 ---
 

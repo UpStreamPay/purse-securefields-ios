@@ -88,6 +88,27 @@ final class DemoUITests: XCTestCase {
         wait(for: [exp], timeout: 3)
     }
 
+    /// The keyboard's document context comes from the field's `text(in:)`, which the SDK masks
+    /// (SDK-12548). A wrong-length mask would leave the keyboard's delete key out of step with the
+    /// real content: one delete must remove exactly the last digit, and retyping it must give back
+    /// the same valid PAN (a digit removed anywhere else breaks the Luhn check).
+    func testKeyboardDeleteStillEditsMaskedPAN() {
+        launch()
+        let pan = app.textFields["pan_field"]
+        let panContainer = app.otherElements["pan_container"]
+        func expectPAN(_ state: String) {
+            let exp = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", state), object: panContainer)
+            wait(for: [exp], timeout: 3)
+        }
+
+        enter("4242424242424242", into: pan)
+        expectPAN("valid")
+        pan.typeText(XCUIKeyboardKey.delete.rawValue)
+        expectPAN("focused") // 15 digits: invalid, still editing
+        pan.typeText("2")
+        expectPAN("valid")
+    }
+
     func testValidFormEnablesPayButton() {
         launch(tokenizeSuccess: true)
         fillValidCard()

@@ -37,7 +37,8 @@ out of `SecureFieldsConfig.fields` is hidden and inert, and takes no part in the
 [Rendering a subset of fields](#rendering-a-subset-of-fields)). The underlying `UITextField` subclasses (`SecureCVVField`, etc.) are
 `internal` to the SDK, so your code cannot name or cast to those concrete types. A cast to the
 public `UITextField` superclass will still succeed, but that is not a way to read card data: the
-`text`/`attributedText` getters are overridden to always return `nil` to external callers (see
+`text`/`attributedText` getters are overridden to always return `nil` to external callers, and
+the `UITextInput` reads (`text(in:)`, `attributedText(in:)`) return only a `•` mask (see
 [Security](../security/security.md#what-your-application-cannot-do)), so no raw value is ever
 exposed regardless of how the view is cast.
 

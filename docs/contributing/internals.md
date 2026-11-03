@@ -105,7 +105,26 @@ var storedText: String? { super.text }
 ```
 
 This three-layer override covers direct casts (`(field as UITextField).text`), attributed text
-reads, and VoiceOver/accessibility service reads.
+reads, and reads of the public `accessibilityValue` property.
+
+### `UITextInput` reads
+
+`text(in:)` and `attributedText(in:)` read the document through the protocol, past the `text`
+override, so they are overridden too. They return `SecureBaseField.masked(_:)`, one `•` per
+UTF-16 unit with whitespace kept, not `nil`: `UIKBRTIPartner` (UIKit's bridge to the
+out-of-process keyboard) calls `text(in:)` on the field on every keystroke to build the
+keyboard's document context. The mask must keep the exact UTF-16 length, because
+`UITextPosition` offsets are measured in UTF-16 units. Whitespace keeps the keyboard's word
+boundaries (deletion, `.words` autocapitalization on the holder name).
+`DemoUITests.testKeyboardDeleteStillEditsMaskedPAN` guards the keyboard side.
+
+The `font` setter forces tabular digits (`withTabularDigits(_:)`). Proportional digits made
+`firstRect(for:)`/`selectionRects(for:)` vary by digit, a geometry side channel on the PAN.
+
+What these overrides cannot stop (swizzling, calling `UITextField`'s implementation directly,
+private KVC keys, the private `UIFieldEditor` subview, the accessibility runtime) and why that
+is accepted is recorded in
+[Security → Limits of in-process isolation](../security/security.md#limits-of-in-process-isolation).
 
 ---
 

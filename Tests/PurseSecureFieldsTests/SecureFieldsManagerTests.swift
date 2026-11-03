@@ -91,6 +91,45 @@ struct SecureFieldsManagerTests {
         #expect(manager.expectedLengths(for: .holderName) == [])
     }
 
+    // MARK: contentChanged sees settled validity
+
+    /// Records `isFieldValid` from inside `secureFieldsContentChanged()`, the way a host drives
+    /// its own borders. Fields used to notify before revalidating, so this read lagged a keystroke.
+    private final class ValidityOnContentChangeSpy: SecureFieldsDelegate {
+        weak var manager: SecureFieldsManager?
+        let field: SecureField
+        var seen: [Bool] = []
+        init(field: SecureField) { self.field = field }
+        func secureFieldsContentChanged() { seen.append(manager?.isFieldValid(field) ?? false) }
+        func secureFieldsDidTokenize(_ result: TokenizationResult) {}
+        func secureFieldsDidFail(_ error: SecureFieldsError) {}
+        func secureFieldsBrandsDetected(_ brands: [CardBrand]) {}
+        func secureFieldsFormValidityChanged(_ isValid: Bool) {}
+    }
+
+    @Test(arguments: [
+        (SecureField.pan, "4111111111111111", "411111111111111"),
+        (.cvv, "123", "12"),
+        (.expDate, "1230", "123"),
+        (.holderName, "JOHN", ""),
+    ])
+    func contentChangedSeesThisKeystrokesValidity(field: SecureField, valid: String, invalid: String) {
+        let manager = makeManager()
+        let spy = ValidityOnContentChangeSpy(field: field)
+        spy.manager = manager
+        manager.delegate = spy
+        let target: SecureBaseField = switch field {
+        case .pan: panField(manager)
+        case .cvv: cvvField(manager)
+        case .expDate: expField(manager)
+        case .holderName: holderField(manager)
+        }
+
+        type(valid, into: target)
+        type(invalid, into: target)
+        #expect(spy.seen.suffix(2) == [true, false])
+    }
+
     // MARK: clearField
 
     @Test func clearFieldClearsOnlyTargetField() {
