@@ -7,6 +7,15 @@ final class SecurePANField: SecureBaseField {
     var rawValue: String { (storedText ?? "").filter(\.isNumber) }
     var hasContent: Bool { !rawValue.isEmpty }
 
+    /// `rawValue` for the tokenization request: a wipeable copy, never a `String`.
+    func copyRawValue() -> SensitiveBuffer {
+        let buffer = SensitiveBuffer()
+        for character in storedText ?? "" where character.isNumber {
+            buffer.append(contentsOf: character.utf8)
+        }
+        return buffer
+    }
+
     var validLengths: [Int] = [16] {
         didSet { if oldValue != validLengths { textDidChange() } }
     }

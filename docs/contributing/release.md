@@ -72,7 +72,7 @@ and none is a repository secret.
 
 | Secret | Where | Value |
 |---|---|---|
-| `RELEASE_PLEASE_TOKEN` | `release-please` **and** `release` environments (the same value in both; never a repository secret) | Fine-grained PAT on this repository alone with **Contents**, **Pull requests** and **Issues: Read and Write**, so CI runs on the release PR and the published release triggers `release.yml` (events raised by `GITHUB_TOKEN` start no workflow). Its account must be a repository admin: the `v*` tag ruleset lets only admins create or move a tag, and both release-please and `release.yml`'s retag write one. It expires — put the rotation in a calendar, and update both copies. |
+| `TF_REPO_AUTOMATION_PAT` | `release-please` **and** `release` environments (the same value in both; never a repository secret) | Fine-grained PAT on this repository alone with **Contents**, **Pull requests** and **Issues: Read and Write**, so CI runs on the release PR and the published release triggers `release.yml` (events raised by `GITHUB_TOKEN` start no workflow). Its account must be a repository admin: the `v*` tag ruleset lets only admins create or move a tag, and both release-please and `release.yml`'s retag write one. It expires — put the rotation in a calendar, and update both copies. |
 | `APPLE_SIGNING_CERT_P12_BASE64` | `release` environment | The Apple Distribution certificate **and its private key**, exported as `.p12`, base64-encoded |
 | `APPLE_SIGNING_CERT_P12_PASSWORD` | `release` environment | The `.p12` export password |
 
@@ -84,7 +84,7 @@ is missing, instead of dying inside the certificate import or at the retag.
 
 `GITHUB_TOKEN` covers the asset upload, under the job's `contents: write`. Creating the SPM tag does
 not use it: `GITHUB_TOKEN` cannot bypass the `release tags` ruleset (see
-[ci.md](ci.md#repository-settings)). `RELEASE_PLEASE_TOKEN` is used for that one `git push` only and
+[ci.md](ci.md#repository-settings)). `TF_REPO_AUTOMATION_PAT` is used for that one `git push` only and
 never given to checkout, so it is not in `.git/config` while package code builds.
 
 ### Release approval
@@ -94,7 +94,7 @@ never given to checkout, so it is not in `.git/config` while package code builds
 the reviewers. The person who started the run cannot approve it, and only `sdk-v*` tags may deploy to
 the environment (PCI-DSS 6.5.1).
 
-**The owner of `RELEASE_PLEASE_TOKEN` can never approve a release.** release-please publishes the
+**The owner of `TF_REPO_AUTOMATION_PAT` can never approve a release.** release-please publishes the
 GitHub release with that token, so GitHub counts its owner as the person who started every release
 run, and *Prevent self-review* excludes them. Another member of `@UpStreamPay/pci-dss` approves.
 Do not turn self-review prevention off to work around it. A GitHub App instead of a personal token
@@ -124,7 +124,7 @@ no branch workflow can read:
 - **Not the GitHub Actions app.** `GITHUB_TOKEN` belongs to every workflow run, and a workflow on
   any branch can ask for `contents: write`, so that bypass would let anyone with write access move a
   release tag.
-- **Not a repository secret.** `RELEASE_PLEASE_TOKEN` is an admin's token, so it bypasses an
+- **Not a repository secret.** `TF_REPO_AUTOMATION_PAT` is an admin's token, so it bypasses an
   admin-only ruleset, and a workflow pushed on any branch can read a repository secret. An
   environment secret is readable only by a job allowed to deploy to that environment.
 
@@ -137,7 +137,7 @@ one set of rules (one reviewer list, one list of refs allowed to deploy):
 | Runs | on every push to `main`, unattended | on a published release (`sdk-v*` tag) |
 | Approval | none: it only opens or updates the release PR, which is reviewed anyway | `@UpStreamPay/pci-dss`: it signs and publishes binaries |
 | Deploys from | `main` | `sdk-v*` tags |
-| Secrets | `RELEASE_PLEASE_TOKEN` | `RELEASE_PLEASE_TOKEN`, `APPLE_SIGNING_*` |
+| Secrets | `TF_REPO_AUTOMATION_PAT` | `TF_REPO_AUTOMATION_PAT`, `APPLE_SIGNING_*` |
 
 Every way of collapsing them into one gives one of the jobs the wrong rules:
 
@@ -240,7 +240,7 @@ approve the `release` environment:
 7. Rewrites `Package.swift` to a `.binaryTarget` pointing to the GitHub Release download URL
    and the computed checksum
 8. Commits the updated `Package.swift` and **creates** the SPM tag (`v1.11.0`) on that commit,
-   pushed with `RELEASE_PLEASE_TOKEN` (the only token the `release tags` ruleset lets through) —
+   pushed with `TF_REPO_AUTOMATION_PAT` (the only token the `release tags` ruleset lets through) —
    never `--force`, so a re-run cannot rewrite a tag merchants already resolve
 9. Uploads `PurseSecureFields.xcframework.zip` to the GitHub Release as a binary asset
 

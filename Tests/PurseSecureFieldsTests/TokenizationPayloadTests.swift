@@ -9,16 +9,16 @@ import Testing
 struct TokenizationPayloadTests {
 
     private func encodeToJSON(_ payload: TokenizationPayload) throws -> [String: Any] {
-        let data = try JSONEncoder().encode(payload)
+        let data = Data(payload.jsonBody().string.utf8)
         return try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
     }
 
     private func makeCard() -> TokenizationPayload.CardPayload {
         .init(
-            pan: "5032026098999722327",
+            pan: SensitiveBuffer("5032026098999722327"),
             expiryMonth: 12,
             expiryYear: 2030,
-            cardHolderName: "Jane Doe",
+            cardHolderName: SensitiveBuffer("Jane Doe"),
             saveToken: false,
             selectedNetwork: "ONEY"
         )
@@ -35,7 +35,7 @@ struct TokenizationPayloadTests {
     }
 
     @Test func regularPayloadCarriesCvvOnly() throws {
-        let payload = TokenizationPayload(cvv: "123", card: makeCard())
+        let payload = TokenizationPayload(cvv: SensitiveBuffer("123"), card: makeCard())
 
         let json = try encodeToJSON(payload)
 
@@ -46,7 +46,7 @@ struct TokenizationPayloadTests {
     /// CVV-only: the body must be `{"cvv": "…"}` and nothing else. The gateway wants
     /// `card` absent — a `card` holding only `selected_network` is rejected for its missing expiry.
     @Test func cvvOnlyPayloadCarriesOnlyTheCvv() throws {
-        let payload = TokenizationPayload(cvv: "1234", card: nil)
+        let payload = TokenizationPayload(cvv: SensitiveBuffer("1234"), card: nil)
 
         let json = try encodeToJSON(payload)
 
@@ -56,7 +56,7 @@ struct TokenizationPayloadTests {
     }
 
     @Test func cardPayloadUsesSnakeCaseKeys() throws {
-        let payload = TokenizationPayload(cvv: "123", card: makeCard())
+        let payload = TokenizationPayload(cvv: SensitiveBuffer("123"), card: makeCard())
 
         let json = try encodeToJSON(payload)
         let card = try #require(json["card"] as? [String: Any])
@@ -67,5 +67,34 @@ struct TokenizationPayloadTests {
         #expect(card["card_holder_name"] as? String == "Jane Doe")
         #expect(card["save_token"] as? Bool == false)
         #expect(card["selected_network"] as? String == "ONEY")
+    }
+
+    /// A card without expiry or holder name omits those keys rather than sending empty values.
+    @Test func absentOptionalsAreOmitted() throws {
+        let card = TokenizationPayload.CardPayload(
+            pan: SensitiveBuffer("4111111111111111"), expiryMonth: nil, expiryYear: nil,
+            cardHolderName: nil, saveToken: nil, selectedNetwork: "VISA"
+        )
+
+        let json = try encodeToJSON(TokenizationPayload(cvv: SensitiveBuffer("123"), card: card))
+        let encoded = try #require(json["card"] as? [String: Any])
+
+        #expect(Set(encoded.keys) == ["pan", "selected_network"])
+    }
+
+    /// The shortest body there is, CVV-only, is padded so URLSession can read it in place.
+    @Test func cvvOnlyBodyIsLongEnoughToBeSharedInPlace() {
+        let body = TokenizationPayload(cvv: SensitiveBuffer("123"), card: nil).jsonBody()
+        #expect(body.count >= SensitiveBuffer.minimumSharedCount)
+    }
+
+    @Test func wipeZeroesEveryCardValue() {
+        let payload = TokenizationPayload(cvv: SensitiveBuffer("123"), card: makeCard())
+
+        payload.wipe()
+
+        #expect(payload.cvv!.isZeroed)
+        #expect(payload.card!.pan.isZeroed)
+        #expect(payload.card!.cardHolderName!.isZeroed)
     }
 }

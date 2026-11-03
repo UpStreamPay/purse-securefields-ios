@@ -131,7 +131,7 @@ signed XCFrameworks and is not a limitation of the Purse SDK specifically.
    as a base64-encoded P12 in the secrets of the `release` environment.
 
 2. **Two signing secrets** in the `release` environment (see
-   [Release guide](release.md#github-secrets), which also covers `RELEASE_PLEASE_TOKEN`):
+   [Release guide](release.md#github-secrets), which also covers `TF_REPO_AUTOMATION_PAT`):
 
    | Secret | Value |
    |---|---|
