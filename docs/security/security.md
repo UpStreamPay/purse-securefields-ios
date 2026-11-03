@@ -97,6 +97,15 @@ property gets nothing. This does not reach UIKit's accessibility runtime, which 
 technologies through a private path of its own: VoiceOver and UI-testing tools can still read
 what is in the field, which is also what lets a VoiceOver user check what they typed.
 
+### Copy, cut or archive the PAN
+
+Copy and Cut are hidden from the PAN field's edit menu, and the `copy(_:)` and `cut(_:)`
+actions themselves do nothing on it, so calling them directly (`selectAll(nil); copy(nil)`)
+does not put the PAN on the general pasteboard either.
+
+The card fields encode nothing when archived. `NSKeyedArchiver` run on an exposed view
+(`panContainer`, `cvvView`…) or on a view containing it does not capture the value.
+
 ### Access the internal field views
 
 All card field classes (`SecurePANField`, `SecureCVVField`, etc.) are `internal` to the SDK.
@@ -106,11 +115,26 @@ They are not reachable via the public API.
 
 ## Limits of in-process isolation
 
-The controls above close the read paths in UIKit's **public** API: the properties a
-`UITextField` exposes, and the `UITextInput` protocol it conforms to. They keep card data out of
-your code paths, including SDKs that read text fields as a matter of course (analytics,
+The controls above close specific read paths on the card fields themselves: the properties a
+`UITextField` exposes, the `UITextInput` protocol it conforms to, the `text` KVC key, casts to
+`UITextField` or `UITextInput`, the pasteboard actions and keyed archiving. They keep card data
+out of your code paths, including SDKs that read text fields as a matter of course (analytics,
 session replay). They are not a boundary against code built to attack the SDK from inside your
 app's process, and no SDK running in that process can be one.
+
+### Known limit: the field editor while a field is focused
+
+While a card field is first responder, UIKit adds a private field-editor view (`UIFieldEditor`)
+under it, and that view answers `UITextInput` with the unmasked value. The class is private,
+but reaching it takes only public API: walk the exposed view's `subviews` recursively, cast
+each to `UITextInput` and call `text(in:)`. The SDK cannot override a private UIKit class, and
+hiding the subview would not help, since the same view is reachable through `layer.sublayers`
+and `CALayer.delegate`. Once the field resigns first responder the editor is gone and the walk
+returns only the mask.
+
+This read requires code that looks for the editor on purpose; analytics and session-replay
+SDKs read the text field itself, which is masked. It is grouped with the other deliberate
+in-process techniques below.
 
 ### Swizzling and runtime access: assessment
 
@@ -122,7 +146,7 @@ overrides:
 |---|---|
 | Method swizzling | Replacing `-[SecureBaseField text]` with the original implementation, or `-[UITextField insertText:]` with one that records each keystroke |
 | Calling the superclass implementation | Looking up `UITextField`'s own `text` getter with `class_getMethodImplementation` and calling it on the field (no swizzling needed) |
-| Private keys and views | Key-value coding on undocumented keys (`_text`, `textStorage`), or `UITextInput` reads on UIKit's private field-editor subview |
+| Private keys and views | Key-value coding on undocumented keys (`_text`, `textStorage`), or `UITextInput` reads on UIKit's field-editor subview while the field is focused (public calls on a private view, see above) |
 | Accessibility runtime | Querying the field through UIKit's private accessibility interfaces (see [Read via accessibility](#read-via-accessibility)) |
 | Memory and pixels | Reading the process heap, or rendering the window to an image and running OCR on it |
 
@@ -140,11 +164,13 @@ overrides:
    lives in process memory; the digits are still on screen. It would also give up UIKit
    behaviours the SDK relies on: selection, pasting a 19-digit Oney PAN, and Wallet autofill
    and card scanning through `textContentType`.
-3. **Accept and document.** Retained. The SDK guarantees that no public API returns card
-   data, whether a property read, a `UITextInput` call, a documented KVC key, or a cast to
-   `UITextField` or `UITextInput`. Against deliberately hostile code, the control is what you
-   ship: review the third-party SDKs you link, do not load code at runtime, and, if your risk
-   model calls for it, refuse to render the form on a compromised device (see
+3. **Accept and document.** Retained. The SDK guarantees that the card fields themselves never
+   return card data, whether through a property read, a `UITextInput` call, the `text` KVC key,
+   a cast to `UITextField` or `UITextInput`, the copy and cut actions, or keyed archiving. It
+   does not cover the focused field's editor subview described above. Against deliberately
+   hostile code, the control is what you ship: review the third-party SDKs you link, do not
+   load code at runtime, and, if your risk model calls for it, refuse to render the form on a
+   compromised device (see
    [Jailbreak detection](#jailbreak-detection-optional-high-security-environments)).
    Raise this with your QSA when scoping.
 

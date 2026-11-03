@@ -49,6 +49,12 @@ class SecureBaseField: UITextField {
         NSAttributedString(string: Self.masked(super.attributedText(in: range).string))
     }
 
+    /// Archiving the field (or any view containing it, such as `panContainer`) with
+    /// `NSKeyedArchiver` would otherwise run UITextField's coder, which writes the text, and
+    /// UIView's, which also archives the field-editor subview holding it while focused. Nothing is
+    /// encoded instead: the SDK never decodes its fields.
+    override func encode(with coder: NSCoder) {}
+
     /// One bullet per UTF-16 unit, so lengths match the offsets UITextInput positions are measured
     /// in. Whitespace is kept: it only reveals the PAN grouping (derivable from brand and digit
     /// count, both already given to the host) and the holder name's word breaks.

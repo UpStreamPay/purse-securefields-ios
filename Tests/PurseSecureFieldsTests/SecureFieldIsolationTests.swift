@@ -239,6 +239,86 @@ struct SecureFieldIsolationTests {
         }
     }
 
+    /// The same host, with the form mounted in a window and the user typing. Covers the paths the
+    /// unmounted test above cannot see: every `UITextInput` anywhere under the exposed view (UIKit
+    /// adds a field-editor subview while a field is first responder), `NSKeyedArchiver`, and
+    /// calling the pasteboard actions directly rather than through the edit menu.
+    @Test func hostApp_mountedAndFocused_readsNoCardData() throws {
+        var config = SecureFieldsConfig(tenantId: "isolation-\(UUID().uuidString)", monitoringEnabled: false)
+        config.urlSessionOverride = StubGatewayURLProtocol.makeSession()
+        let manager = SecureFieldsManager(config: config)
+
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 400, height: 800))
+        let stack = UIStackView(arrangedSubviews: [
+            manager.panContainer, manager.cvvView, manager.expDateView, manager.holderNameView,
+        ])
+        stack.axis = .vertical
+        stack.frame = window.bounds
+        window.addSubview(stack)
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+
+        let entries: [(view: UIView, typed: String, secret: String)] = [
+            (manager.panContainer, "4111111111111111", "4111 1111"),
+            (manager.cvvView, "739", "739"),
+            (manager.expDateView, "1230", "12/30"),
+            (manager.holderNameView, "John Doe", "John Doe"),
+        ]
+
+        func textInputReads(under view: UIView) -> [(owner: String, read: String)] {
+            var reads: [(String, String)] = []
+            func walk(_ v: UIView) {
+                if let input = v as? UITextInput,
+                   let range = input.textRange(from: input.beginningOfDocument, to: input.endOfDocument) {
+                    reads.append(("\(type(of: v))", input.text(in: range) ?? ""))
+                }
+                v.subviews.forEach(walk)
+            }
+            walk(view)
+            return reads
+        }
+
+        func archive(_ view: UIView) throws -> Data {
+            try NSKeyedArchiver.archivedData(withRootObject: view, requiringSecureCoding: false)
+        }
+
+        for entry in entries {
+            let field = try #require(
+                (entry.view as? SecureBaseField) ?? entry.view.subviews.compactMap { $0 as? SecureBaseField }.first
+            )
+            #expect(field.becomeFirstResponder())
+            field.text = entry.typed
+            field.textDidChange()
+            let secret = Data(entry.secret.utf8)
+
+            // Focused: archive and pasteboard. The field-editor subview is a documented limit
+            // (docs/security/security.md, "Limits of in-process isolation"), so the walk is only
+            // asserted once the field resigns.
+            let focusedArchive = try archive(entry.view)
+            #expect(focusedArchive.range(of: secret) == nil, "\(type(of: field)) archived its value")
+
+            // `changeCount` rather than reading the string back: a read raises the paste-permission
+            // prompt, which blocks a test run without a host app.
+            if field is SecurePANField {
+                let changeCount = UIPasteboard.general.changeCount
+                field.selectAll(nil)
+                field.copy(nil)
+                field.cut(nil)
+                #expect(UIPasteboard.general.changeCount == changeCount, "PAN reached the pasteboard")
+                #expect(field.storedText == "4111 1111 1111 1111", "cut(nil) removed the PAN")
+            }
+
+            #expect(field.resignFirstResponder())
+            for (owner, read) in textInputReads(under: entry.view) {
+                let hasDigit = read.contains(where: \.isNumber)
+                #expect(!hasDigit, "\(owner) leaked a digit: \(read)")
+                #expect(!read.contains(entry.secret), "\(owner) leaked \(read)")
+            }
+            let resignedArchive = try archive(entry.view)
+            #expect(resignedArchive.range(of: secret) == nil, "\(type(of: field)) archived its value")
+        }
+    }
+
     // MARK: - storedText / rawValue still accessible internally
 
     @Test func panField_rawValueStillReadable() {

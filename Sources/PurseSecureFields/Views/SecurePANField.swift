@@ -29,6 +29,12 @@ final class SecurePANField: SecureBaseField {
         return super.canPerformAction(action, withSender: sender)
     }
 
+    /// `canPerformAction` only gates the edit menu and keyboard shortcuts: a host calling
+    /// `selectAll(nil); copy(nil)` on the field reaches UITextField's implementation directly and
+    /// puts the PAN on the general pasteboard. The actions themselves are no-ops here.
+    override func copy(_ sender: Any?) {}
+    override func cut(_ sender: Any?) {}
+
     @objc override func textDidChange() {
         let digits = rawValue
 
