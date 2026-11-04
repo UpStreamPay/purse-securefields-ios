@@ -33,6 +33,7 @@ or signed (see [Release approval](#release-approval)).
 - [Step 1 — Push to main](#step-1--push-to-main)
 - [Step 2 — Merge the release PR](#step-2--merge-the-release-pr)
 - [Step 3 — CI builds and signs the XCFramework](#step-3--ci-builds-and-signs-the-xcframework)
+- [Snapshots](#snapshots)
 - [Verifying the signature locally](#verifying-the-signature-locally)
 - [Verifying the SPM checksum](#verifying-the-spm-checksum)
 
@@ -247,6 +248,22 @@ approve the `release` environment:
 After CI completes, the GitHub Release contains the signed XCFramework zip and the updated
 `Package.swift` (on the tag) declares the binary target. Merchants who add the package in
 Xcode will get the signed XCFramework.
+
+---
+
+## Snapshots
+
+Every update of the open release PR runs `snapshot.yml`. It builds an unsigned XCFramework,
+attaches it to a `snapshot-<next-version>-SNAPSHOT-<run>` prerelease, and force-pushes a `snapshot`
+branch whose `Package.swift` points at it. Older snapshot releases are deleted. To test the next
+release before merging it:
+
+```swift
+.package(url: "https://github.com/UpStreamPay/purse-securefields-ios.git", branch: "snapshot")
+```
+
+Then run `swift package update` to pick up a newer snapshot. Nothing here is signed or approved,
+and SPM never resolves it from a version requirement.
 
 ---
 
