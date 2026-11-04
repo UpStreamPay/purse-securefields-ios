@@ -61,13 +61,14 @@ jobs:
           )
           EOF
 
-      # One orphan commit without .github/: GITHUB_TOKEN may not push workflow changes.
+      # One orphan commit without .github/ (GITHUB_TOKEN may not push workflow changes) and without
+      # the sources the binary replaces.
       - name: Push the upcoming-release branch
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           git checkout --quiet --orphan upcoming-release
-          git rm -r --cached --quiet .github
+          git rm -r --cached --quiet .github Tests Sources/PurseSecureFields
           git add Package.swift Binaries
           git -c user.name="github-actions[bot]" -c user.email="github-actions[bot]@users.noreply.github.com" \
             commit --quiet -m "Upcoming release $VERSION (unsigned, from $GITHUB_SHA)"
