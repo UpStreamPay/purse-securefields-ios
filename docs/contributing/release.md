@@ -33,6 +33,7 @@ or signed (see [Release approval](#release-approval)).
 - [Step 1 — Push to main](#step-1--push-to-main)
 - [Step 2 — Merge the release PR](#step-2--merge-the-release-pr)
 - [Step 3 — CI builds and signs the XCFramework](#step-3--ci-builds-and-signs-the-xcframework)
+- [Upcoming release](#upcoming-release)
 - [Verifying the signature locally](#verifying-the-signature-locally)
 - [Verifying the SPM checksum](#verifying-the-spm-checksum)
 
@@ -247,6 +248,28 @@ approve the `release` environment:
 After CI completes, the GitHub Release contains the signed XCFramework zip and the updated
 `Package.swift` (on the tag) declares the binary target. Merchants who add the package in
 Xcode will get the signed XCFramework.
+
+---
+
+## Upcoming release
+
+Every update of the open release PR runs `upcoming-release.yml`. It builds unsigned XCFrameworks
+stamped `<next-version>-SNAPSHOT` and force-pushes them, committed, to the `upcoming-release`
+branch (one orphan commit, rebuilt each time). Binaries are committed rather than attached to a
+release because the org tag ruleset lets no workflow token create a tag.
+
+Test the next release the way a merchant integrates it, before it is merged:
+
+```swift
+.package(url: "https://github.com/UpStreamPay/purse-securefields-ios.git", branch: "upcoming-release")
+```
+
+Read access to this repository is all it takes. Run `swift package update` to pick up a newer
+build. Nothing here is signed or approved, and SPM never resolves it from a version requirement.
+
+A Slack message announces each build. One-time setup: an `upcoming-release` environment holding
+`SLACK_WEBHOOK_URL` (an incoming webhook for the channel), deployment branches limited to
+`release-please--branches--main--components--sdk`.
 
 ---
 
