@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.11.0](https://github.com/UpStreamPay/purse-securefields-ios/compare/sdk-v1.10.1...sdk-v1.11.0) (2026-11-05)
+
+
+### Features
+
+* **security:** zero the SDK's card copies after tokenization, keep fields on failure (SDK-12549) ([#77](https://github.com/UpStreamPay/purse-securefields-ios/issues/77)) ([aefe40e](https://github.com/UpStreamPay/purse-securefields-ios/commit/aefe40ed9e7529779420dda80890e9969d24c6e0))
+
+
+### Bug Fixes
+
+* **security:** mask UITextInput reads of the card fields (SDK-12548) ([#78](https://github.com/UpStreamPay/purse-securefields-ios/issues/78)) ([2d9d8e5](https://github.com/UpStreamPay/purse-securefields-ios/commit/2d9d8e53792abc0d9f55c90658a74d784e6c6777))
+
+
+### Documentation
+
+* **security:** the SDK supports SAQ A eligibility, not SAQ A-EP ([#67](https://github.com/UpStreamPay/purse-securefields-ios/issues/67)) ([78dc841](https://github.com/UpStreamPay/purse-securefields-ios/commit/78dc841ff3882516725ca947f62f3b5ff718cd94))
+
 ## [1.10.1](https://github.com/UpStreamPay/purse-securefields-ios/compare/sdk-v1.10.0...sdk-v1.10.1) (2026-10-06)
 
 
