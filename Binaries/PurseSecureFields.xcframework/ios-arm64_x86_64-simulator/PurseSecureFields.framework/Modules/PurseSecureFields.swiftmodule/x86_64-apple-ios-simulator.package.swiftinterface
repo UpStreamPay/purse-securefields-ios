@@ -1,0 +1,210 @@
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Apple Swift version 6.1.2 effective-5.10 (swiftlang-6.1.2.1.2 clang-1700.0.13.5)
+// swift-module-flags: -target x86_64-apple-ios15.0-simulator -enable-objc-interop -enable-library-evolution -swift-version 5 -enforce-exclusivity=checked -O -enable-experimental-feature DebugDescriptionMacro -module-name PurseSecureFields -package-name purse_securefields_ios
+// swift-module-flags-ignorable:  -interface-compiler-version 6.1.2
+import CryptoKit
+import DeveloperToolsSupport
+import Foundation
+import Foundation/*.Bundle*/
+import Foundation/*.ProcessInfo*/
+import Foundation/*.URL*/
+import Swift
+import SwiftUI
+import UIKit
+import _Concurrency
+import _StringProcessing
+import _SwiftConcurrencyShims
+public enum CardBrand : Swift.String, Swift.CaseIterable, Swift.Equatable {
+  case visa
+  case mastercard
+  case amex
+  case maestro
+  case carteBancaire
+  case oney
+  public init?(apiValue: Swift.String)
+  public init?(rawValue: Swift.String)
+  public typealias AllCases = [PurseSecureFields.CardBrand]
+  public typealias RawValue = Swift.String
+  nonisolated public static var allCases: [PurseSecureFields.CardBrand] {
+    get
+  }
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public struct SecureFieldsStyle {
+  public struct StateStyle {
+    public let textColor: UIKit.UIColor?
+    public let backgroundColor: UIKit.UIColor?
+    public let borderColor: UIKit.UIColor?
+    public let borderWidth: CoreFoundation.CGFloat?
+    public init(textColor: UIKit.UIColor? = nil, backgroundColor: UIKit.UIColor? = nil, borderColor: UIKit.UIColor? = nil, borderWidth: CoreFoundation.CGFloat? = nil)
+  }
+  public let font: UIKit.UIFont
+  public let textColor: UIKit.UIColor
+  public let placeholderColor: UIKit.UIColor
+  public let tintColor: UIKit.UIColor
+  public let keyboardAppearance: UIKit.UIKeyboardAppearance
+  public let backgroundColor: UIKit.UIColor?
+  public let borderColor: UIKit.UIColor?
+  public let borderWidth: CoreFoundation.CGFloat
+  public let cornerRadius: CoreFoundation.CGFloat
+  public let focus: PurseSecureFields.SecureFieldsStyle.StateStyle?
+  public let valid: PurseSecureFields.SecureFieldsStyle.StateStyle?
+  public let invalid: PurseSecureFields.SecureFieldsStyle.StateStyle?
+  public let empty: PurseSecureFields.SecureFieldsStyle.StateStyle?
+  public static let `default`: PurseSecureFields.SecureFieldsStyle
+  public init(font: UIKit.UIFont = .systemFont(ofSize: 16), textColor: UIKit.UIColor = .label, placeholderColor: UIKit.UIColor = .placeholderText, tintColor: UIKit.UIColor = .systemBlue, keyboardAppearance: UIKit.UIKeyboardAppearance = .default, backgroundColor: UIKit.UIColor? = nil, borderColor: UIKit.UIColor? = nil, borderWidth: CoreFoundation.CGFloat = 0, cornerRadius: CoreFoundation.CGFloat = 0, focus: PurseSecureFields.SecureFieldsStyle.StateStyle? = nil, valid: PurseSecureFields.SecureFieldsStyle.StateStyle? = nil, invalid: PurseSecureFields.SecureFieldsStyle.StateStyle? = nil, empty: PurseSecureFields.SecureFieldsStyle.StateStyle? = nil)
+}
+public struct SecureFieldsPlaceholders {
+  public let pan: Swift.String
+  public let cvv: Swift.String
+  public let expDate: Swift.String
+  public let holderName: Swift.String
+  public init(pan: Swift.String = "1234 5678 9012 3456", cvv: Swift.String = "123", expDate: Swift.String = "MM/YY", holderName: Swift.String = "Cardholder Name")
+}
+public struct SecureFieldConfig {
+  public let placeholder: Swift.String?
+  public let accessibilityLabel: Swift.String?
+  public init(placeholder: Swift.String? = nil, accessibilityLabel: Swift.String? = nil)
+}
+public struct SecureFieldsFieldsConfig {
+  public let pan: PurseSecureFields.SecureFieldConfig?
+  public let expDate: PurseSecureFields.SecureFieldConfig?
+  public let holderName: PurseSecureFields.SecureFieldConfig?
+  public let cvv: PurseSecureFields.SecureFieldConfig
+  public static let all: PurseSecureFields.SecureFieldsFieldsConfig
+  public static let cvvOnly: PurseSecureFields.SecureFieldsFieldsConfig
+  public init(pan: PurseSecureFields.SecureFieldConfig? = nil, expDate: PurseSecureFields.SecureFieldConfig? = nil, holderName: PurseSecureFields.SecureFieldConfig? = nil, cvv: PurseSecureFields.SecureFieldConfig = .init())
+  public var configuredFields: Swift.Set<PurseSecureFields.SecureField> {
+    get
+  }
+  public var isCVVOnly: Swift.Bool {
+    get
+  }
+}
+public struct SecureFieldsConfig {
+  public let tenantId: Swift.String
+  public let environment: PurseSecureFields.VaultEnvironment
+  public let brands: [PurseSecureFields.CardBrand]
+  public let brandSelector: Swift.Bool
+  public let style: PurseSecureFields.SecureFieldsStyle
+  public let placeholders: PurseSecureFields.SecureFieldsPlaceholders
+  public let fields: PurseSecureFields.SecureFieldsFieldsConfig
+  public let requiresHolderName: Swift.Bool
+  public let pinnedPublicKeyHashes: [Swift.String]
+  public let apiKey: Swift.String?
+  public let monitoringEnabled: Swift.Bool
+  public var urlSessionOverride: Foundation.URLSession?
+  public init(tenantId: Swift.String, environment: PurseSecureFields.VaultEnvironment = .sandbox, brands: [PurseSecureFields.CardBrand] = CardBrand.allCases, brandSelector: Swift.Bool = false, style: PurseSecureFields.SecureFieldsStyle = .default, placeholders: PurseSecureFields.SecureFieldsPlaceholders = .init(), fields: PurseSecureFields.SecureFieldsFieldsConfig = .all, requiresHolderName: Swift.Bool = false, pinnedPublicKeyHashes: [Swift.String] = [], apiKey: Swift.String? = nil, monitoringEnabled: Swift.Bool = true)
+}
+public enum SecureFieldsError : Swift.Error {
+  case fieldsIncomplete
+  case networkError(any Swift.Error)
+  case apiError(message: Swift.String, statusCode: Swift.Int)
+  case invalidResponse
+}
+public struct TokenizationResult {
+  public let vaultFormToken: Swift.String
+  public let bin: Swift.String?
+  public let lastFourDigits: Swift.String?
+  public let detectedBrands: [PurseSecureFields.CardBrand]
+  public let birthDate: Swift.String?
+  public let selectedNetwork: PurseSecureFields.CardBrand?
+  public init(vaultFormToken: Swift.String, bin: Swift.String?, lastFourDigits: Swift.String?, detectedBrands: [PurseSecureFields.CardBrand], birthDate: Swift.String? = nil, selectedNetwork: PurseSecureFields.CardBrand? = nil)
+}
+public enum VaultEnvironment : Swift.String {
+  case test
+  case sandbox
+  case production
+  public init?(rawValue: Swift.String)
+  public typealias RawValue = Swift.String
+  public var rawValue: Swift.String {
+    get
+  }
+}
+public enum SecureField {
+  case pan, cvv, expDate, holderName
+  public static func == (a: PurseSecureFields.SecureField, b: PurseSecureFields.SecureField) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public protocol SecureFieldsDelegate : AnyObject {
+  func secureFieldsDidTokenize(_ result: PurseSecureFields.TokenizationResult)
+  func secureFieldsDidFail(_ error: PurseSecureFields.SecureFieldsError)
+  func secureFieldsBrandsDetected(_ brands: [PurseSecureFields.CardBrand])
+  func secureFieldsFormValidityChanged(_ isValid: Swift.Bool)
+  func secureFieldsBrandSelected(_ brand: PurseSecureFields.CardBrand)
+  func secureFieldsContentChanged()
+  func secureFieldsFocusChanged(field: PurseSecureFields.SecureField, isFocused: Swift.Bool)
+  func secureFieldsScreenshotDetected()
+  func secureFieldsBinLookupFailed(_ error: PurseSecureFields.SecureFieldsError)
+}
+extension PurseSecureFields.SecureFieldsDelegate {
+  public func secureFieldsBrandSelected(_ brand: PurseSecureFields.CardBrand)
+  public func secureFieldsContentChanged()
+  public func secureFieldsFocusChanged(field: PurseSecureFields.SecureField, isFocused: Swift.Bool)
+  public func secureFieldsScreenshotDetected()
+  public func secureFieldsBinLookupFailed(_ error: PurseSecureFields.SecureFieldsError)
+}
+final public class SecureFieldsManager {
+  final public let panContainer: PurseSecureFields.SecurePANContainer
+  final public var cvvView: UIKit.UIView {
+    get
+  }
+  final public var expDateView: UIKit.UIView {
+    get
+  }
+  final public var holderNameView: UIKit.UIView {
+    get
+  }
+  weak final public var delegate: (any PurseSecureFields.SecureFieldsDelegate)?
+  final public let configuredFields: Swift.Set<PurseSecureFields.SecureField>
+  final public var isCVVOnly: Swift.Bool {
+    get
+  }
+  final public var selectedBrand: PurseSecureFields.CardBrand? {
+    get
+  }
+  final public func selectBrand(_ brand: PurseSecureFields.CardBrand)
+  final public var panDigitCount: Swift.Int {
+    get
+  }
+  final public func isFieldValid(_ field: PurseSecureFields.SecureField) -> Swift.Bool
+  final public func isFieldFocused(_ field: PurseSecureFields.SecureField) -> Swift.Bool
+  final public func hasFieldContent(_ field: PurseSecureFields.SecureField) -> Swift.Bool
+  final public func expectedLengths(for field: PurseSecureFields.SecureField) -> [Swift.Int]
+  final public func clearField(_ field: PurseSecureFields.SecureField)
+  final public func clearFields()
+  final public var obscuresOnBackground: Swift.Bool {
+    get
+    set
+  }
+  public init(config: PurseSecureFields.SecureFieldsConfig)
+  @objc deinit
+  final public func submit(selectedNetwork: PurseSecureFields.CardBrand? = nil, saveToken: Swift.Bool = false)
+}
+@objc @_inheritsConvenienceInitializers @_hasMissingDesignatedInitializers @_Concurrency.MainActor @preconcurrency final public class SecureBrandSelectorView : UIKit.UIView {
+  @_Concurrency.MainActor @preconcurrency final public var onBrandSelected: ((PurseSecureFields.CardBrand) -> Swift.Void)?
+  @_Concurrency.MainActor @preconcurrency final public var selectedBrand: PurseSecureFields.CardBrand? {
+    get
+  }
+  @_Concurrency.MainActor @preconcurrency @objc override dynamic public init(frame: CoreFoundation.CGRect)
+  @objc deinit
+}
+@objc @_hasMissingDesignatedInitializers @_Concurrency.MainActor @preconcurrency final public class SecurePANContainer : UIKit.UIView {
+  @_Concurrency.MainActor @preconcurrency final public var panFieldAccessibilityIdentifier: Swift.String? {
+    get
+    set
+  }
+  @objc deinit
+}
+extension PurseSecureFields.CardBrand : Swift.Hashable {}
+extension PurseSecureFields.CardBrand : Swift.RawRepresentable {}
+extension PurseSecureFields.VaultEnvironment : Swift.Equatable {}
+extension PurseSecureFields.VaultEnvironment : Swift.Hashable {}
+extension PurseSecureFields.VaultEnvironment : Swift.RawRepresentable {}
+extension PurseSecureFields.SecureField : Swift.Equatable {}
+extension PurseSecureFields.SecureField : Swift.Hashable {}

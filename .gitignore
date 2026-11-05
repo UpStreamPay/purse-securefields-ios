@@ -1,0 +1,25 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Xcode (keep shared schemes under xcshareddata/)
+xcuserdata/
+DerivedData/
+build/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# macOS
+.DS_Store
+
+# Local demo app secrets (monitoring API key) — see .env.example
+.env
+
+# IntelliJ Idea
+.idea
+.run
+*.iml
+
+# Internal pre-publication audit — must never be committed to a public repo
+sdk-open-sourcing-gate.html
