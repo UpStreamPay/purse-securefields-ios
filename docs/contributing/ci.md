@@ -36,7 +36,7 @@ edited. A title that would fail here — `Feat/monitoring`, a branch name — re
 (`autorelease: pending`) is open, unless the pull request title is `fix:` or `revert:` — Dependabot's
 `ci:` updates wait too. A release PR is opened by running Release Please by hand (see
 [release.md](release.md#step-1--freeze-the-release)); merging or closing it lifts the freeze. When it
-opens or closes, the last check of every other open PR is re-run, so no verdict goes stale.
+opens, reopens or closes, the last check of every other open PR is re-run, so no verdict goes stale.
 
 ## Dependencies
 

@@ -207,9 +207,9 @@ The release PR contains:
 - A `.release-please-manifest.json` bump
 
 While it is open, the `Release freeze` check (`release-freeze.yml`) fails on every PR into `main`
-whose title is not `fix:` or `revert:`. A bug found in NRT is fixed by a normal `fix:` PR into
+whose title is not `fix:` or `revert:` (breaking `fix!:` included). A bug found in NRT is fixed by a normal `fix:` PR into
 `main`: merging it updates the release PR and rebuilds `upcoming-release`. When the release PR
-opens or closes, the check is re-run on the other open PRs.
+opens, reopens or closes, the check is re-run on the other open PRs.
 
 Close the release PR to lift the freeze without releasing.
 
