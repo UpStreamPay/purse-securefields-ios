@@ -38,6 +38,36 @@ final class VaultAPIClient {
         self.baseURL = baseURL
         self.pinningDelegate = nil
         self.session = session
+        self.usesSessionOverride = true
+    }
+
+    /// True when the client was built on an injected session instead of its own pinned one.
+    /// Lets tests check which client the manager ended up with.
+    private(set) var usesSessionOverride = false
+
+    /// True when SPKI pinning is enforced on this client's session.
+    var isPinned: Bool { pinningDelegate != nil }
+
+    /// Builds the client the manager talks to. `sessionOverride` (from
+    /// `SecureFieldsConfig.urlSessionOverride`) is ignored, with a console warning, unless the host
+    /// app is a development build: an injected session bypasses certificate pinning, so it must
+    /// never take effect in a release-signed app (SDK-12425). Same runtime guard as
+    /// `VaultEnvironment.resolve(_:isDebugHost:)`, for the same reason: the XCFramework is
+    /// archived in Release, so `#if DEBUG` would remove the option from every consumer, our own
+    /// E2E suite included.
+    static func make(
+        baseURL: String,
+        pinnedPublicKeyHashes: [String],
+        sessionOverride: URLSession?,
+        isDebugHost: Bool
+    ) -> VaultAPIClient {
+        if let sessionOverride {
+            if isDebugHost {
+                return VaultAPIClient(baseURL: baseURL, session: sessionOverride)
+            }
+            NSLog("PurseSecureFields: urlSessionOverride is not allowed in a release-signed app — ignored, using the pinned session")
+        }
+        return VaultAPIClient(baseURL: baseURL, pinnedPublicKeyHashes: pinnedPublicKeyHashes)
     }
 
     func binLookup(

@@ -238,10 +238,13 @@ public struct SecureFieldsConfig {
 
     /// Substitutes the `URLSession` used for BIN lookup and tokenization.
     ///
-    /// **Tests only.** A session set here bypasses certificate pinning entirely, so it must never
-    /// be set in a shipping app. It exists outside `#if DEBUG` because the distributed
-    /// XCFramework is built in Release: gated, no consumer of the binary — including our own E2E
-    /// suite — could stub the gateway at all.
+    /// **Tests only.** A session set here bypasses certificate pinning entirely, so it is honoured
+    /// only on a development host (the simulator, or a build whose provisioning profile carries
+    /// `get-task-allow`). In a release-signed app it is ignored, with a console warning, and the
+    /// pinned session is used instead — the same runtime guard as `VaultEnvironment.test`.
+    /// It exists outside `#if DEBUG` because the distributed XCFramework is built in Release:
+    /// gated, no consumer of the binary — including our own E2E suite — could stub the gateway
+    /// at all.
     ///
     /// Remote log monitoring builds its own session and is not affected; disable it with
     /// `monitoringEnabled: false` when running against a stub.

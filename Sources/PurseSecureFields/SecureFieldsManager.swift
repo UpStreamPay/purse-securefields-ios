@@ -170,7 +170,8 @@ public final class SecureFieldsManager {
     }
 
     private let config: SecureFieldsConfig
-    private let apiClient: VaultAPIClient
+    /// Internal (not private) so tests can check which client the manager built.
+    let apiClient: VaultAPIClient
     // Remote log monitoring — observes submit start/result via explicit hooks (below) rather
     // than tracking submit counters inline here. See MonitoringCoordinator for everything this
     // manager doesn't need to know about monitoring.
@@ -196,11 +197,17 @@ public final class SecureFieldsManager {
 
     // MARK: - Init
 
-    public init(config: SecureFieldsConfig) {
-        // `.test` is internal-only and is refused in a release-signed host app, whatever the
-        // merchant passed — the SDK ships as one binary for every build type, so the check can
-        // only be a runtime one (mirrors Android's resolveEnvironment).
-        let environment = VaultEnvironment.resolve(config.environment, isDebugHost: VaultEnvironment.isDebugHost)
+    public convenience init(config: SecureFieldsConfig) {
+        self.init(config: config, isDebugHost: VaultEnvironment.isDebugHost)
+    }
+
+    /// `isDebugHost` is injectable so tests can simulate a release-signed host; production always
+    /// goes through `init(config:)`.
+    init(config: SecureFieldsConfig, isDebugHost: Bool) {
+        // `.test` and `urlSessionOverride` are internal-only and refused in a release-signed host
+        // app, whatever the merchant passed — the SDK ships as one binary for every build type,
+        // so the check can only be a runtime one (mirrors Android's resolveEnvironment).
+        let environment = VaultEnvironment.resolve(config.environment, isDebugHost: isDebugHost)
 
         // Constructed and started first, using the local `config` parameter — Swift requires
         // every stored property be assigned before `self` is used, so `monitoring` (a `let`)
@@ -218,11 +225,12 @@ public final class SecureFieldsManager {
 
         self.config = config
         self.configuredFields = config.fields.configuredFields
-        if let overrideSession = config.urlSessionOverride {
-            self.apiClient = VaultAPIClient(baseURL: environment.apiRoot, session: overrideSession)
-        } else {
-            self.apiClient = VaultAPIClient(baseURL: environment.apiRoot, pinnedPublicKeyHashes: config.pinnedPublicKeyHashes)
-        }
+        self.apiClient = VaultAPIClient.make(
+            baseURL: environment.apiRoot,
+            pinnedPublicKeyHashes: config.pinnedPublicKeyHashes,
+            sessionOverride: config.urlSessionOverride,
+            isDebugHost: isDebugHost
+        )
         let pan = SecurePANField()
         let cvv = SecureCVVField()
         let exp = SecureExpDateField()
