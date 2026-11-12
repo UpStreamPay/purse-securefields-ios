@@ -4,7 +4,12 @@ import Foundation
 /// (the `/widget/secure_fields` route), which forwards them to Datadog.
 /// Fire-and-forget: never throws, never retries, and is kept
 /// separate from `VaultAPIClient` so a telemetry failure can never affect PCI flows.
+///
+/// The API key travels in the `X-Api-Key` header, never in the URL: a URL is written to proxy
+/// and access logs, a header is not.
 final class RemoteLogClient {
+
+    static let apiKeyHeader = "X-Api-Key"
 
     private let monitoringURL: URL?
     private let apiKey: String
@@ -25,14 +30,12 @@ final class RemoteLogClient {
     }
 
     func send(_ events: [SecureFieldsLog]) {
-        guard !events.isEmpty, let monitoringURL else { return }
-        guard var components = URLComponents(url: monitoringURL, resolvingAgainstBaseURL: false) else { return }
-        components.queryItems = [URLQueryItem(name: "api-key", value: apiKey)]
-        guard let url = components.url, let body = try? JSONEncoder().encode(events) else { return }
+        guard !events.isEmpty, let monitoringURL, let body = try? JSONEncoder().encode(events) else { return }
 
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: monitoringURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(apiKey, forHTTPHeaderField: Self.apiKeyHeader)
         request.httpBody = body
 
         session.dataTask(with: request) { _, _, _ in
