@@ -274,8 +274,11 @@ matching the wire format used by Purse's other SecureFields SDKs:
 MonitoringCoordinator  ← SecureFieldsManager's ONLY awareness of monitoring
 └── RemoteLogger       ← info()/warn()/error()
     ├── LogQueue       ← buffers events, flushes at 16 events / 2s idle / 64KB, mirrors web SimpleQueue
-    └── RemoteLogClient ← POST {monitoringApiRoot}/widget/secure_fields?api-key=…
+    └── RemoteLogClient ← POST {monitoringApiRoot}/widget/secure_fields, key in X-Api-Key
 ```
+
+- **The API key goes in the `X-Api-Key` header, never in the URL**: a URL is written to proxy
+  and access logs, a header is not.
 
 - **`SecureFieldsManager` carries no monitoring state** — no counters, no payload-building, no
   `RemoteLogger` reference. It constructs one `MonitoringCoordinator` and calls

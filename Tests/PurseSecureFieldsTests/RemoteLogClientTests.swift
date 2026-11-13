@@ -6,8 +6,8 @@ import Foundation
 /// `Demo/Sources/MockURLProtocol.swift` (not available to this target) so `RemoteLogClient`
 /// can be tested via its `init(monitoringApiRoot:apiKey:session:)` test-only init.
 ///
-/// Swift Testing runs tests in parallel, so callbacks are keyed by the request's `api-key` query
-/// param (each test uses a unique one) rather than stored in a single shared closure — a plain
+/// Swift Testing runs tests in parallel, so callbacks are keyed by the request's `X-Api-Key`
+/// header (each test uses a unique key) rather than stored in a single shared closure — a plain
 /// `static var onRequest` would race across concurrently-running tests.
 final class RequestCapturingURLProtocol: URLProtocol {
     private static let lock = NSLock()
@@ -27,7 +27,7 @@ final class RequestCapturingURLProtocol: URLProtocol {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
-        if let apiKey = Self.apiKey(from: request.url) {
+        if let apiKey = request.value(forHTTPHeaderField: RemoteLogClient.apiKeyHeader) {
             Self.lock.lock()
             let handler = Self.handlers[apiKey]
             Self.lock.unlock()
@@ -39,11 +39,6 @@ final class RequestCapturingURLProtocol: URLProtocol {
     }
 
     override func stopLoading() {}
-
-    private static func apiKey(from url: URL?) -> String? {
-        guard let url, let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
-        return components.queryItems?.first(where: { $0.name == "api-key" })?.value
-    }
 
     static func body(of request: URLRequest) -> Data? {
         if let body = request.httpBody { return body }
@@ -76,7 +71,7 @@ struct RemoteLogClientTests {
         )
     }
 
-    @Test func postsAJSONArrayWithApiKeyAsQueryParam() throws {
+    @Test func postsAJSONArrayWithApiKeyInAHeaderNotTheURL() throws {
         let semaphore = DispatchSemaphore(value: 0)
         var captured: URLRequest?
         RequestCapturingURLProtocol.register(apiKey: "secret key") { request in
@@ -95,7 +90,9 @@ struct RemoteLogClientTests {
         let request = try #require(captured)
         #expect(request.httpMethod == "POST")
         #expect(request.url?.path == "/widget/secure_fields")
-        #expect(request.url?.query == "api-key=secret%20key")
+        #expect(request.value(forHTTPHeaderField: "X-Api-Key") == "secret key")
+        #expect(request.url?.query == nil)
+        #expect(request.url?.absoluteString.contains("secret") == false)
 
         let body = try #require(RequestCapturingURLProtocol.body(of: request))
         let array = try #require(try JSONSerialization.jsonObject(with: body) as? [[String: Any]])

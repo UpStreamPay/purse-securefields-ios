@@ -6,7 +6,7 @@ struct RemoteLoggerTests {
 
     // RemoteLogClient.send() hits the network asynchronously even against a mock URLProtocol,
     // so a semaphore signalled per captured request makes waiting for it deterministic. Each
-    // call gets its own random api-key so parallel tests never share a request-capturing slot
+    // call gets its own random API key so parallel tests never share a request-capturing slot
     // (this key never needs to match RemoteLogger's own `apiKey:` param — when a `client`
     // override is supplied, RemoteLogger never looks at that param).
     private func capturingClient(onRequest: @escaping (URLRequest) -> Void) -> RemoteLogClient {
