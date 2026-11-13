@@ -13,11 +13,12 @@ The release process is fully driven from GitHub:
 
 | Step | Trigger | What happens |
 |---|---|---|
-| 1 | Push to `main` | release-please opens or updates a release PR with a changelog and version bump |
+| 1 | Run **Release Please** by hand (the freeze) | release-please opens the release PR with a changelog and version bump; its build goes to `upcoming-release` for NRT |
 | 2 | Merge the release PR | release-please creates the GitHub Release and its tag (e.g. `sdk-v1.11.0`) on `main` |
 | 3 | GitHub Release published | A codeowner approves the `release` environment; CI then builds a signed XCFramework, computes its checksum, and updates `Package.swift` to a binary target pointing to the new release |
 
-Merging the release PR triggers the release; a codeowner then approves it before anything is built
+While the release PR is open, only `fix:` and `revert:` PRs can be merged into `main`. Merging the
+release PR triggers the release; a codeowner then approves it before anything is built
 or signed (see [Release approval](#release-approval)).
 
 ---
@@ -30,7 +31,7 @@ or signed (see [Release approval](#release-approval)).
   - [Release approval](#release-approval)
   - [Why two environments, `release-please` and `release`](#why-two-environments-release-please-and-release)
 - [Versioning](#versioning)
-- [Step 1 — Push to main](#step-1--push-to-main)
+- [Step 1 — Freeze the release](#step-1--freeze-the-release)
 - [Step 2 — Merge the release PR](#step-2--merge-the-release-pr)
 - [Step 3 — CI builds and signs the XCFramework](#step-3--ci-builds-and-signs-the-xcframework)
 - [Upcoming release](#upcoming-release)
@@ -135,7 +136,7 @@ one set of rules (one reviewer list, one list of refs allowed to deploy):
 | | `release-please` | `release` |
 |---|---|---|
 | Job | `release-please.yml` | `release.yml` |
-| Runs | on every push to `main`, unattended | on a published release (`sdk-v*` tag) |
+| Runs | by hand to freeze a release, then on every push to `main`, unattended | on a published release (`sdk-v*` tag) |
 | Approval | none: it only opens or updates the release PR, which is reviewed anyway | `@UpStreamPay/pci-dss`: it signs and publishes binaries |
 | Deploys from | `main` | `sdk-v*` tags |
 | Secrets | `TF_REPO_AUTOMATION_PAT` | `TF_REPO_AUTOMATION_PAT`, `APPLE_SIGNING_*` |
@@ -175,7 +176,7 @@ the git tag. `Package.swift` is updated by CI after the release is created.
 | `fix:`, `perf:`, `refactor:` | Patch | `1.2.3` → `1.2.4` |
 | `docs:`, `chore:`, `style:`, `test:`, `ci:` | No release | — |
 
-Pushes that contain only non-releasable commits produce no release PR and no tag.
+A freeze with only non-releasable commits since the last release opens no release PR.
 
 ### Two tags per version
 
@@ -195,17 +196,22 @@ since the old tags are not in its format; it is only used until the first `sdk-v
 
 ---
 
-## Step 1 — Push to main
+## Step 1 — Freeze the release
 
-Merge a branch with Conventional Commit messages into `main`. release-please runs on every push
-and either opens a new release PR or adds the new commits to an existing one.
+Run **Actions → Release Please → Run workflow** on `main`. release-please opens the release PR,
+and `upcoming-release.yml` publishes its build for NRT (see [Upcoming release](#upcoming-release)).
+Between freezes, a push to `main` opens no release PR; release-please only tags a merged one.
 
 The release PR contains:
 - A `CHANGELOG.md` update with the new version's entry
 - A `.release-please-manifest.json` bump
 
-Do not merge the release PR immediately — wait until all intended commits for this version
-are included.
+While it is open, the `Release freeze` check (`release-freeze.yml`) fails on every PR into `main`
+whose title is not `fix:` or `revert:` (breaking `fix!:` included). A bug found in NRT is fixed by a normal `fix:` PR into
+`main`: merging it updates the release PR and rebuilds `upcoming-release`. When the release PR
+opens, reopens or closes, the check is re-run on the other open PRs.
+
+Close the release PR to lift the freeze without releasing.
 
 ---
 
@@ -253,12 +259,13 @@ Xcode will get the signed XCFramework.
 
 ## Upcoming release
 
-Every update of the open release PR runs `upcoming-release.yml`. It builds unsigned XCFrameworks
+Every update of the open release PR — the freeze, then each fix merged during it — runs
+`upcoming-release.yml`. It builds unsigned XCFrameworks
 stamped `<next-version>-SNAPSHOT` and force-pushes them, committed, to the `upcoming-release`
 branch (one orphan commit, rebuilt each time). Binaries are committed rather than attached to a
 release because the org tag ruleset lets no workflow token create a tag.
 
-Test the next release the way a merchant integrates it, before it is merged:
+Run the NRT on it the way a merchant integrates it, before the release PR is merged:
 
 ```swift
 .package(url: "https://github.com/UpStreamPay/purse-securefields-ios.git", branch: "upcoming-release")

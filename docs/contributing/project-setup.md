@@ -42,9 +42,11 @@ purse-securefields-ios/
 │   └── Sources/               ← DemoViewController and extensions
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml             ← Tests on every PR
-│       ├── release.yml        ← Build, sign, and publish XCFramework on release
-│       └── release-please.yml ← Automated release PR management
+│       ├── ci.yml               ← Tests on every PR
+│       ├── release.yml          ← Build, sign, and publish XCFramework on release
+│       ├── release-please.yml   ← Release PR, opened by hand (the freeze)
+│       ├── release-freeze.yml   ← Only fix:/revert: PRs while a release PR is open
+│       └── upcoming-release.yml ← Publishes the release PR's build for NRT
 ├── release-please-config.json
 └── .release-please-manifest.json
 ```
@@ -202,15 +204,16 @@ release-please manages version bumps and changelog generation from Conventional 
 {".": "1.0.4"}
 ```
 
-The `.github/workflows/release-please.yml` workflow runs on every push to `main` and calls
-the `googleapis/release-please-action` action.
+The `.github/workflows/release-please.yml` workflow calls the `googleapis/release-please-action`
+action. Run by hand, it opens the release PR (the freeze); on push to `main` it updates an open one,
+or tags a merged one.
 
 ---
 
 ## Step 6 — First release
 
 1. Add the GitHub secrets described in the [Release guide](release.md#prerequisites-one-time-setup).
-2. Push a `feat:` commit to `main` — release-please opens a release PR.
+2. Push a `feat:` commit to `main`, then run **Release Please** by hand — it opens a release PR.
 3. Merge the release PR.
 4. The CI builds and signs the XCFramework and attaches it to the GitHub Release.
 

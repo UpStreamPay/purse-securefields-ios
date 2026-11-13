@@ -1,6 +1,11 @@
 name: Release Please
 
+# Running this workflow by hand freezes a release: release-please opens the release PR, which
+# publishes the upcoming-release build for NRT (upcoming-release.yml). While it is open only fixes
+# reach main (release-freeze.yml) and each one updates it. Merging it tags and publishes the release.
+
 on:
+  workflow_dispatch:
   push:
     branches: [main]
 
@@ -11,6 +16,8 @@ permissions:
 
 jobs:
   release-please:
+    # A dispatch from another branch would release from it.
+    if: github.ref_name == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # The token lives only in this environment (deployable from main alone) and in `release`, never
@@ -18,8 +25,19 @@ jobs:
     # and this one is an admin's, which bypasses the `release tags` ruleset.
     environment: release-please
     steps:
+      # On push, update the release PR only during a freeze; otherwise just tag a merged one.
+      - name: Release PR open?
+        id: freeze
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          n=$(gh pr list --state open --label 'autorelease: pending' --json number -q length)
+          echo "open=$n" >> "$GITHUB_OUTPUT"
+
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           token: ${{ secrets.TF_REPO_AUTOMATION_PAT }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          skip-github-pull-request: ${{ github.event_name == 'push' && steps.freeze.outputs.open == '0' }}
