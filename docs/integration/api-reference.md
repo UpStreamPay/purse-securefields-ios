@@ -252,6 +252,11 @@ the gateway. **It bypasses certificate pinning entirely and must never be set in
 It is available in the distributed binary because that binary is built in Release — gated behind
 `#if DEBUG`, no consumer of the XCFramework could stub anything.
 
+It is guarded **at runtime**, like `.test`: honoured on a development build (the simulator, or a
+binary whose provisioning profile carries `get-task-allow`) and ignored anywhere else, with a
+console warning — a release-signed app always talks to the Vault through the SDK's own session,
+with certificate pinning applied when `pinnedPublicKeyHashes` is set.
+
 Remote log monitoring builds its own session and is *not* substituted; pass
 `monitoringEnabled: false` when running against a stub.
 

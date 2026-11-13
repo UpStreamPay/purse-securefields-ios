@@ -205,6 +205,11 @@ SecureFieldsConfig(
 Provide at least two hashes (primary + backup) so a certificate renewal does not break
 existing app versions in the field.
 
+Pinning cannot be switched off from the host app in a release-signed build:
+`SecureFieldsConfig.urlSessionOverride`, the test hook that substitutes the SDK's session, is
+ignored there (with a console warning), as `VaultEnvironment.test` is. It only takes effect on a
+development build (the simulator, or a `get-task-allow` provisioning profile).
+
 ### Handle screenshot detection
 
 The SDK fires `secureFieldsScreenshotDetected()` after the system saves a screenshot. The OS
