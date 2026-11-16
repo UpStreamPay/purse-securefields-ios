@@ -97,6 +97,41 @@ struct MonitoringCoordinatorTests {
         #expect((payload["submitErrorCodes"] as? [String])?.first == "400")
     }
 
+    @Test func submitLogCarriesOnlySelectedNetworkAndSaveTokenLikeTheWebSDK() throws {
+        let semaphore = DispatchSemaphore(value: 0)
+        var captured: [URLRequest] = []
+        let lock = NSLock()
+        let sut = coordinator { request in
+            lock.lock(); captured.append(request); lock.unlock()
+            semaphore.signal()
+        }
+
+        sut.recordSubmitStart(selectedNetwork: .carteBancaire, saveToken: true)
+        #expect(semaphore.wait(timeout: .now() + 2) == .success)
+        sut.recordSubmitStart()
+        #expect(semaphore.wait(timeout: .now() + 2) == .success)
+
+        lock.lock(); let requests = captured; lock.unlock()
+        func payload(of request: URLRequest) throws -> [String: Any] {
+            let body = try #require(RequestCapturingURLProtocol.body(of: request))
+            let event = try #require((try JSONSerialization.jsonObject(with: body) as? [[String: Any]])?.first)
+            #expect(event["code"] as? String == "SUBMIT")
+            return try #require(event["payload"] as? [String: Any])
+        }
+
+        let withOptions = try payload(of: requests[0])
+        #expect(Array(withOptions.keys) == ["arg0"])
+        let arg0 = try #require(withOptions["arg0"] as? [String: Any])
+        #expect(Set(arg0.keys) == ["selectedNetwork", "saveToken"])
+        #expect(arg0["selectedNetwork"] as? String == "CARTE_BANCAIRE")
+        #expect(arg0["saveToken"] as? Bool == true)
+
+        // No brand passed: the key is left out rather than sent as null.
+        let defaults = try #require(try payload(of: requests[1])["arg0"] as? [String: Any])
+        #expect(Set(defaults.keys) == ["saveToken"])
+        #expect(defaults["saveToken"] as? Bool == false)
+    }
+
     @Test func focusAndBlurAreSentImmediately() throws {
         let semaphore = DispatchSemaphore(value: 0)
         var captured: [URLRequest] = []

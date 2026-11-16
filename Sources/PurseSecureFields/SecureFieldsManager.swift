@@ -629,7 +629,7 @@ public final class SecureFieldsManager {
         // so this local is the only way it can still reach the host on the result.
         let submittedBirthDate = isBirthdate ? cvvField.rawValue : nil
 
-        monitoring.recordSubmitStart()
+        monitoring.recordSubmitStart(selectedNetwork: selectedNetwork, saveToken: saveToken)
         apiClient.tokenize(tenantId: config.tenantId, payload: payload) { [weak self] result in
             guard let self else { return }
             DispatchQueue.main.async {

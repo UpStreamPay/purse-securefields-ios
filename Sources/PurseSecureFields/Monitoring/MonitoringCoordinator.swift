@@ -88,9 +88,18 @@ final class MonitoringCoordinator {
         ])
     }
 
-    func recordSubmitStart() {
+    /// Takes the merchant's own `submit` arguments, not the network the SDK resolves from them.
+    ///
+    /// The payload matches the web vault SDK's SUBMIT log, `{ arg0: { selectedNetwork, saveToken } }`,
+    /// so one collector query covers every platform. Only these two: the card data is never passed
+    /// here, and nothing else should land in the logs by default.
+    func recordSubmitStart(selectedNetwork: CardBrand? = nil, saveToken: Bool = false) {
         submitAttempts += 1
-        logger.info(LogCode.submit)
+        var options: [String: JSONValue] = ["saveToken": .bool(saveToken)]
+        if let selectedNetwork {
+            options["selectedNetwork"] = .string(selectedNetwork.rawValue)
+        }
+        logger.info(LogCode.submit, payload: ["arg0": .object(options)])
     }
 
     func recordSubmitSuccess() {
