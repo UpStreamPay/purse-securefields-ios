@@ -30,8 +30,30 @@ jobs:
           xcodebuild test \
             -scheme PurseSecureFields \
             -destination "platform=iOS Simulator,id=$SIM_ID" \
+            -resultBundlePath "$RUNNER_TEMP/tests.xcresult" \
             CODE_SIGNING_ALLOWED=NO \
             | grep --line-buffered -E "(Test Suite|Test Case|✔|✘|error:|FAILED|PASSED|run with)"
+
+      # Test counts for purse-ci-harvester, which pulls them into BigQuery (format `ttr`). Read from
+      # the result bundle: xcbeautify's JUnit report leaves out Swift Testing tests.
+      - name: Write test telemetry
+        if: ${{ !cancelled() }}
+        run: |
+          [ -d "$RUNNER_TEMP/tests.xcresult" ] || exit 0
+          xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/tests.xcresult" \
+            | jq -e 'select(.passedTests + .failedTests > 0)
+                | {result_status: (if .failedTests > 0 then "failed" else "passed" end),
+                   passed_count: .passedTests, failed_count: .failedTests}' \
+            > ci-harvester-ttr.json || rm -f ci-harvester-ttr.json
+
+      - name: Upload test telemetry
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-harvester-ttr-library
+          path: ci-harvester-ttr.json
+          retention-days: 7
+          if-no-files-found: ignore
 
   demo-ui-tests:
     name: Demo UI Tests
@@ -57,8 +79,29 @@ jobs:
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 120 \
             -retry-tests-on-failure -test-iterations 2 \
+            -resultBundlePath "$RUNNER_TEMP/tests.xcresult" \
             CODE_SIGNING_ALLOWED=NO \
             | grep --line-buffered -E "(Test Suite|Test Case|passed|failed|error:|BUILD)"
+
+      # Same as Library Tests, under its own artifact name: two jobs of one run cannot share one.
+      - name: Write test telemetry
+        if: ${{ !cancelled() }}
+        run: |
+          [ -d "$RUNNER_TEMP/tests.xcresult" ] || exit 0
+          xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/tests.xcresult" \
+            | jq -e 'select(.passedTests + .failedTests > 0)
+                | {result_status: (if .failedTests > 0 then "failed" else "passed" end),
+                   passed_count: .passedTests, failed_count: .failedTests}' \
+            > ci-harvester-ttr.json || rm -f ci-harvester-ttr.json
+
+      - name: Upload test telemetry
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-harvester-ttr-ui
+          path: ci-harvester-ttr.json
+          retention-days: 7
+          if-no-files-found: ignore
 
   release-build:
     name: Release build (macos-15)
