@@ -193,6 +193,8 @@ public struct SecureFieldsConfig {
     /// When enabled, the cardholder's pick wins over any `selectedNetwork` passed to `submit`.
     public let brandSelector: Bool
 
+    /// The fields' style at init. Change it on a mounted form with
+    /// `SecureFieldsManager.updateStyle(_:)`.
     public let style: SecureFieldsStyle
     public let placeholders: SecureFieldsPlaceholders
 

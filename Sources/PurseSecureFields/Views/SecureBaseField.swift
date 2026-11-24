@@ -147,7 +147,11 @@ class SecureBaseField: UITextField {
         self.style = style
         font = style.font
         tintColor = style.tintColor
+        let keyboardChanged = keyboardAppearance != style.keyboardAppearance
         keyboardAppearance = style.keyboardAppearance
+        // A keyboard that is already open keeps its appearance until its input views reload
+        // (`updateStyle(_:)` on a focused field).
+        if keyboardChanged && isFirstResponder { reloadInputViews() }
         layer.cornerRadius = style.cornerRadius
         applyStateStyle()
     }

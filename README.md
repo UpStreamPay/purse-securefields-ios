@@ -125,6 +125,9 @@ SecureFieldsStyle(
 )
 ```
 
+To restyle fields that are already mounted (a dark theme, say), call
+`secureFields.updateStyle(newStyle)`. Typed content and focus are kept.
+
 ### `SecureFieldsPlaceholders`
 
 ```swift
