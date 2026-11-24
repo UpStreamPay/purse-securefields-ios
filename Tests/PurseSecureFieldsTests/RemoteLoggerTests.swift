@@ -65,6 +65,9 @@ struct RemoteLoggerTests {
 
         sut.info("SHOULD_NOT_SEND")
 
+        // `called` alone only proves the asynchronous send has not landed *yet*: that is how this
+        // test passed for a logger that was in fact live, and failed when the send won the race.
+        #expect(!sut.enabled)
         #expect(!called)
     }
 
@@ -75,6 +78,9 @@ struct RemoteLoggerTests {
 
         sut.info("SHOULD_NOT_SEND")
 
+        // `called` alone only proves the asynchronous send has not landed *yet*: that is how this
+        // test passed for a logger that was in fact live, and failed when the send won the race.
+        #expect(!sut.enabled)
         #expect(!called)
     }
 

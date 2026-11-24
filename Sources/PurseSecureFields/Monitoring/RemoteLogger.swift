@@ -14,7 +14,8 @@ final class RemoteLogger {
     private let version: String
     private let env: String
     private let instanceId: String
-    private let enabled: Bool
+    /// Internal (not private) so tests can check the opt-out without racing the asynchronous send.
+    let enabled: Bool
     private let queue: LogQueue
 
     init(
@@ -35,10 +36,14 @@ final class RemoteLogger {
         self.env = env
         self.instanceId = instanceId
 
+        // The opt-out wins over everything, an injected client included: a test passing its own
+        // client with `monitoringEnabled: false` must get a disabled logger, not a live one.
         let resolvedClient: RemoteLogClient?
-        if let client {
+        if !monitoringEnabled {
+            resolvedClient = nil
+        } else if let client {
             resolvedClient = client
-        } else if monitoringEnabled, let apiKey, !apiKey.isEmpty {
+        } else if let apiKey, !apiKey.isEmpty {
             resolvedClient = RemoteLogClient(monitoringApiRoot: monitoringApiRoot, apiKey: apiKey)
         } else {
             resolvedClient = nil
