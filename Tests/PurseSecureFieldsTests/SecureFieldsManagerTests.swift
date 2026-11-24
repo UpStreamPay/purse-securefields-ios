@@ -382,6 +382,103 @@ struct SecureFieldsManagerTests {
         #expect(manager.cvvView.accessibilityLabel == nil)
     }
 
+    // MARK: updateStyle (SDK-12749)
+
+    private func darkStyle() -> SecureFieldsStyle {
+        SecureFieldsStyle(
+            font: .systemFont(ofSize: 20),
+            textColor: .white,
+            placeholderColor: .lightGray,
+            tintColor: .systemOrange,
+            keyboardAppearance: .dark,
+            backgroundColor: .black,
+            borderColor: .darkGray,
+            borderWidth: 1,
+            cornerRadius: 12,
+            valid: .init(borderColor: .systemGreen),
+            empty: .init(borderColor: .gray)
+        )
+    }
+
+    @Test func updateStyleRepaintsEveryField() {
+        let manager = makeManager()
+        let fields: [SecureBaseField] = [panField(manager), cvvField(manager), expField(manager), holderField(manager)]
+        for field in fields { #expect(field.backgroundColor == nil) }
+
+        manager.updateStyle(darkStyle())
+
+        for field in fields {
+            #expect(field.backgroundColor == .black)
+            #expect(field.textColor == .white)
+            #expect(field.tintColor == .systemOrange)
+            #expect(field.keyboardAppearance == .dark)
+            #expect(field.layer.cornerRadius == 12)
+            #expect(field.layer.borderColor == UIColor.gray.cgColor, "empty state of the new style")
+            #expect(field.font?.pointSize == 20)
+        }
+    }
+
+    @Test func updateStyleKeepsTabularDigits() {
+        let manager = makeManager()
+        manager.updateStyle(darkStyle())
+
+        let features = panField(manager).font?.fontDescriptor.object(forKey: .featureSettings) as? [[UIFontDescriptor.FeatureKey: Int]]
+        #expect(features?.contains {
+            $0[.type] == kNumberSpacingType && $0[.selector] == kMonospacedNumbersSelector
+        } == true)
+    }
+
+    @Test func updateStyleKeepsPlaceholderTextAndRecoloursIt() {
+        var config = SecureFieldsConfig(
+            tenantId: "tenant",
+            placeholders: .init(pan: "PAN here"),
+            fields: .init(pan: .init(), expDate: .init(), cvv: .init(placeholder: "CVC")),
+            monitoringEnabled: false
+        )
+        let sessionConfig = URLSessionConfiguration.ephemeral
+        sessionConfig.protocolClasses = [FailingURLProtocol.self]
+        config.urlSessionOverride = URLSession(configuration: sessionConfig)
+        let manager = SecureFieldsManager(config: config)
+
+        manager.updateStyle(darkStyle())
+
+        for (field, text) in [(panField(manager) as SecureBaseField, "PAN here"), (cvvField(manager), "CVC")] {
+            #expect(field.placeholder == text)
+            let color = field.attributedPlaceholder?.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor
+            #expect(color == .lightGray)
+        }
+    }
+
+    @Test func updateStyleKeepsWhatTheCardholderTyped() {
+        let spy = SpyDelegate()
+        let manager = makeManager(fields: .cvvOnly)
+        manager.delegate = spy
+        type("123", into: cvvField(manager))
+        #expect(manager.isFieldValid(.cvv))
+        let validityEvents = spy.validityChanges
+
+        manager.updateStyle(darkStyle())
+
+        #expect(manager.hasFieldContent(.cvv))
+        #expect(manager.isFieldValid(.cvv))
+        #expect(spy.validityChanges == validityEvents, "restyling is not a form event")
+        // The new style's state overrides apply to the field's current state straight away.
+        #expect(cvvField(manager).layer.borderColor == UIColor.systemGreen.cgColor)
+    }
+
+    @Test func updateStyleCanBeReverted() {
+        let manager = makeManager()
+        manager.updateStyle(darkStyle())
+
+        manager.updateStyle(.default)
+
+        let field = cvvField(manager)
+        #expect(field.backgroundColor == nil)
+        #expect(field.layer.borderWidth == 0)
+        #expect(field.layer.borderColor == nil)
+        #expect(field.keyboardAppearance == .default)
+    }
+
     // MARK: requiresHolderName
 
     @Test func holderNameExcludedFromFormValidityByDefault() {

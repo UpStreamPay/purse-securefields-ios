@@ -16,6 +16,7 @@ managed by the SDK — raw card values are never accessible to your application 
 - [PAN container and brand selector](#pan-container-and-brand-selector)
 - [Applying styles](#applying-styles)
   - [Style properties](#style-properties)
+  - [Restyling a mounted form](#restyling-a-mounted-form)
 - [Updating placeholders after init](#updating-placeholders-after-init)
 - [Privacy overlay](#privacy-overlay)
 - [See also](#see-also)
@@ -176,7 +177,7 @@ brand is detected, the brand selector is not shown and `secureFieldsBrandsDetect
 ## Applying styles
 
 Pass a `SecureFieldsStyle` in `SecureFieldsConfig` at initialisation time. Styles are applied to
-all fields at once.
+all fields at once. To change them later, see [Restyling a mounted form](#restyling-a-mounted-form).
 
 ```swift
 SecureFieldsConfig(
@@ -225,6 +226,25 @@ style: SecureFieldsStyle(
 States resolve in order: `focus` while the field is first responder, then `valid` or `invalid`
 once it has content, and `empty` while it has none. Whatever a state leaves unset falls back to
 the base style. The names match `VaultStyles` on Android and the web SDK's CSS pseudo-classes.
+
+### Restyling a mounted form
+
+To change the look of fields that are already on screen (switching to a dark theme, say), call
+`updateStyle(_:)` with the new style:
+
+```swift
+override func traitCollectionDidChange(_ previous: UITraitCollection?) {
+    super.traitCollectionDidChange(previous)
+    secureFields.updateStyle(traitCollection.userInterfaceStyle == .dark ? darkStyle : lightStyle)
+}
+```
+
+Only the appearance changes. What the cardholder typed, focus, validity and the detected brand
+stay as they were, and no delegate event fires. The state overrides apply to each field's current
+state straight away, a new `keyboardAppearance` reaches a keyboard that is already open, and
+placeholders keep their text but take the new `placeholderColor`. The new style replaces the
+previous one: anything it leaves at its default goes back to that default. The rest of
+`SecureFieldsConfig` stays fixed at init.
 
 ---
 

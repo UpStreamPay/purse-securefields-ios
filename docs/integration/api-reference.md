@@ -145,6 +145,16 @@ public func clearFields()
 public func clearField(_ field: SecureField)
 ```
 
+### Style
+
+```swift
+// Repaints every field with a new style on a mounted form. Typed content, focus, validity and
+// brand state are kept and no delegate event fires; placeholders keep their text and take the
+// new placeholderColor. Replaces the whole style. Mirrors setConfig on web and
+// setFieldConfig(…, VaultFieldConfigUpdate(styles:)) on Android.
+public func updateStyle(_ style: SecureFieldsStyle)
+```
+
 ### Privacy
 
 ```swift
@@ -157,7 +167,8 @@ public var obscuresOnBackground: Bool
 
 ## `SecureFieldsConfig`
 
-Passed to `SecureFieldsManager.init()`. All configuration is immutable after initialisation.
+Passed to `SecureFieldsManager.init()`. All configuration is immutable after initialisation,
+except the style, which `updateStyle(_:)` replaces on a mounted form.
 
 ```swift
 public struct SecureFieldsConfig {

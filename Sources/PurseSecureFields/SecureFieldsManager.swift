@@ -255,20 +255,49 @@ public final class SecureFieldsManager {
 
     // MARK: - Config
 
-    private func applyConfig(_ config: SecureFieldsConfig) {
-        let style = config.style
+    /// Repaints every field with a new style, on a form that is already mounted — switching to a
+    /// dark theme without leaving the payment screen, for instance. Mirrors `setConfig` on the web
+    /// SDK and `setFieldConfig(…, VaultFieldConfigUpdate(styles:))` on Android.
+    ///
+    /// Only the appearance changes: what the cardholder typed, focus, validity, the detected brand
+    /// and the form's validity all stay as they were, and no delegate event fires. The state
+    /// styles (`focus`, `valid`, `invalid`, `empty`) apply straight away to each field's current
+    /// state. A new `keyboardAppearance` reaches a keyboard that is already open. Placeholders keep
+    /// their text and take the new `placeholderColor`.
+    ///
+    /// Replaces the whole style: anything the new style leaves at its default goes back to that
+    /// default. The rest of `SecureFieldsConfig` stays fixed at init. Call on the main thread.
+    public func updateStyle(_ style: SecureFieldsStyle) {
+        applyStyle(style)
+    }
+
+    private var allFields: [(SecureField, SecureBaseField)] {
+        [(.pan, panField), (.cvv, cvvField), (.expDate, expDateField), (.holderName, holderNameField)]
+    }
+
+    /// Placeholder text for a field: its `fields` entry, else the legacy `placeholders` one.
+    private func placeholder(for field: SecureField) -> String {
+        if let perField = config.fields.config(for: field)?.placeholder { return perField }
         let ph = config.placeholders
-        let legacyPlaceholders: [SecureField: String] = [
-            .pan: ph.pan, .cvv: ph.cvv, .expDate: ph.expDate, .holderName: ph.holderName,
-        ]
-        let fields: [(SecureField, SecureBaseField)] = [
-            (.pan, panField), (.cvv, cvvField), (.expDate, expDateField), (.holderName, holderNameField),
-        ]
-        for (name, field) in fields {
+        switch field {
+        case .pan:        return ph.pan
+        case .cvv:        return ph.cvv
+        case .expDate:    return ph.expDate
+        case .holderName: return ph.holderName
+        }
+    }
+
+    private func applyStyle(_ style: SecureFieldsStyle) {
+        for (name, field) in allFields {
             field.applyStyle(style)
-            let perField = config.fields.config(for: name)
-            field.applyPlaceholder(perField?.placeholder ?? legacyPlaceholders[name]!, color: style.placeholderColor)
-            field.accessibilityLabel = perField?.accessibilityLabel
+            field.applyPlaceholder(placeholder(for: name), color: style.placeholderColor)
+        }
+    }
+
+    private func applyConfig(_ config: SecureFieldsConfig) {
+        applyStyle(config.style)
+        for (name, field) in allFields {
+            field.accessibilityLabel = config.fields.config(for: name)?.accessibilityLabel
         }
         // A field left out of `fields` is not part of the form. It is still constructed — the
         // state accessors above answer for it (`isFieldValid(.pan)` is simply false, and

@@ -83,7 +83,7 @@ Tests/              — SecureFieldsTests
 - `VaultEnvironment.test` is wrapped in `#if DEBUG` — never remove that guard or add a similar always-compiled "internal/test" option. The distributed XCFramework is always built in `Release` configuration (`xcodebuild archive` in release.yml), so `#if DEBUG` is the only mechanism that actually keeps something out of what merchants integrate — a runtime check (like Android's `FLAG_DEBUGGABLE` guard) would NOT work here, since this framework isn't recompiled per host app.
 
 ## Style / placeholder config
-- Applied once at init via `applyConfig(_:)` in the manager.
+- Applied at init via `applyConfig(_:)` in the manager. The style (not the placeholder text) can be replaced on a mounted form with the public `updateStyle(_:)` (SDK-12749), which runs the same `applyStyle(_:)` path as init: placeholders keep their text and take the new `placeholderColor`, typed content/focus/validity are kept, and no delegate or monitoring event fires. A focused field reloads its input views so a new `keyboardAppearance` reaches the open keyboard.
 - `SecureFieldsStyle` sets font (digits always rendered tabular, see Field isolation), textColor, tintColor, keyboardAppearance, placeholderColor.
 - `SecureFieldsPlaceholders` sets per-field placeholder strings. A `SecureFieldConfig.placeholder` in `fields` wins over it.
 - No `setPlaceholders` runtime method — config is the single source.
