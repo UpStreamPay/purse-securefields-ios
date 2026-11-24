@@ -53,21 +53,6 @@ struct SecureFieldsManagerSubmitTests {
     private func cvvField(_ m: SecureFieldsManager) -> SecureCVVField { m.cvvView as! SecureCVVField }
     private func expField(_ m: SecureFieldsManager) -> SecureExpDateField { m.expDateView as! SecureExpDateField }
 
-    /// Polls until `condition` holds, instead of sleeping a fixed amount: BIN lookup and submit
-    /// hop main → URLSession → main, and a fixed wait turns into a flake as soon as the machine
-    /// is loaded (swift-testing runs these suites in parallel).
-    private func waitUntil(
-        _ description: String,
-        timeout: TimeInterval = 10,
-        _ condition: () -> Bool
-    ) async throws {
-        let deadline = Date().addingTimeInterval(timeout)
-        while !condition() && Date() < deadline {
-            try await Task.sleep(nanoseconds: 20_000_000)
-        }
-        #expect(condition(), "timed out waiting for \(description)")
-    }
-
     @Test func oneySubmitSendsNoCvvAndNoBirthdate() async throws {
         let tenantId = "oney-\(UUID().uuidString)"
         StubGatewayURLProtocol.register(tenantId: tenantId) { request, _ in
@@ -246,7 +231,7 @@ struct SecureFieldsManagerSubmitTests {
             guard attempts.next() == 1 else {
                 return .init(statusCode: 200, body: #"{"form_token":"tok_inflight","card":{"bin":"41111111","last_four_digits":"1111"}}"#)
             }
-            _ = release.wait(timeout: .now() + 10)
+            _ = release.wait(timeout: .now() + waitUntilTimeout)
             return .init(statusCode: 503, body: "")
         }
         let manager = makeManager(tenantId: tenantId, brands: [.visa])
