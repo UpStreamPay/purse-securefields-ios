@@ -20,6 +20,7 @@ code. The SDK handles tokenization directly — your app only receives the resul
 - [Built-in mitigations](#built-in-mitigations)
 - [Card data in memory](#card-data-in-memory)
 - [What the SDK sends to monitoring](#what-the-sdk-sends-to-monitoring)
+- [What the SDK sends for Purse 3DS](#what-the-sdk-sends-for-purse-3ds)
 - [Export compliance](#export-compliance)
 - [See also](#see-also)
 
@@ -205,6 +206,12 @@ SecureFieldsConfig(
 Provide at least two hashes (primary + backup) so a certificate renewal does not break
 existing app versions in the field.
 
+Pinning covers the **vault** gateway — tokenization and BIN lookup, the only calls that ever
+carry card data. The two Purse 3DS calls go to the Orchestration host
+(`https://api.purse-{test,sandbox,live}.com/payment/v2`), which these hashes do not describe; they are not
+pinned, exactly as the monitoring endpoint on the same host family is not. See
+[What the SDK sends for Purse 3DS](#what-the-sdk-sends-for-purse-3ds) for what travels there.
+
 Pinning cannot be switched off from the host app in a release-signed build:
 `SecureFieldsConfig.urlSessionOverride`, the test hook that substitutes the SDK's session, is
 ignored there (with a console warning), as `VaultEnvironment.test` is. It only takes effect on a
@@ -343,12 +350,54 @@ writes nothing to disk, `UserDefaults` or the keychain.
 
 ---
 
+## What the SDK sends for Purse 3DS
+
+Enabled per call (`submit(threeDSEnabled: true)`, `submitSavedCard(_:)`,
+`challenge(_:presenting:)`); otherwise the SDK makes none of these calls.
+
+| Call | Host | Body |
+|---|---|---|
+| `POST /v2/3ds/versioning` | Orchestration | `device_channel`, and the vault **form token** (fresh card) or the **oneWallet token id** (saved card) with its session or entity/customer reference; `use_network_token`, `amount`, `currency` in network-token mode |
+| `POST /v2/3ds/challenge-result` | Orchestration | the `three_ds_server_trans_id`, and nothing else — any other field is refused |
+
+Both calls carry `SecureFieldsConfig.apiKey` in the `X-Api-Key` header when you set one — the same gateway key
+monitoring uses, in a header rather than the URL for the same reason (a URL is written to proxy and access logs).
+
+**No card data leaves the device on either call**: no PAN, no CVV, no holder name, no expiry.
+The device data that the 3DS flow needs is collected locally by the 3DS SDK and travels inside
+the `sdk` block's `encrypted_data` — a JWE the SDK produces and that only the directory server
+and the issuer's ACS can read. Secure Fields never inspects it.
+
+The native challenge runs directly between the 3DS SDK and the issuer's ACS. Secure Fields draws
+none of those screens and reads none of that traffic.
+
+The challenge outcome your app receives is **device-transited and untrusted**, by design: it is
+what the server reported at the moment it was asked. Fulfil on `GET /v2/payments/{id}` or the
+payment webhook, server-side, never on what the device says.
+
+The Netcetera 3DS Mobile SDK is not part of the `PurseSecureFields` product. It sits behind the
+`ThreeDSProvider` protocol in the optional `PurseSecureFields3DS` product, so an integration that
+does not use Purse 3DS links no third-party code at all.
+
+The 3DS SDK's API key is in no artifact and no repository. The merchant backend reads it from
+`GET /v2/entities/{entityId}/app-sdk-configuration` and the app passes the opaque answer as
+`SecureFieldsConfig.appSDKConfiguration`. Secure Fields decodes it, keeps the key in memory for
+the life of the manager, hands it to the 3DS SDK's `initialize` and nowhere else: it is never
+logged, never persisted and never part of a monitoring payload.
+
+---
+
 ## Export compliance
 
 The SDK performs no cryptography of its own beyond SHA-256 hashing (via Apple's CryptoKit) for
 certificate-pin comparison, and relies on the operating system's TLS stack for transport
 security. That is exempt encryption under Apple's export rules, so integrators can normally
 answer `ITSAppUsesNonExemptEncryption = false` in their app's `Info.plist`.
+
+An app that links the optional **`PurseSecureFields3DS`** product also ships the Netcetera 3DS
+Mobile SDK, which encrypts the device data it collects (JWE, with ephemeral keys) as EMV 3-D Secure
+requires. Take that third-party encryption into account — and Netcetera's own export
+classification — when you answer the question for such an app.
 
 This is guidance, not legal advice — confirm it against your own app's full feature set.
 

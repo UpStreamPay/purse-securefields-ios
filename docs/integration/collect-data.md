@@ -145,6 +145,9 @@ func secureFieldsDidFail(_ error: SecureFieldsError) {
         showAlert("Payment error (\(statusCode)): \(message)")
     case .invalidResponse:
         showAlert("Unexpected response from the server.")
+    case .threeDS(let threeDSError):
+        // Only ever raised on a call that asked for Purse 3DS — see the API reference.
+        showAlert("Authentication failed: \(threeDSError)")
     }
 }
 ```

@@ -176,6 +176,10 @@ public final class SecureFieldsManager {
     // than tracking submit counters inline here. See MonitoringCoordinator for everything this
     // manager doesn't need to know about monitoring.
     private let monitoring: MonitoringCoordinator
+    // Purse 3DS — the 3DS SDK's lifecycle, versioning, the EMVCo transaction and the native
+    // challenge. Internal (not private) so tests can reach it. The manager holds no 3DS state of
+    // its own: everything lives in the coordinator, as it does for monitoring.
+    let threeDS: ThreeDSCoordinator
     private var detectedBrands: [CardBrand] = []
     /// CVV-only: the brand the host named through `selectBrand(_:)`, standing in for the BIN
     /// lookup a form without a PAN field can never run.
@@ -201,9 +205,14 @@ public final class SecureFieldsManager {
         self.init(config: config, isDebugHost: VaultEnvironment.isDebugHost)
     }
 
-    /// `isDebugHost` is injectable so tests can simulate a release-signed host; production always
-    /// goes through `init(config:)`.
-    init(config: SecureFieldsConfig, isDebugHost: Bool) {
+    /// `isDebugHost` and `threeDSProvider` are injectable so tests can simulate a release-signed
+    /// host and stand in for the `PurseSecureFields3DS` product without touching the process-wide
+    /// `PurseThreeDS` registry; production always goes through `init(config:)`.
+    init(
+        config: SecureFieldsConfig,
+        isDebugHost: Bool,
+        threeDSProvider: ThreeDSProvider? = PurseThreeDS.provider
+    ) {
         // `.test` and `urlSessionOverride` are internal-only and refused in a release-signed host
         // app, whatever the merchant passed — the SDK ships as one binary for every build type,
         // so the check can only be a runtime one (mirrors Android's resolveEnvironment).
@@ -225,6 +234,18 @@ public final class SecureFieldsManager {
 
         self.config = config
         self.configuredFields = config.fields.configuredFields
+        self.threeDS = ThreeDSCoordinator(
+            tenantId: config.tenantId,
+            client: ThreeDSAPIClient.make(
+                baseURL: environment.orchestrationApiRoot,
+                apiKey: config.apiKey,
+                sessionOverride: config.urlSessionOverride,
+                isDebugHost: isDebugHost
+            ),
+            provider: threeDSProvider,
+            apiKey: AppSDKConfiguration(data: config.appSDKConfiguration).threeDSAPIKey,
+            isProduction: environment == .production
+        )
         self.apiClient = VaultAPIClient.make(
             baseURL: environment.apiRoot,
             pinnedPublicKeyHashes: config.pinnedPublicKeyHashes,
@@ -245,12 +266,20 @@ public final class SecureFieldsManager {
         applyConfig(config)
         setupPrivacyObservers()
         setupMonitoringObservers()
+        // Best effort, non-blocking, once per lifecycle: the device data the 3DS SDK collects
+        // here is what the app flow sends instead of the web 3DS Method. Nothing waits on it —
+        // a failure is logged and retried inside the `submit()` chain.
+        threeDS.start()
     }
 
     deinit {
         privacyObservers.forEach { NotificationCenter.default.removeObserver($0) }
         monitoringObservers.forEach { NotificationCenter.default.removeObserver($0) }
         monitoring.unmount()
+        // Only this manager's transaction: `cleanup()` would hit the process-wide 3DS service,
+        // which another live manager may be using. Detached, so a chain still running closes the
+        // transaction it gets instead of storing it where nothing could ever close it.
+        threeDS.detach()
     }
 
     // MARK: - Config
@@ -569,7 +598,9 @@ public final class SecureFieldsManager {
 
     // MARK: - Submit
 
-    /// Tokenizes the form.
+    /// Tokenizes the form and, with `threeDSEnabled`, chains the Purse 3DS steps onto it:
+    /// versioning on the Orchestration host, then the local EMVCo transaction. The result then
+    /// carries `threeDSServerTransID` and the `sdk` block on top of today's fields.
     ///
     /// - Parameters:
     ///   - selectedNetwork: the network to submit for a co-badged card, overriding the SDK's own
@@ -578,6 +609,9 @@ public final class SecureFieldsManager {
     ///     detected on this card, rather than tokenizing under a network the BIN doesn't carry.
     ///     Mirrors `SubmitOptions.selectedNetwork` on Android.
     ///   - saveToken: asks the vault to retain the card for later reuse.
+    ///   - threeDSEnabled: the entity's Purse 3DS setting as the caller knows it — the session
+    ///     flow passes `three_ds_settings.vendor == "NETCETERA"`, the advanced flow the
+    ///     merchant's own configuration. Left `false`, this is today's call, byte for byte.
     ///
     /// A form configuring `pan` without `expDate` submits a card block with no `expiry_month` or
     /// `expiry_year`, which the gateway rejects as `INVALID_FORM` — surfaced as `.apiError`. The
@@ -598,13 +632,38 @@ public final class SecureFieldsManager {
     /// flight, so `secureFieldsFormValidityChanged` does not fire, and a second `submit()` before
     /// the first completes is ignored. A host that disables its Pay button on tap must re-enable
     /// it in `secureFieldsDidFail` — no validity event will.
-    public func submit(selectedNetwork: CardBrand? = nil, saveToken: Bool = false) {
+    ///
+    /// A **CVV-only** form never versions: it has no card of its own to authenticate, and the
+    /// saved card next to it is `submitSavedCard(_:)`'s job.
+    ///
+    /// A 3DS failure after a successful tokenization is reported through
+    /// `secureFieldsDidFail(.threeDS(_:))` and the fields are **kept**, as on any other failure:
+    /// a retry is a new `submit()`, which re-tokenizes.
+    public func submit(
+        selectedNetwork: CardBrand? = nil,
+        saveToken: Bool = false,
+        threeDSEnabled: Bool = false
+    ) {
         guard !isSubmitting else { return }
         // A configured `pan` has no expiry to send without a configured `expDate`, and the gateway
         // rejects a card block without one (INVALID_FORM). Reported ahead of the completeness
         // check: otherwise an unfilled form masks the configuration fault as `.fieldsIncomplete`.
         guard fieldsGatingValidity.allSatisfy(\.isValid) else {
             delegate?.secureFieldsDidFail(.fieldsIncomplete)
+            return
+        }
+
+        // A CVV-only form has no card of its own to authenticate — web skips the chain on it the
+        // same way, and the saved card it belongs to is versioned by `submitSavedCard(_:)`.
+        let runThreeDS = threeDSEnabled && !isCVVOnly
+        if threeDSEnabled && isCVVOnly {
+            NSLog("PurseSecureFields: threeDSEnabled ignored — a CVV-only form has no card to version; use submitSavedCard(_:)")
+        }
+        // Fail fast, before anything is tokenized — or even copied out of the fields: without the
+        // `PurseSecureFields3DS` product or the 3DS SDK's key the chain cannot run, and minting a
+        // vault token that can never be paid on a Purse 3DS entity only leaves a dangling form.
+        if runThreeDS, let blocker = threeDS.blocker {
+            delegate?.secureFieldsDidFail(.threeDS(blocker))
             return
         }
 
@@ -662,29 +721,79 @@ public final class SecureFieldsManager {
         apiClient.tokenize(tenantId: config.tenantId, payload: payload) { [weak self] result in
             guard let self else { return }
             DispatchQueue.main.async {
-                self.isSubmitting = false
                 switch result {
                 case .success(let response):
-                    self.monitoring.recordSubmitSuccess()
-                    let tokenResult = TokenizationResult(
-                        vaultFormToken: response.formToken,
-                        bin: response.card?.bin,
-                        lastFourDigits: response.card?.lastFourDigits,
-                        detectedBrands: self.detectedBrands,
-                        birthDate: submittedBirthDate,
-                        selectedNetwork: selectedBrand
-                    )
-                    // The card is tokenized: the form has served its purpose, so reset it —
-                    // fields, brand and BIN state — or stale `detectedBrands`/`selectedBrand`/
-                    // lengths bleed into the next transaction. Built `tokenResult` first so it
-                    // still carries this transaction's brands. A failure leaves the form alone.
-                    self.clearFields()
-                    self.delegate?.secureFieldsDidTokenize(tokenResult)
+                    // Read before `clearFields()` wipes the brand state: the result still
+                    // describes this transaction.
+                    let detected = self.detectedBrands
+                    guard runThreeDS else {
+                        self.isSubmitting = false
+                        self.monitoring.recordSubmitSuccess()
+                        self.finishTokenization(
+                            response: response,
+                            detected: detected,
+                            birthDate: submittedBirthDate,
+                            network: selectedBrand,
+                            threeDS: nil
+                        )
+                        return
+                    }
+                    // The latch stays closed across versioning and the EMVCo transaction: the
+                    // whole chain is one submit.
+                    self.threeDS.prepare(formToken: response.formToken) { [weak self] preparation in
+                        guard let self else { return }
+                        self.isSubmitting = false
+                        switch preparation {
+                        case .success(let preparation):
+                            // Recorded here, not at the tokenization: on a 3DS submit the chain
+                            // is the submit, and the delegate hears about it only now.
+                            self.monitoring.recordSubmitSuccess()
+                            self.finishTokenization(
+                                response: response,
+                                detected: detected,
+                                birthDate: submittedBirthDate,
+                                network: selectedBrand,
+                                threeDS: preparation
+                            )
+                        case .failure(let error):
+                            // The token is minted but unusable without its 3DS transaction on a
+                            // Purse 3DS entity. The form is left as it is so the cardholder can
+                            // retry without re-entering the card.
+                            self.monitoring.recordSubmitFailure(error)
+                            self.delegate?.secureFieldsDidFail(error)
+                        }
+                    }
                 case .failure(let error):
+                    self.isSubmitting = false
                     self.monitoring.recordSubmitFailure(error)
                     self.delegate?.secureFieldsDidFail(error)
                 }
             }
         }
+    }
+
+    /// The card is tokenized: the form has served its purpose, so reset it — fields, brand and
+    /// BIN state — or stale `detectedBrands` / `selectedBrand` / lengths bleed into the next
+    /// transaction. The result is built first so it still carries this transaction's brands.
+    /// A failure leaves the form alone.
+    private func finishTokenization(
+        response: TokenizationResponse,
+        detected: [CardBrand],
+        birthDate: String?,
+        network: CardBrand?,
+        threeDS: ThreeDSCoordinator.Preparation?
+    ) {
+        let tokenResult = TokenizationResult(
+            vaultFormToken: response.formToken,
+            bin: response.card?.bin,
+            lastFourDigits: response.card?.lastFourDigits,
+            detectedBrands: detected,
+            birthDate: birthDate,
+            selectedNetwork: network,
+            threeDSServerTransID: threeDS?.threeDSServerTransID,
+            sdk: threeDS?.sdk
+        )
+        clearFields()
+        delegate?.secureFieldsDidTokenize(tokenResult)
     }
 }

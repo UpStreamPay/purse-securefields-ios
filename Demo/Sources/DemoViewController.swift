@@ -51,6 +51,30 @@ final class DemoViewController: UIViewController {
         ("Any", nil), ("Visa", .visa), ("MC", .mastercard), ("Amex", .amex), ("CB", .carteBancaire),
     ]
 
+    /// Asks `submit()` for the Purse 3DS chain, then — with a merchant backend — plays the
+    /// advanced-flow payment and challenge (`DemoBackend`). Off by default, so the plain
+    /// tokenization stays one tap away.
+    lazy var threeDSSwitch: UISwitch = {
+        let control = UISwitch()
+        control.isOn = false
+        control.accessibilityIdentifier = "three_ds_switch"
+        return control
+    }()
+
+    /// The eligible `creditcard` PSPs, as the merchant backend listed them at launch.
+    lazy var pspControl: UISegmentedControl = {
+        let control = UISegmentedControl(items: DemoBackend.cardSolutions.map(\.partner))
+        control.selectedSegmentIndex = DemoBackend.selectedSolution
+        control.accessibilityIdentifier = "psp_control"
+        control.addTarget(self, action: #selector(pspChanged(_:)), for: .valueChanged)
+        return control
+    }()
+
+    @objc private func pspChanged(_ sender: UISegmentedControl) {
+        DemoBackend.selectedSolution = sender.selectedSegmentIndex
+        updateDebugPanel()
+    }
+
     lazy var brandControl: UISegmentedControl = {
         let control = UISegmentedControl(items: Self.demoBrands.map(\.title))
         control.selectedSegmentIndex = 0
@@ -114,24 +138,32 @@ final class DemoViewController: UIViewController {
                 holderName: "Name Surname"
             ),
             fields: fields,
-            apiKey: Self.monitoringApiKey
+            // The key also goes on the 3DS calls as `X-Api-Key`: the gateway wants one on
+            // challenge-result. Monitoring stays off unless `.env` names a key of its own.
+            apiKey: Self.monitoringApiKey ?? Self.gatewayAPIKey,
+            monitoringEnabled: Self.monitoringApiKey != nil,
+            appSDKConfiguration: Self.appSDKConfiguration
         ))
     }
+
+    /// The `data` of `GET /v2/entities/{entityId}/app-sdk-configuration`, loaded once at launch
+    /// by `SceneDelegate` — a static because the mode switch rebuilds this controller.
+    static var appSDKConfiguration: String?
+
+    /// The merchant's public API key, from the same backend. See `DemoBackend.gatewayAPIKey()`.
+    static var gatewayAPIKey: String?
 
     // Set via env vars when launching Xcode/xcodebuild, or a gitignored .env file loaded with
     // `source scripts/load-env.sh` (see Demo/Resources/Info.plist) — never commit real values
     // here. Falls back to a shared sandbox tenant when unset, so the demo still runs out of
     // the box.
     private static var tenantId: String {
-        let value = Bundle.main.object(forInfoDictionaryKey: "TENANT_ID") as? String
-        return value?.isEmpty == false ? value! : "61ff8a6a-edd5-4f40-aa32-8410a73e79ac"
+        // The Purse Vault tenant of the 3DS demo entity — `DemoBackend.entityId`'s default.
+        DemoBackend.setting("TENANT_ID") ?? "61ff8a6a-edd5-4f40-aa32-8410a73e79ac"
     }
 
     // Blank when unset, which leaves remote log monitoring disabled.
-    private static var monitoringApiKey: String? {
-        let value = Bundle.main.object(forInfoDictionaryKey: "MONITORING_API_KEY") as? String
-        return value?.isEmpty == false ? value : nil
-    }
+    private static var monitoringApiKey: String? { DemoBackend.setting("MONITORING_API_KEY") }
 
     // MARK: - UI
 
@@ -150,6 +182,29 @@ final class DemoViewController: UIViewController {
         config.baseBackgroundColor = .systemBlue
         let btn = UIButton(configuration: config)
         btn.isEnabled = false
+        return btn
+    }()
+
+    /// `authentication.challenge_data`. Filled in by the advanced flow when the issuer asks for a
+    /// challenge; paste one by hand to replay a challenge from a payment made elsewhere.
+    /// Base64url, unpadded, exactly as the API returned it.
+    lazy var challengeField: UITextField = {
+        let field = UITextField()
+        field.placeholder = "paste authentication.challenge_data"
+        field.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        field.autocapitalizationType = .none
+        field.autocorrectionType = .no
+        field.clearButtonMode = .whileEditing
+        field.accessibilityIdentifier = "challenge_field"
+        return field
+    }()
+
+    lazy var challengeButton: UIButton = {
+        var config = UIButton.Configuration.tinted()
+        config.title = "Run 3DS challenge"
+        config.baseBackgroundColor = .systemIndigo
+        let btn = UIButton(configuration: config)
+        btn.accessibilityIdentifier = "challenge_button"
         return btn
     }()
 
@@ -205,8 +260,10 @@ final class DemoViewController: UIViewController {
         manager.delegate = self
         setupLayout()
         updateFieldBorders()
+        updateDebugPanel()
         payButton.addTarget(self, action: #selector(payTapped), for: .touchUpInside)
         clearButton.addTarget(self, action: #selector(clearTapped), for: .touchUpInside)
+        challengeButton.addTarget(self, action: #selector(challengeTapped), for: .touchUpInside)
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(keyboardWillChange(_:)),
@@ -222,6 +279,13 @@ final class DemoViewController: UIViewController {
         let fields = manager.configuredFields.map { String(describing: $0) }.sorted().joined(separator: ", ")
         let cvvLengths = manager.expectedLengths(for: .cvv)
         let selected = manager.selectedBrand?.rawValue ?? "none"
+        let threeDS = manager.isThreeDSAvailable
+            ? "✓ provider linked" + (manager.threeDSWarnings.isEmpty
+                ? ""
+                : " · \(manager.threeDSWarnings.count) warning(s)")
+            : (PurseThreeDS.provider == nil ? "✗ no provider" : "✗ no app SDK configuration")
+        let psp = DemoBackend.cardSolution.map { "\($0.partner) · \($0.method)" }
+            ?? (DemoBackend.baseURL == nil ? "— no merchant backend" : "— no creditcard solution / backend unreachable")
         debugLabel.text = """
         Fields  \(fields)
         PAN     length=\(panLength)  valid=\(panValid ? "✓" : "✗")
@@ -229,6 +293,9 @@ final class DemoViewController: UIViewController {
         Expiry  valid=\(expiryValid ? "✓" : "✗")
         Brands  \(brands)
         Form    \(formValid ? "✓ ready" : "✗ incomplete")
+        3DS     \(threeDS)
+        PSP     \(psp)
+        Entity  \(DemoBackend.baseURL == nil ? "—" : DemoBackend.entityId)
         """
     }
 
@@ -238,7 +305,20 @@ final class DemoViewController: UIViewController {
         resultLabel.textColor = .secondaryLabel
         resultLabel.text = "Submitting…"
         payButton.isEnabled = false
-        manager.submit()
+        manager.submit(threeDSEnabled: threeDSSwitch.isOn)
+    }
+
+    @objc private func challengeTapped() {
+        let blob = (challengeField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !blob.isEmpty else {
+            resultLabel.textColor = .systemRed
+            resultLabel.text = "Paste challenge_data from the payment response first."
+            return
+        }
+        view.endEditing(true)
+        resultLabel.textColor = .secondaryLabel
+        resultLabel.text = "Running challenge…"
+        runChallenge(blob, paymentID: nil)
     }
 
     @objc private func clearTapped() {

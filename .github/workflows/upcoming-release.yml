@@ -45,7 +45,12 @@ jobs:
         run: |
           mkdir Binaries
           mv .build/PurseSecureFields.xcframework Binaries/
-          cat > Package.swift << 'EOF'
+          # The Netcetera binary target, copied from the source manifest — as release.yml does.
+          THREEDS_URL=$(grep -o 'https://nexus[^"]*ThreeDS_SDK.zip' Package.swift)
+          THREEDS_CHECKSUM=$(grep -A1 'ThreeDS_SDK.zip' Package.swift | grep -o '[0-9a-f]\{64\}')
+          test -n "$THREEDS_URL"
+          test -n "$THREEDS_CHECKSUM"
+          cat > Package.swift << EOF
           // swift-tools-version: 5.9
           import PackageDescription
 
@@ -53,10 +58,14 @@ jobs:
               name: "PurseSecureFields",
               platforms: [.iOS(.v15)],
               products: [
-                  .library(name: "PurseSecureFields", targets: ["PurseSecureFields"])
+                  .library(name: "PurseSecureFields", targets: ["PurseSecureFields"]),
+                  // Optional, Purse 3DS only: Sources/PurseSecureFields3DS stays in the commit.
+                  .library(name: "PurseSecureFields3DS", targets: ["PurseSecureFields3DS"])
               ],
               targets: [
-                  .binaryTarget(name: "PurseSecureFields", path: "Binaries/PurseSecureFields.xcframework")
+                  .binaryTarget(name: "PurseSecureFields", path: "Binaries/PurseSecureFields.xcframework"),
+                  .target(name: "PurseSecureFields3DS", dependencies: ["PurseSecureFields", "ThreeDS_SDK"]),
+                  .binaryTarget(name: "ThreeDS_SDK", url: "${THREEDS_URL}", checksum: "${THREEDS_CHECKSUM}")
               ]
           )
           EOF

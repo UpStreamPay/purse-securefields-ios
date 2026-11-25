@@ -100,6 +100,7 @@ class CheckoutViewController: UIViewController, SecureFieldsDelegate {
 | `requiresHolderName` | `Bool` | `false` | Whether the cardholder name gates form validity |
 | `apiKey` | `String?` | `nil` | Api key for remote log monitoring (Datadog). Monitoring silently disables itself when omitted |
 | `monitoringEnabled` | `Bool` | `true` | Opt-out for remote log monitoring |
+| `appSDKConfiguration` | `String?` | `nil` | Purse 3DS only: the opaque `data` of `GET /v2/entities/{entityId}/app-sdk-configuration`, fetched by your backend |
 
 ### Remote log monitoring
 
@@ -199,6 +200,26 @@ manager.submit(saveToken: true)   // save vault token for reuse
 manager.clearFields()             // reset all fields and BIN state
 ```
 
+### Purse 3DS
+
+```swift
+manager.submit(threeDSEnabled: true)   // tokenize, then version and build the EMVCo transaction
+manager.submitSavedCard(.session(walletTokenId: id, clientSessionId: sessionId)) { result in }
+manager.challenge(challengeData, presenting: self) { result in }
+manager.releaseThreeDS()               // after a frictionless verdict
+```
+
+Needs two things, or `manager.isThreeDSAvailable` is `false` and the three calls above fail:
+
+- the optional **`PurseSecureFields3DS`** product of this package, added to your app next to
+  `PurseSecureFields` (`.threeDS(.providerUnavailable)` without it);
+- **`SecureFieldsConfig(appSDKConfiguration:)`** — the opaque `data` your backend reads from
+  `GET /v2/entities/{entityId}/app-sdk-configuration` (`.threeDS(.configurationMissing)` without
+  it). It carries the 3DS SDK's API key: fetch it at startup, keep it in memory, never persist it.
+
+Full walkthrough:
+[Purse 3DS](docs/integration/api-reference.md#purse-3ds).
+
 ## Delegate
 
 ```swift
@@ -264,9 +285,13 @@ PAN length and CVV length are driven by the BIN lookup API response — not hard
 ```swift
 public struct TokenizationResult {
     public let vaultFormToken: String
-    public let bin: String
-    public let lastFourDigits: String
+    public let bin: String?
+    public let lastFourDigits: String?
     public let detectedBrands: [CardBrand]
+    public let birthDate: String?            // Oney only
+    public let selectedNetwork: CardBrand?
+    public let threeDSServerTransID: String? // Purse 3DS only
+    public let sdk: ThreeDSSDKBlock?         // Purse 3DS only
 }
 ```
 

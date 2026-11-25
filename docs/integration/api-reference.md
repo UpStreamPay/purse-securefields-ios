@@ -17,6 +17,7 @@ Module: `PurseSecureFields`
 - [SecureField](#securefield)
 - [CardBrand](#cardbrand)
 - [TokenizationResult](#tokenizationresult)
+- [Purse 3DS](#purse-3ds)
 - [SecureFieldsError](#securefieldsError)
 
 ---
@@ -105,8 +106,15 @@ valid, never focused and has no content.
 ```swift
 // Validates all fields and initiates tokenization.
 // Fires secureFieldsDidTokenize or secureFieldsDidFail on the delegate.
-public func submit(selectedNetwork: CardBrand? = nil, saveToken: Bool = false)
+public func submit(
+    selectedNetwork: CardBrand? = nil,
+    saveToken: Bool = false,
+    threeDSEnabled: Bool = false
+)
 ```
+
+`threeDSEnabled` chains [Purse 3DS](#purse-3ds) onto the tokenization. Left `false`, this is the
+call it has always been.
 
 Calling `submit()` while any required field is invalid is safe — it fires
 `secureFieldsDidFail(.fieldsIncomplete)` without making a network request.
@@ -183,7 +191,8 @@ public struct SecureFieldsConfig {
         requiresHolderName: Bool = false,
         pinnedPublicKeyHashes: [String] = [],
         apiKey: String? = nil,
-        monitoringEnabled: Bool = true
+        monitoringEnabled: Bool = true,
+        appSDKConfiguration: String? = nil
     )
 }
 ```
@@ -201,6 +210,7 @@ public struct SecureFieldsConfig {
 | `pinnedPublicKeyHashes` | No | SHA-256 SPKI hashes (Base64) for certificate pinning |
 | `apiKey` | No | Api key for remote log monitoring (Datadog). Monitoring silently disables itself when omitted — see [Remote log monitoring](#remote-log-monitoring) |
 | `monitoringEnabled` | No | Opt-out for remote log monitoring (default `true`) |
+| `appSDKConfiguration` | Purse 3DS only | The opaque `data` your backend reads from `GET /v2/entities/{entityId}/app-sdk-configuration`. Holds a secret — see [Purse 3DS](#purse-3ds) |
 
 **Preconditions** (crash at init time if violated):
 - `tenantId` must not be blank
@@ -543,6 +553,8 @@ public struct TokenizationResult {
     public let detectedBrands: [CardBrand]  // empty on a CVV-only form
     public let birthDate: String?        // Oney only — "yyyy-MM-dd"
     public let selectedNetwork: CardBrand?  // the network submitted as `selected_network`. nil on a CVV-only form
+    public let threeDSServerTransID: String?  // Purse 3DS only — see below
+    public let sdk: ThreeDSSDKBlock?          // Purse 3DS only — see below
 }
 ```
 
@@ -553,10 +565,166 @@ public struct TokenizationResult {
 stored a cryptogram against a card it already knows and echoes no card block. Matches
 `SubmitResult.Success.card == null` on Android.
 
+`threeDSServerTransID` and `sdk` are non-nil exactly after a successful
+`submit(threeDSEnabled: true)` on a form with a PAN field — see [Purse 3DS](#purse-3ds).
+
 `birthDate` and `selectedNetwork` are reflected from the SDK's own state, not from the response:
 the birth date never reaches the gateway, and the submitted network is not echoed back, so this
 result is the only place either can be read. Matches `SubmitResult.Success` on Android and
 `birth_date` on web.
+
+---
+
+## Purse 3DS
+
+3D Secure for native apps, through Purse's own 3DS server (Netcetera). There is **no iframe and
+no 3DS Method**: the 3DS SDK collects the device data at init, `submit(threeDSEnabled: true)`
+versions the card and builds the EMVCo transaction locally, and a challenge is drawn natively by
+the 3DS SDK.
+
+The backend contract is `doc/3DS/13-3DS-app-sdk-integration.md` in `UpStreamPay/orchestration-api`.
+
+### What Purse 3DS needs
+
+**1. The `PurseSecureFields3DS` product.** The Netcetera 3DS Mobile SDK is not part of
+`PurseSecureFields`: it sits behind `ThreeDSProvider`, in the optional `PurseSecureFields3DS`
+product of the same package. Add that product to your app target next to `PurseSecureFields` and
+the SDK finds it at runtime — nothing to register. It needs Xcode 26.4 or later. An app that does
+not use Purse 3DS leaves it out and links no Netcetera code.
+
+**2. The app SDK configuration.** The 3DS SDK needs an API key, and that key is in no artifact:
+your **backend** reads it, with the OAuth2 token it already uses for `POST /v2/payments`, from
+
+```
+GET /v2/entities/{entityId}/app-sdk-configuration   →   { "data": "<base64>" }
+```
+
+and hands `data` to your app, which passes it to Secure Fields untouched:
+
+```swift
+let config = SecureFieldsConfig(
+    tenantId: tenantId,
+    environment: .production,
+    appSDKConfiguration: data   // opaque — do not decode, do not build it yourself
+)
+```
+
+`data` holds a secret. Fetch it at app startup, keep it in memory only (your backend may cache
+the answer for the `max-age` of its `Cache-Control`), never persist it, never log it. A key
+rotation is then a Purse-side change: no app release.
+
+**3. Your public API key** as `SecureFieldsConfig(apiKey:)`. The 3DS calls carry it as an
+`X-Api-Key` header, and Purse's API gateway refuses the challenge outcome call without it: the
+challenge then ends on `.threeDS(.challengeResultFailed(statusCode: 401, …))`. The payment itself
+is not affected — confirm it server-side, as always.
+
+The endpoint serves the **advanced flow**. A session-flow (Headless Checkout) delivery of the
+key does not exist yet, so native Purse 3DS is advanced-flow only for now.
+
+Without the product, `isThreeDSAvailable` is `false` and every 3DS call fails with
+`.threeDS(.providerUnavailable)`; without a usable `appSDKConfiguration`, with
+`.threeDS(.configurationMissing)`. The rest of the SDK is unaffected either way.
+
+```swift
+if manager.isThreeDSAvailable {
+    manager.submit(threeDSEnabled: true)
+}
+```
+
+### Fresh card
+
+```swift
+manager.submit(threeDSEnabled: true)
+// → secureFieldsDidTokenize(result)
+//   result.vaultFormToken       — as today
+//   result.threeDSServerTransID — correlates every later 3DS step
+//   result.sdk                  — the EMVCo `sdk` block, Encodable
+```
+
+Send the three to your backend over your own channel. The `sdk` block replaces the web `browser`
+block: `partner_data.sdk` on a session `validate`, a top-level `sdk` on `POST /v2/payments`.
+Encode it verbatim — `JSONEncoder().encode(result.sdk)` is the whole hand-off.
+
+A failure after the card was tokenized arrives as `secureFieldsDidFail(.threeDS(_:))` and the
+fields are **kept**, so the cardholder can retry without re-entering the card. A retry is a new
+`submit()`: a `three_ds_server_trans_id` is consumed by the first payment call that records a
+verdict.
+
+A **CVV-only** form never versions — it has no card of its own. Use `submitSavedCard(_:)` for the
+saved card, and the CVV-only form beside it when the token needs a CVV.
+
+### Saved card
+
+```swift
+// Session flow
+manager.submitSavedCard(.session(walletTokenId: token.id, clientSessionId: sessionId)) { result in
+    switch result {
+    case .success(let saved):
+        // saved.threeDSServerTransID, saved.sdk
+    case .failure(.threeDS(.cardNotEligible)):
+        // "not eligible" — show the card fields instead. Do not retry.
+    case .failure(let error):
+        // technical failure
+    }
+}
+
+// Advanced flow, on the card's network token
+manager.submitSavedCard(
+    .advanced(walletTokenId: token.id, entityId: entityId, customerReference: "cust-42"),
+    networkToken: true,
+    amount: 11500,      // minor units — the split amount must equal it
+    currency: "EUR"
+) { result in /* result.networkTokenUsed == false means the FPAN fallback happened */ }
+```
+
+No card form, no tokenization. `walletTokenId` is the oneWallet token `id` (a UUID), never its
+`value`. `amount` and `currency` are advanced-flow only; the session flow takes them from the
+session.
+
+### Challenge
+
+A Purse 3DS `C` has **no redirect**: the payment answer carries
+`authentication.status == "IN_PROGRESS"` and an `authentication.challenge_data` blob. Pass that
+blob verbatim.
+
+```swift
+manager.challenge(challengeData, presenting: self) { result in
+    switch result {
+    case .success(let challenge):
+        switch challenge.result {
+        case .settled:  // challenge.authorizationStatus is the payment as it stands
+        case .pending:  // a normal ending — hand over to your backend, do not loop
+        case .rejected: // the payment still settles on its own
+        }
+    case .failure(let error):
+        break
+    }
+}
+```
+
+The 3DS SDK draws every screen over the view controller you pass; Secure Fields renders nothing.
+The timeout is 5 minutes, the value Purse announces to the issuer.
+
+The outcome is **the server's**, read back once the challenge ends — never the device-side
+callback, which only ever says "the challenge is over". Your backend's truth is still
+`GET /v2/payments/{id}` or the payment webhook: everything that transited the device is
+untrusted.
+
+### Releasing the 3DS resources
+
+`challenge(_:presenting:)` releases them itself. On a **frictionless** verdict — a `Y` / `A`, or
+a refusal — nothing tells Secure Fields the payment is over, so call it yourself:
+
+```swift
+manager.releaseThreeDS()
+```
+
+A transaction left open is the usual cause of a failure on the next one.
+
+### `threeDSWarnings`
+
+Device integrity warnings raised by the 3DS SDK, empty until it has initialized. The SDK enforces
+no policy on them: refusing, flagging or ignoring a HIGH severity is your decision.
 
 ---
 
@@ -579,5 +747,40 @@ public enum SecureFieldsError: Error {
 
     /// Response was received but could not be decoded.
     case invalidResponse
+
+    /// The Purse 3DS chain failed. Only ever raised on a call that asked for 3DS.
+    /// See [Purse 3DS](#purse-3ds).
+    case threeDS(ThreeDSError)
+}
+
+public enum ThreeDSError: Error, Equatable {
+    /// The `PurseSecureFields3DS` product is not linked.
+    case providerUnavailable
+    /// `SecureFieldsConfig.appSDKConfiguration` is absent, unreadable or carries no 3DS key.
+    case configurationMissing
+    /// The 3DS SDK failed to initialize, at init and again on the submit retry.
+    case initializationFailed(String)
+    /// 422 `card-not-versionable`. On a saved card this is the "not eligible" answer — show the
+    /// card fields instead. Do not retry.
+    case cardNotEligible
+    /// 422 `not-configured`: a configuration problem on Purse's side. Do not retry.
+    case notConfigured
+    /// Any other versioning refusal, with the RFC 7807 `type` when the body carried one.
+    case versioningFailed(statusCode: Int, type: String?)
+    /// The gateway refused POST /v2/3ds/challenge-result — 401: no or unknown `apiKey`.
+    case challengeResultFailed(statusCode: Int, type: String?)
+    /// A 3DS call never got a usable answer (network, timeout, unreadable body).
+    case networkError
+    /// `createTransaction` or `doChallenge` threw.
+    case transactionFailed(String)
+    /// The 3DS SDK's ephemeral public key was not a JWK object.
+    case invalidEphemeralKey
+    /// The `challenge_data` blob was not an app (`deviceChannel: "01"`) challenge, or did not
+    /// match the live transaction.
+    case invalidChallengeData
+    /// `challenge()` was called with no live transaction.
+    case noActiveTransaction
+    /// `challenge()` was called while a challenge is already on screen.
+    case challengeInProgress
 }
 ```

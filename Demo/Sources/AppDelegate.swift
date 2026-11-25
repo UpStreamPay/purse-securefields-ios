@@ -1,9 +1,10 @@
 import UIKit
 
+/// The window is built by `SceneDelegate`, not here: iOS 26 traps an app that declares a
+/// `UIApplicationSceneManifest` and still creates its window from the app delegate. This one only
+/// wires up the UI-test mocks, which must be in place before the scene connects.
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
-
-    var window: UIWindow?
 
     func application(
         _ application: UIApplication,
@@ -12,10 +13,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         #if DEBUG
         configureMockIfUITesting()
         #endif
-        let window = UIWindow(frame: UIScreen.main.bounds)
-        window.rootViewController = UINavigationController(rootViewController: DemoViewController())
-        window.makeKeyAndVisible()
-        self.window = window
         return true
     }
 
