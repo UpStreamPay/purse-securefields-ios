@@ -72,7 +72,9 @@ let package = Package(
         .iOS(.v15)
     ],
     products: [
-        .library(name: "PurseSecureFields", type: .dynamic, targets: ["PurseSecureFields"])
+        .library(name: "PurseSecureFields", type: .dynamic, targets: ["PurseSecureFields"]),
+        // Optional, Purse 3DS only — see AGENTS.md, "Purse 3DS".
+        .library(name: "PurseSecureFields3DS", targets: ["PurseSecureFields3DS"])
     ],
     targets: [
         .target(
@@ -142,12 +144,20 @@ Demo/
 ├── Resources/
 │   └── Info.plist
 └── Sources/
-    ├── AppDelegate.swift
+    ├── AppDelegate.swift                ← UI-test mock wiring only
+    ├── SceneDelegate.swift              ← the window (UIScene lifecycle)
     ├── DemoViewController.swift         ← SecureFieldsManager init + layout
     ├── DemoViewController+Layout.swift  ← UIStackView layout
     ├── DemoViewController+Delegate.swift ← SecureFieldsDelegate conformance
     └── MockURLProtocol.swift            ← URLProtocol stub for UI tests
 ```
+
+The window is built in `SceneDelegate.scene(_:willConnectTo:options:)`, with the matching
+`UISceneConfigurations` entry in `Info.plist`. Do not move it back onto `AppDelegate`: iOS 26
+traps an app that declares a `UIApplicationSceneManifest` and still creates its window from
+`application(_:didFinishLaunchingWithOptions:)`, and the app then dies at launch
+(`_UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption`, `EXC_BREAKPOINT`) — every UI
+test reports "com.purse.securefields.demo crashed" with no other clue.
 
 The demo uses a `--uitesting` launch argument in UI tests to inject a `MockURLProtocol` session,
 allowing the tokenization and BIN lookup endpoints to return fixed responses without a real network.

@@ -40,14 +40,14 @@ final class StubGatewayURLProtocol: URLProtocol {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
-        let tenantId = Self.tenantId(from: request.url)
         let body = Self.drainBody(of: request)
 
         Self.lock.lock()
-        if let tenantId {
-            Self.captured[tenantId, default: []].append((request, body))
+        let key = Self.tenantId(from: request.url) ?? Self.routingKey(from: body)
+        if let key {
+            Self.captured[key, default: []].append((request, body))
         }
-        let handler = tenantId.flatMap { Self.handlers[$0] }
+        let handler = key.flatMap { Self.handlers[$0] }
         Self.lock.unlock()
 
         guard let handler else {
@@ -74,6 +74,22 @@ final class StubGatewayURLProtocol: URLProtocol {
               let index = components.firstIndex(of: "tenants"),
               components.indices.contains(index + 1) else { return nil }
         return components[index + 1]
+    }
+
+    /// The 3DS endpoints carry no tenant in their path (`/payment/v2/3ds/...`), so the routing
+    /// key comes from the body instead — whichever of these identifiers the shape carries. Each
+    /// test still registers under a value unique to it, so suites stay parallel-safe.
+    private static let bodyKeys = [
+        "tenant_id", "wallet_token_id", "three_ds_server_trans_id",
+    ]
+
+    private static func routingKey(from body: Data?) -> String? {
+        guard let body,
+              let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else { return nil }
+        for key in bodyKeys {
+            if let value = json[key] as? String, handlers[value] != nil { return value }
+        }
+        return nil
     }
 
     /// URLSession hands the body to protocols as a stream, never as `httpBody`.

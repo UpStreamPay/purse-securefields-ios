@@ -25,13 +25,28 @@ public struct TokenizationResult {
     /// which submits no network at all.
     public let selectedNetwork: CardBrand?
 
+    /// The 3DS transaction id every later step correlates on. Non-nil only after
+    /// `submit(threeDSEnabled: true)` on a form with a PAN field; `nil` otherwise.
+    ///
+    /// Session flow: the Headless Checkout card plugin sends it as
+    /// `payment_data.three_ds_server_trans_id` on `validate`. Advanced flow: the app forwards it
+    /// to its backend for `split[].three_ds_server_trans_id` on `POST /v2/payments`.
+    public let threeDSServerTransID: String?
+
+    /// The EMVCo `sdk` block, to be sent **verbatim** in place of the web `browser` block —
+    /// `partner_data.sdk` on `validate`, top-level `sdk` on `POST /v2/payments`. Non-nil exactly
+    /// when `threeDSServerTransID` is.
+    public let sdk: ThreeDSSDKBlock?
+
     public init(
         vaultFormToken: String,
         bin: String?,
         lastFourDigits: String?,
         detectedBrands: [CardBrand],
         birthDate: String? = nil,
-        selectedNetwork: CardBrand? = nil
+        selectedNetwork: CardBrand? = nil,
+        threeDSServerTransID: String? = nil,
+        sdk: ThreeDSSDKBlock? = nil
     ) {
         self.vaultFormToken = vaultFormToken
         self.bin = bin
@@ -39,5 +54,7 @@ public struct TokenizationResult {
         self.detectedBrands = detectedBrands
         self.birthDate = birthDate
         self.selectedNetwork = selectedNetwork
+        self.threeDSServerTransID = threeDSServerTransID
+        self.sdk = sdk
     }
 }

@@ -7,10 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		3C1B95BD2FD181C000E5108E /* PurseSecureFields in Frameworks */ = {isa = PBXBuildFile; productRef = 3C1B95BC2FD181C000E5108E /* PurseSecureFields */; };
-		3C1B95BE2FD181C000E5108E /* PurseSecureFields.framework in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 3C1B95BC2FD181C000E5108E /* PurseSecureFields */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		AA00000000000000000061 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000060 /* Assets.xcassets */; };
 		AA00000000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000002 /* AppDelegate.swift */; };
+		AA00000000000000000070 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000071 /* SceneDelegate.swift */; };
+		AA00000000000000000077 /* DemoBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000078 /* DemoBackend.swift */; };
+		AA00000000000000000076 /* PurseSecureFields3DS in Frameworks */ = {isa = PBXBuildFile; productRef = AA00000000000000000075 /* PurseSecureFields3DS */; };
 		AA00000000000000000003 /* DemoViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000004 /* DemoViewController.swift */; };
 		AA0000000000000000002B /* DemoViewController+Layout.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000002A /* DemoViewController+Layout.swift */; };
 		AA0000000000000000002D /* DemoViewController+Delegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000002C /* DemoViewController+Delegate.swift */; };
@@ -20,6 +21,8 @@
 
 /* Begin PBXFileReference section */
 		AA00000000000000000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		AA00000000000000000071 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
+		AA00000000000000000078 /* DemoBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoBackend.swift; sourceTree = "<group>"; };
 		AA00000000000000000004 /* DemoViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoViewController.swift; sourceTree = "<group>"; };
 		AA0000000000000000000A /* Demo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Demo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000000000000000000B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -36,7 +39,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3C1B95BD2FD181C000E5108E /* PurseSecureFields in Frameworks */,
+				AA00000000000000000076 /* PurseSecureFields3DS in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -56,7 +59,6 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				3C1B95BE2FD181C000E5108E /* PurseSecureFields.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -87,6 +89,8 @@
 			isa = PBXGroup;
 			children = (
 				AA00000000000000000002 /* AppDelegate.swift */,
+				AA00000000000000000071 /* SceneDelegate.swift */,
+				AA00000000000000000078 /* DemoBackend.swift */,
 				AA00000000000000000004 /* DemoViewController.swift */,
 				AA0000000000000000002A /* DemoViewController+Layout.swift */,
 				AA0000000000000000002C /* DemoViewController+Delegate.swift */,
@@ -130,7 +134,7 @@
 			);
 			name = Demo;
 			packageProductDependencies = (
-				3C1B95BC2FD181C000E5108E /* PurseSecureFields */,
+				AA00000000000000000075 /* PurseSecureFields3DS */,
 			);
 			productName = Demo;
 			productReference = AA0000000000000000000A /* Demo.app */;
@@ -231,6 +235,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA00000000000000000001 /* AppDelegate.swift in Sources */,
+				AA00000000000000000070 /* SceneDelegate.swift in Sources */,
+				AA00000000000000000077 /* DemoBackend.swift in Sources */,
 				AA00000000000000000003 /* DemoViewController.swift in Sources */,
 				AA0000000000000000002B /* DemoViewController+Layout.swift in Sources */,
 				AA0000000000000000002D /* DemoViewController+Delegate.swift in Sources */,
@@ -406,10 +412,10 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		3C1B95BC2FD181C000E5108E /* PurseSecureFields */ = {
+		AA00000000000000000075 /* PurseSecureFields3DS */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 3C1B95BB2FD181C000E5108E /* XCLocalSwiftPackageReference ".." */;
-			productName = PurseSecureFields;
+			productName = PurseSecureFields3DS;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

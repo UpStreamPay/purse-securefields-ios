@@ -36,7 +36,22 @@ extension DemoViewController {
             stackView.setCustomSpacing(24, after: modeControl)
         }
 
+        // Only on a form with a PAN: a CVV-only form never versions — `submitSavedCard(_:)` does.
         if fields.contains(.pan) {
+            let threeDSRow = UIStackView(arrangedSubviews: [sectionLabel("Purse 3DS"), threeDSSwitch])
+            threeDSRow.axis = .horizontal
+            threeDSRow.spacing = 12
+            threeDSRow.alignment = .center
+            stackView.addArrangedSubview(threeDSRow)
+            // Only once the backend has listed something to choose from.
+            if !DemoBackend.cardSolutions.isEmpty {
+                stackView.addArrangedSubview(sectionLabel("PSP"))
+                stackView.addArrangedSubview(pspControl)
+                stackView.setCustomSpacing(24, after: pspControl)
+            } else {
+                stackView.setCustomSpacing(24, after: threeDSRow)
+            }
+
             stackView.addArrangedSubview(sectionLabel("Card Number"))
             stackView.addArrangedSubview(manager.panContainer)
         }
@@ -118,6 +133,14 @@ extension DemoViewController {
         cvvSectionLabel.accessibilityIdentifier = "cvv_label"
 
         stackView.addArrangedSubview(divider())
+        // Only with a PAN: the challenge needs the transaction `submit(threeDSEnabled:)` opened.
+        if fields.contains(.pan) {
+            stackView.addArrangedSubview(sectionLabel("3DS challenge"))
+            stackView.addArrangedSubview(secureViewContainer(challengeField))
+            stackView.addArrangedSubview(challengeButton)
+            stackView.setCustomSpacing(24, after: challengeButton)
+            stackView.addArrangedSubview(divider())
+        }
         stackView.addArrangedSubview(sectionLabel("Result"))
         stackView.addArrangedSubview(resultLabel)
     }

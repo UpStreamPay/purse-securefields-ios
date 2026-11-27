@@ -121,6 +121,27 @@ final class MonitoringCoordinator {
         case .networkError: return "NETWORK_ERROR"
         case .apiError(_, let statusCode): return String(statusCode)
         case .invalidResponse: return "INVALID_RESPONSE"
+        // The case name only — a `ThreeDSError` can carry provider or gateway text in its
+        // associated values, and none of it belongs in a log payload.
+        case .threeDS(let threeDSError): return Self.threeDSCode(for: threeDSError)
+        }
+    }
+
+    private static func threeDSCode(for error: ThreeDSError) -> String {
+        switch error {
+        case .providerUnavailable: return "THREEDS_PROVIDER_UNAVAILABLE"
+        case .configurationMissing: return "THREEDS_CONFIGURATION_MISSING"
+        case .initializationFailed: return "THREEDS_INIT_FAILED"
+        case .cardNotEligible: return "THREEDS_CARD_NOT_ELIGIBLE"
+        case .notConfigured: return "THREEDS_NOT_CONFIGURED"
+        case .versioningFailed(let statusCode, _): return "THREEDS_VERSIONING_\(statusCode)"
+        case .challengeResultFailed(let statusCode, _): return "THREEDS_CHALLENGE_RESULT_\(statusCode)"
+        case .transactionFailed: return "THREEDS_TRANSACTION_FAILED"
+        case .invalidEphemeralKey: return "THREEDS_INVALID_EPHEMERAL_KEY"
+        case .invalidChallengeData: return "THREEDS_INVALID_CHALLENGE_DATA"
+        case .noActiveTransaction: return "THREEDS_NO_ACTIVE_TRANSACTION"
+        case .challengeInProgress: return "THREEDS_CHALLENGE_IN_PROGRESS"
+        case .networkError: return "THREEDS_NETWORK_ERROR"
         }
     }
 }

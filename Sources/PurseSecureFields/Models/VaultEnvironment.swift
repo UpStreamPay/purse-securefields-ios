@@ -28,6 +28,19 @@ public enum VaultEnvironment: String {
         }
     }
 
+    /// The Orchestration API of the environment — a different host from the Vault one, and the
+    /// one the two Purse 3DS calls go to (`/3ds/versioning`, `/3ds/challenge-result`), under the
+    /// `/payment/v2` prefix. Production is `purse-live.com`, **not** the `purse-secure.com` of the
+    /// other two roots: that host serves no Orchestration (it does not even resolve). Same
+    /// values as the web SDK's `ORCHESTRATION_API_ROOTS`.
+    var orchestrationApiRoot: String {
+        switch self {
+        case .test: return "https://api.purse-test.com/payment/v2"
+        case .sandbox: return "https://api.purse-sandbox.com/payment/v2"
+        case .production: return "https://api.purse-live.com/payment/v2"
+        }
+    }
+
     var monitoringApiRoot: String {
         switch self {
         case .test: return "https://api.purse-test.com"

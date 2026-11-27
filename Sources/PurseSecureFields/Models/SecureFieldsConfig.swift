@@ -229,8 +229,10 @@ public struct SecureFieldsConfig {
     /// ```
     public let pinnedPublicKeyHashes: [String]
 
-    /// Api key used to authenticate remote log monitoring.
-    /// Monitoring silently disables itself when omitted.
+    /// Your public Purse API key. Authenticates remote log monitoring (which silently disables
+    /// itself when this is omitted) and goes, as an `X-Api-Key` header, on the Purse 3DS calls —
+    /// Purse's API gateway refuses `POST /v2/3ds/challenge-result` without one, so **set it when
+    /// you use Purse 3DS**.
     public let apiKey: String?
 
     /// Opt-out for remote log monitoring. Defaults to enabled. Events are sent as they happen —
@@ -238,7 +240,19 @@ public struct SecureFieldsConfig {
     /// `RemoteLogger`.
     public let monitoringEnabled: Bool
 
-    /// Substitutes the `URLSession` used for BIN lookup and tokenization.
+    /// The app SDK configuration, **required for Purse 3DS** and unused otherwise.
+    ///
+    /// Pass the `data` string your backend reads from
+    /// `GET /v2/entities/{entityId}/app-sdk-configuration`, exactly as received: it is opaque.
+    /// The endpoint takes your OAuth2 token, so the app cannot call it itself.
+    ///
+    /// It holds a secret (the 3DS SDK's API key). Fetch it at app startup, keep it in memory
+    /// only, never persist it and never log it. Without it `submit(threeDSEnabled: true)`,
+    /// `submitSavedCard(_:)` and `challenge(_:presenting:)` fail with
+    /// `.threeDS(.configurationMissing)`.
+    public let appSDKConfiguration: String?
+
+    /// Substitutes the `URLSession` used for BIN lookup, tokenization and the two Purse 3DS calls.
     ///
     /// **Tests only.** A session set here bypasses certificate pinning entirely, so it is honoured
     /// only on a development host (the simulator, or a build whose provisioning profile carries
@@ -263,7 +277,8 @@ public struct SecureFieldsConfig {
         requiresHolderName: Bool = false,
         pinnedPublicKeyHashes: [String] = [],
         apiKey: String? = nil,
-        monitoringEnabled: Bool = true
+        monitoringEnabled: Bool = true,
+        appSDKConfiguration: String? = nil
     ) {
         precondition(!tenantId.trimmingCharacters(in: .whitespaces).isEmpty, "SecureFields: tenantId must not be empty")
         self.tenantId = tenantId
@@ -277,5 +292,6 @@ public struct SecureFieldsConfig {
         self.pinnedPublicKeyHashes = pinnedPublicKeyHashes
         self.apiKey = apiKey
         self.monitoringEnabled = monitoringEnabled
+        self.appSDKConfiguration = appSDKConfiguration
     }
 }

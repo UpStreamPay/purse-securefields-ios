@@ -235,7 +235,9 @@ final class VaultAPIClient {
     }
 }
 
-private extension URLSessionConfiguration {
+extension URLSessionConfiguration {
+    /// Ephemeral, no cache, no cookies — every SDK session uses it (`VaultAPIClient`,
+    /// `ThreeDSAPIClient`).
     static var pciSecure: URLSessionConfiguration {
         let config = URLSessionConfiguration.ephemeral
         config.urlCache = nil
